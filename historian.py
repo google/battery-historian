@@ -17,9 +17,10 @@
 # TO USE: (see also usage() below)
 # adb shell dumpsys batterystats --enable full-wake-history
 # adb shell dumpsys batterystats --reset
-# (optionally start monsoon/power monitor logging:
+# optionally start monsoon/power monitor logging:
+#   if device/host clocks are not synced, run historian.py -v
 #   cts/tools/utils/monsoon.py --serialno 2294 --hz 1 --samples 100000 \
-#   -timestamp | tee monsoon.out)
+#   -timestamp | tee monsoon.out
 # ...let device run a while...
 # stop monsoon.py
 # collect bugreport
@@ -35,20 +36,43 @@ import subprocess
 import sys
 import time
 
-HISTORY_END_STRING = "Per-PID"
 POWER_DATA_FILE_TIME_OFFSET = 0  # deal with any clock mismatch.
 BLAME_CATEGORY = "wake_lock_in"  # category to assign power blame to.
 ROWS_TO_SUMMARIZE = ["wake_lock", "running"]  # -s: summarize these rows
+HISTORY_END_STRING = "Per-PID"
 
 getopt_debug = 0
 getopt_bill_extra_secs = 0
 getopt_power_quanta = 15        # slice monsoon data this many seconds,
                                 # to avoid crashing visualizer
 getopt_power_data_file = False
+getopt_proc_name = ""
 getopt_show_all_wakelocks = False
 getopt_sort_by_power = True
 getopt_summarize_pct = -1
-getopt_proc_name = ""
+
+
+def usage():
+  """Print usage of the script."""
+  print "\nUsage: %s [OPTIONS] [FILE]\n" % sys.argv[0]
+  print "  -a: show all wakelocks (don't abbreviate system wakelocks)"
+  print "  -d: debug mode, output debugging info for this program"
+  print ("  -e TIME: extend billing an extra TIME seconds after each\n"
+         "     wakelock, or until the next wakelock is seen.  Useful for\n"
+         "     accounting for modem power overhead.")
+  print "  -h: print this message."
+  print ("  -n PROC: output another row containing only wakelocks from\n"
+         "     processes whose name matches PROC.")
+  print ("  -p FILE: analyze FILE containing power data.  Format per\n"
+         "     line: <timestamp in epoch seconds> <amps>")
+  print ("  -q TIME: quantize data on power row in buckets of TIME\n"
+         "     seconds (default %d)" % getopt_power_quanta)
+  print ("  -s PCT: summarize certain useful rows with additional rows\n"
+         "     showing percent time spent over PCT% in each.")
+  print "  -t: sort power report by wakelock duration instead of charge"
+  print "  -v: synchronize device time before collecting power data"
+  print "\n"
+  sys.exit(1)
 
 
 def parse_time(s, fmt):
@@ -75,12 +99,13 @@ def time_float_to_human(t):
 
 
 def abbrev_timestr(s):
+  """Chop milliseconds off of a time string, if present."""
   arr = s.split("s")
   if len(arr) < 3: return "0s"
   return arr[0]+"s"
 
 
-def str_to_jsdate(t):
+def timestr_to_jsdate(t):
   lt = time.localtime(t)
   return time.strftime("new Date(%y,%m,%d,%H,%M,%S)", lt)
 
@@ -99,6 +124,14 @@ def get_quoted_region(e):
 def get_after_equal(e):
   e = e.split("=")[1]
   return e
+
+
+def get_wifi_suppl_state(e):
+  try:
+    e = get_after_equal(e)
+    return e.split("(")[0]
+  except IndexError:
+    return ""
 
 
 def get_event_subcat(cat, e):
@@ -168,49 +201,35 @@ def apply_fn_over_range(fn, start_time, end_time, arglist):
   return results
 
 
-class AttrSum(object):
-  """Summary data of BLAME_CATEGORY instance used for power accounting."""
+def space_escape(match):
+  value = match.group()
+  p = re.compile(r"\s+")
+  return p.sub("_", value)
 
-  def __init__(self):
-    self.name = ""
-    self.mah = 0
-    self.timestr = ""
-    self._duration_list = []
 
-  def add(self, name, duration, mah, t):
-    self.name = name
-    self._duration_list.append(duration)
-    self.mah += mah
-    if not self.timestr:
-      self.timestr = time_float_to_human(t)
+def parse_reset_time(line):
+  line = line.strip()
+  line = line.split("RESET:TIME: ", 1)[1]
+  st = time.strptime(line, "%Y-%m-%d-%H-%M-%S")
+  return time.mktime(st)
 
-  def get_count(self):
-    return len(self._duration_list)
 
-  def get_median_duration(self):
-    return sorted(self._duration_list)[int(self.get_count() / 2)]
+def is_file_legacy_mode(input_file):
+  """Autodetect legacy (K and earlier) format."""
+  detection_on = False
+  for line in fileinput.input(input_file):
+    if not detection_on and "Battery History" in line:
+      detection_on = True
+    if not detection_on:
+      continue
 
-  def get_total_duration(self):
-    return sum(self._duration_list)
+    line_time = line.split()[0]
+    if "+" not in line_time and "-" not in line_time:
+      continue
 
-  def to_str(self, total_mah, show_power):
-    """Returns a summary string."""
-    if total_mah:
-      pct = self.mah * 100 / total_mah
-    else:
-      pct = 0
-    avg = self.get_total_duration() / self.get_count()
-
-    ret = ""
-    if show_power:
-      ret += "%.3f mAh (%.1f%%), " % (self.mah, pct)
-    ret += "%3s events, " % str(self.get_count())
-    ret += "%6.3fs total " % self.get_total_duration()
-    ret += "%6.3fs avg " % avg
-    ret += "%6.3fs median: " % self.get_median_duration()
-    ret += self.name
-    ret += " (first at %s)" % self.timestr
-    return ret
+    fileinput.close()
+    return line_time[0] == "-"
+  return False
 
 
 def is_emit_event(e):
@@ -225,8 +244,8 @@ def is_proc_event(e):
   return e.startswith("+proc")
 
 
-# returns a multidimensional dict
 def autovivify():
+  """Returns a multidimensional dict."""
   return collections.defaultdict(autovivify)
 
 
@@ -246,6 +265,49 @@ def add_emit_event(emit_dict, cat, name, start, end):
     emit_dict[cat].append(newevent)
   else:
     emit_dict[cat] = [newevent]
+
+
+def sync_time():
+  subprocess.call(["adb", "root"])
+  subprocess.call(["sleep", "3"])
+  start_time = int(time.time())
+  while int(time.time()) == start_time:
+    pass
+  curr_time = time.strftime("%Y%m%d.%H%M%S", time.localtime())
+  subprocess.call(["adb", "shell", "date", "-s", curr_time])
+  sys.exit(0)
+
+
+def parse_argv():
+  """Parse argument and set up globals."""
+  global getopt_debug, getopt_bill_extra_secs, getopt_power_quanta
+  global getopt_sort_by_power, getopt_power_data_file, getopt_proc_name
+  global getopt_summarize_pct, getopt_show_all_wakelocks
+
+  try:
+    opts, argv_rest = getopt.getopt(sys.argv[1:],
+                                    "ade:hn:p:q:s:tv", ["help"])
+  except getopt.GetoptError as err:
+    print "<pre>\n"
+    print str(err)
+    usage()
+  try:
+    for o, a in opts:
+      if o == "-a": getopt_show_all_wakelocks = True
+      if o == "-d": getopt_debug = True
+      if o == "-e": getopt_bill_extra_secs = int(a)
+      if o in ("-h", "--help"): usage()
+      if o == "-n": getopt_proc_name = str(a)
+      if o == "-p": getopt_power_data_file = a
+      if o == "-q": getopt_power_quanta = int(a)
+      if o == "-s": getopt_summarize_pct = int(a)
+      if o == "-t": getopt_sort_by_power = False
+      if o == "-v": sync_time()
+  except ValueError as err:
+    print str(err)
+    usage()
+
+  return argv_rest
 
 
 class Printer(object):
@@ -292,6 +354,34 @@ class Printer(object):
       ("activepower", "#dd4477"),
       ("power", "#ff2222")]
 
+  def __init__(self):
+    self._print_setting_cats = set()
+    for cat in self._print_setting:
+      self._print_setting_cats.add(cat[0])
+
+  def combine_wifi_states(self, event_list, start_time):
+    """Discard intermediate states and combine events chronologically."""
+    tracking_states = ["disconn", "completed", "disabled", "scanning"]
+    selected_event_list = []
+    for event in event_list:
+      state = get_wifi_suppl_state(event[0])
+      if state in tracking_states:
+        selected_event_list.append(event)
+
+    if len(selected_event_list) <= 1:
+      return set(selected_event_list)
+
+    event_name = "wifi_suppl="
+    for e in selected_event_list:
+      state = get_wifi_suppl_state(e[0])
+      event_name += (state + "->")
+    event_name = event_name[:-2]
+
+    sample_event = selected_event_list[0][0]
+    timestr_start = sample_event.find("(")
+    event_name += sample_event[timestr_start:]
+    return set([(event_name, start_time, start_time)])
+
   def aggregate_events(self, emit_dict):
     """Combine events with the same name occurring during the same second.
 
@@ -314,7 +404,10 @@ class Printer(object):
         else:
           start_dict[start_time] = [event]
       for start_time, event_list in start_dict.iteritems():
-        event_set = set(event_list)      # uniqify
+        if cat == "wifi_suppl":
+          event_set = self.combine_wifi_states(event_list, start_time)
+        else:
+          event_set = set(event_list)      # uniqify
         for event in event_set:
           output_dict[cat].append(event)
     return output_dict
@@ -322,13 +415,15 @@ class Printer(object):
   def print_emit_dict(self, cat, emit_dict):
     for e in emit_dict[cat]:
       print "['%s', '%s', %s, %s]," % (cat, e[0],
-                                       str_to_jsdate(e[1]), str_to_jsdate(e[2]))
+                                       timestr_to_jsdate(e[1]),
+                                       timestr_to_jsdate(e[2]))
 
   def print_highlight_dict(self, cat, highlight_dict):
     catname = cat.replace("highlight_", getopt_proc_name + " ")
     for e in highlight_dict[cat]:
       print "['%s', '%s', %s, %s]," % (catname, e[0],
-                                       str_to_jsdate(e[1]), str_to_jsdate(e[2]))
+                                       timestr_to_jsdate(e[1]),
+                                       timestr_to_jsdate(e[2]))
 
   def print_events(self, emit_dict, highlight_dict):
     """print category data in the order of _print_setting.
@@ -357,11 +452,9 @@ class Printer(object):
     # handle category that is not included in _print_setting
     if cat_count < len(emit_dict):
       for cat in emit_dict:
-        if cat not in self._print_setting:
-          if getopt_debug:
-            print "event category not found: " + cat
-          else:
-            self.print_emit_dict(cat, emit_dict)
+        if cat not in self._print_setting_cats:
+          sys.stderr.write("event category not found: %s\n" % cat)
+          self.print_emit_dict(cat, emit_dict)
 
   def print_chart_options(self, emit_dict, highlight_dict, width, height):
     """Print Options provided to the visualizater."""
@@ -383,11 +476,8 @@ class Printer(object):
     # handle category that is not included in _print_setting
     if cat_count < len(emit_dict):
       for cat in emit_dict:
-        if cat not in self._print_setting:
-          if getopt_debug:
-            print "event category not found: " + cat
-          else:
-            color_string += "'%s', " % self._default_color
+        if cat not in self._print_setting_cats:
+          color_string += "'%s', " % self._default_color
 
     print("\toptions = {\n"
           "\ttimeline: { colorByRowLabel: true},\n"
@@ -494,7 +584,7 @@ class LegacyFormatConverter(object):
 
 
 class BHEmitter(object):
-  """Process battery history."""
+  """Process battery history section from bugreport.txt."""
   _omit_cats = ["temp", "volt", "brightness", "sensor", "proc"]
   _in_progress_dict = autovivify()  # events that are currently in progress
   _proc_dict = {}             # mapping of "proc" uid to human-readable name
@@ -598,6 +688,48 @@ class BHEmitter(object):
     apply_fn_over_range(self.track_event_parallelism_fn,
                         start_time, end_time, [time_dict])
 
+  def emit_event(self, cat, event_name, start_time, start_timestr,
+                 end_event_name, end_time, end_timestr,
+                 emit_dict, time_dict, highlight_dict):
+    (start_proc_id, start_proc_name) = get_proc_pair(event_name)
+    (end_proc_id, end_proc_name) = get_proc_pair(end_event_name)
+    (event_name, short_event_name) = self.process_event_name(event_name,
+                                                             start_timestr,
+                                                             end_timestr)
+
+    if "wake_lock" in cat:
+      end_event_name = self.process_event_name(end_event_name,
+                                               start_timestr, end_timestr)[0]
+      # +wake_lock/+wake_lock_in for -n option
+      if start_proc_id == self._search_proc_id:
+        add_emit_event(highlight_dict, "highlight_" + cat,
+                       event_name, start_time, end_time)
+      # -wake_lock for -n option
+      if (end_proc_name and end_proc_name != start_proc_name and
+          end_proc_id == self._search_proc_id):
+        add_emit_event(highlight_dict, "highlight_" + cat,
+                       end_event_name, start_time, end_time)
+      if start_proc_name != end_proc_name:
+        if end_proc_name:
+          add_emit_event(emit_dict, cat, end_event_name,
+                         start_time, end_time)
+        # do not emit +wake_lock event if it does not have
+        # an id and we already emit a -wake_lock event
+        if cat == "wake_lock" and end_proc_id and not start_proc_id:
+          return
+
+    if cat == BLAME_CATEGORY:
+      self.cat_list.append((short_event_name, start_time, end_time))
+
+      end_time += getopt_bill_extra_secs
+      self.track_event_parallelism(start_time, end_time, time_dict)
+
+    if end_time - start_time < 1:
+      # HACK: visualizer library doesn't always render sub-second events
+      end_time += 1
+
+    add_emit_event(emit_dict, cat, event_name, start_time, end_time)
+
   def handle_event(self, event_time, time_str, event_str,
                    emit_dict, time_dict, highlight_dict):
     """Handle an individual event.
@@ -637,44 +769,9 @@ class BHEmitter(object):
         start_time = event_time
         start_timestr = time_str
 
-      (start_proc_id, start_proc_name) = get_proc_pair(event_name)
-      (end_proc_id, end_proc_name) = get_proc_pair(event_str)
-      (event_name, short_event_name) = self.process_event_name(event_name,
-                                                               start_timestr,
-                                                               time_str)
-
-      if "wake_lock" in cat:
-        end_event_name = self.process_event_name(event_str,
-                                                 start_timestr, time_str)[0]
-        # +wake_lock/+wake_lock_in for -n option
-        if start_proc_id == self._search_proc_id:
-          add_emit_event(highlight_dict, "highlight_" + cat,
-                         event_name, start_time, t)
-        # -wake_lock for -n option
-        if (end_proc_name and end_proc_name != start_proc_name and
-            end_proc_id == self._search_proc_id):
-          add_emit_event(highlight_dict, "highlight_" + cat,
-                         end_event_name, start_time, t)
-        if start_proc_name != end_proc_name:
-          if end_proc_name:
-            add_emit_event(emit_dict, cat, end_event_name,
-                           start_time, event_time)
-          # do not emit +wake_lock event if it does not have
-          # an id and we already emit a -wake_lock event
-          if cat == "wake_lock" and end_proc_id and not start_proc_id:
-            return
-
-      if cat == BLAME_CATEGORY:
-        self.cat_list.append((short_event_name, start_time, event_time))
-
-        end_time = event_time + getopt_bill_extra_secs
-        self.track_event_parallelism(start_time, end_time, time_dict)
-
-      if event_time - start_time < 1:
-        # HACK: visualizer library doesn't always render sub-second events
-        event_time += 1
-
-      add_emit_event(emit_dict, cat, event_name, start_time, event_time)
+      self.emit_event(cat, event_name, start_time, start_timestr,
+                      event_str, event_time, time_str,
+                      emit_dict, time_dict, highlight_dict)
 
   def generate_summary_row(self, row_to_summarize, emit_dict, start_time,
                            end_time):
@@ -682,6 +779,7 @@ class BHEmitter(object):
 
     summarize_quanta = 60
     row_name = row_to_summarize + "_pct"
+    if row_to_summarize not in emit_dict: return
     summarize_list = emit_dict[row_to_summarize]
     seconds_dict = {}
 
@@ -710,6 +808,60 @@ class BHEmitter(object):
 
     for i in ROWS_TO_SUMMARIZE:
       self.generate_summary_row(i, emit_dict, start_time, end_time)
+
+  def emit_remaining_events(self, end_time, end_timestr, emit_dict, time_dict,
+                            highlight_dict):
+    for cat in self._in_progress_dict:
+      for subcat in self._in_progress_dict[cat]:
+        (event_name, s_time, s_timestr) = self._in_progress_dict[cat][subcat]
+        self.emit_event(cat, event_name, s_time, s_timestr,
+                        event_name, end_time, end_timestr,
+                        emit_dict, time_dict, highlight_dict)
+
+
+class BlameSynopsis(object):
+  """Summary data of BLAME_CATEGORY instance used for power accounting."""
+
+  def __init__(self):
+    self.name = ""
+    self.mah = 0
+    self.timestr = ""
+    self._duration_list = []
+
+  def add(self, name, duration, mah, t):
+    self.name = name
+    self._duration_list.append(duration)
+    self.mah += mah
+    if not self.timestr:
+      self.timestr = time_float_to_human(t)
+
+  def get_count(self):
+    return len(self._duration_list)
+
+  def get_median_duration(self):
+    return sorted(self._duration_list)[int(self.get_count() / 2)]
+
+  def get_total_duration(self):
+    return sum(self._duration_list)
+
+  def to_str(self, total_mah, show_power):
+    """Returns a summary string."""
+    if total_mah:
+      pct = self.mah * 100 / total_mah
+    else:
+      pct = 0
+    avg = self.get_total_duration() / self.get_count()
+
+    ret = ""
+    if show_power:
+      ret += "%.3f mAh (%.1f%%), " % (self.mah, pct)
+    ret += "%3s events, " % str(self.get_count())
+    ret += "%6.3fs total " % self.get_total_duration()
+    ret += "%6.3fs avg " % avg
+    ret += "%6.3fs median: " % self.get_median_duration()
+    ret += self.name
+    ret += " (first at %s)" % self.timestr
+    return ret
 
 
 class PowerEmitter(object):
@@ -774,7 +926,7 @@ class PowerEmitter(object):
       if event_name in self._synopsis_dict:
         sd = self._synopsis_dict[event_name]
       else:
-        sd = AttrSum()
+        sd = BlameSynopsis()
 
       amps = self.get_range_power(start_time,
                                   end_time + getopt_bill_extra_secs,
@@ -853,106 +1005,10 @@ class PowerEmitter(object):
     print "total: %.3f mAh, %d events" % (total_mah, total_count)
 
 
-def space_escape(match):
-  value = match.group()
-  p = re.compile(r"\s+")
-  return p.sub("_", value)
-
-
-def parse_reset_time(line):
-  line = line.strip()
-  line = line.split("RESET:TIME: ", 1)[1]
-  st = time.strptime(line, "%Y-%m-%d-%H-%M-%S")
-  return time.mktime(st)
-
-
-def usage():
-  """Print usage of the script."""
-  print "\nUsage: %s [OPTIONS] [FILE]\n" % sys.argv[0]
-  print "  -a: show all wakelocks (don't abbreviate system wakelocks)"
-  print "  -d: debug mode, output debugging info for this program"
-  print ("  -e TIME: extend billing an extra TIME seconds after each\n"
-         "     wakelock, or until the next wakelock is seen.  Useful for\n"
-         "     accounting for modem power overhead.")
-  print "  -h: print this message."
-  print ("  -n PROC: output another row containing only wakelocks from\n"
-         "     processes whose name matches PROC.")
-  print ("  -p FILE: analyze FILE containing power data.  Format per\n"
-         "     line: <timestamp in epoch seconds> <amps>")
-  print ("  -q TIME: quantize data on power row in buckets of TIME\n"
-         "     seconds (default %d)" % getopt_power_quanta)
-  print ("  -s PCT: summarize certain useful rows with additional rows\n"
-         "     showing percent time spent over PCT% in each.")
-  print "  -t: sort power report by wakelock duration instead of charge"
-  print "  -v: synchronize device time before collecting power data"
-  print "\n"
-  sys.exit(1)
-
-
-def sync_time():
-  subprocess.call(["adb", "root"])
-  subprocess.call(["sleep", "3"])
-  start_time = int(time.time())
-  while int(time.time()) == start_time:
-    pass
-  curr_time = time.strftime("%Y%m%d.%H%M%S", time.localtime())
-  subprocess.call(["adb", "shell", "date", "-s", curr_time])
-  sys.exit(0)
-
-
-def parse_argv():
-  """Parse argument and set up globals."""
-  global getopt_debug, getopt_bill_extra_secs, getopt_power_quanta
-  global getopt_sort_by_power, getopt_power_data_file, getopt_proc_name
-  global getopt_summarize_pct, getopt_show_all_wakelocks
-
-  try:
-    opts, argv_rest = getopt.getopt(sys.argv[1:],
-                                    "ade:hn:p:q:s:tv", ["help"])
-  except getopt.GetoptError as err:
-    print "<pre>\n"
-    print str(err)
-    usage()
-  try:
-    for o, a in opts:
-      if o == "-a": getopt_show_all_wakelocks = True
-      if o == "-d": getopt_debug = True
-      if o == "-e": getopt_bill_extra_secs = int(a)
-      if o in ("-h", "--help"): usage()
-      if o == "-n": getopt_proc_name = str(a)
-      if o == "-p": getopt_power_data_file = a
-      if o == "-q": getopt_power_quanta = int(a)
-      if o == "-s": getopt_summarize_pct = int(a)
-      if o == "-t": getopt_sort_by_power = False
-      if o == "-v": sync_time()
-  except ValueError as err:
-    print str(err)
-    usage()
-
-  return argv_rest
-
-
-def is_legacy_mode(input_file):
-  """Autodetect legacy format."""
-  detection_on = False
-  for line in fileinput.input(input_file):
-    if not detection_on and "Battery History" in line:
-      detection_on = True
-    if not detection_on:
-      continue
-
-    line_time = line.split()[0]
-    if "+" not in line_time and "-" not in line_time:
-      continue
-
-    fileinput.close()
-    return line_time[0] == "-"
-  return False
-
-
 def main():
   data_start_time = 0.0
   data_stop_time = 0
+  data_stop_timestr = ""
 
   on_mode = False
   prev_battery_level = -1
@@ -963,7 +1019,7 @@ def main():
 
   argv_remainder = parse_argv()
   input_file = argv_remainder[0]
-  legacy_mode = is_legacy_mode(input_file)
+  legacy_mode = is_file_legacy_mode(input_file)
 
   if legacy_mode:
     input_string = LegacyFormatConverter().convert(input_file)
@@ -982,6 +1038,7 @@ def main():
 
     if "RESET:TIME: " in line:
       data_start_time = parse_reset_time(line)
+      continue
 
     if line.isspace(): continue
     if HISTORY_END_STRING in line or not line: break
@@ -1014,7 +1071,10 @@ def main():
 
     prev_battery_level = line_battery_level
     data_stop_time = event_time
+    data_stop_timestr = line_time
 
+  bhemitter.emit_remaining_events(data_stop_time, data_stop_timestr,
+                                  emit_dict, time_dict, highlight_dict)
   input_file.close()
 
   bhemitter.generate_summary_rows(emit_dict, data_start_time,
@@ -1039,7 +1099,12 @@ def main():
 <html>
 <head>
 """
+
   print "Battery historian analysis for %s :<p>" % argv_remainder[0]
+  if legacy_mode:
+    print("<p><b>WARNING:</b> legacy format detected; "
+          "history information is limited\n")
+
   print """
 <script type="text/javascript" src="https://www.google.com/jsapi?autoload={'modules':[{'name':'visualization',
        'version':'1','packages':['timeline']}]}"></script>
@@ -1090,7 +1155,6 @@ function drawChart() {
   svg.setAttribute('height', chart_height);
   var content = $('#chart').children()[0];
   $(content).css('height', chart_height);
-
 }
 
 
@@ -1112,12 +1176,10 @@ width:100px;
 """
   start_localtime = time_float_to_human(data_start_time)
   stop_localtime = time_float_to_human(data_stop_time)
-  print '<div id="chart"></div>'
-  if legacy_mode:
-    print("<p><b>WARNING:</b> legacy format detected; "
-          "history information is limited\n")
+  print ('<div id="chart"><b>WARNING: Visualizer disabled. '
+         'If you see this message, download the HTML then open it.</b></div>')
   if "wake_lock_in" not in emit_dict and (getopt_power_data_file
-                                           or getopt_proc_name):
+                                          or getopt_proc_name):
     print("<p><b>WARNING:</b>\n"
           "<br>No information available about wake_lock_in.\n"
           "<br>To enable full wakelock reporting: \n"
