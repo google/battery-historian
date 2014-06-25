@@ -94,8 +94,11 @@ def parse_time(s, fmt):
   return ret
 
 
-def time_float_to_human(t):
-  return time.strftime("%H:%M:%S", time.localtime(t))
+def time_float_to_human(t, show_complete_time):
+  if show_complete_time:
+    return time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(t))
+  else:
+    return time.strftime("%H:%M:%S", time.localtime(t))
 
 
 def abbrev_timestr(s):
@@ -256,7 +259,9 @@ def swap(swap_list, first, second):
 def add_emit_event(emit_dict, cat, name, start, end):
   newevent = (name, int(start), int(end))
   if end < start:
-    print "BUG: end time before start time:<br>" % str(newevent)
+    print "BUG: end time before start time: %s %s %s<br>" % (name,
+                                                             start,
+                                                             end)
   else:
     if getopt_debug:
       print "Stored emitted event: %s<br>" % str(newevent)
@@ -305,6 +310,9 @@ def parse_argv():
       if o == "-v": sync_time()
   except ValueError as err:
     print str(err)
+    usage()
+
+  if not argv_rest:
     usage()
 
   return argv_rest
@@ -534,6 +542,7 @@ class LegacyFormatConverter(object):
     return header
 
   def convert(self, input_file):
+    """Convert legacy format file into string that fits latest format."""
     output_string = ""
     history_start = False
 
@@ -598,6 +607,7 @@ class BHEmitter(object):
       print "store_event: %s in %s/%s<br>" % (event_str, cat, subcat)
 
   def retrieve_event(self, cat, subcat):
+    """Pop event from in-progress event dict if match exists."""
     if cat in self._in_progress_dict:
       try:
         result = self._in_progress_dict[cat].pop(subcat)
@@ -651,6 +661,7 @@ class BHEmitter(object):
     return name
 
   def abbreviate_event_name(self, name):
+    """Abbreviate location-related event name."""
     if not getopt_show_all_wakelocks:
       if "wake_lock" in name:
         if "LocationManagerService" in name or "NlpWakeLock" in name:
@@ -833,7 +844,7 @@ class BlameSynopsis(object):
     self._duration_list.append(duration)
     self.mah += mah
     if not self.timestr:
-      self.timestr = time_float_to_human(t)
+      self.timestr = time_float_to_human(t, False)
 
   def get_count(self):
     return len(self._duration_list)
@@ -1095,7 +1106,7 @@ def main():
   printer = Printer()
 
   print """
-<!DOCTYLE html>
+<!DOCTYPE html>
 <html>
 <head>
 """
@@ -1174,8 +1185,11 @@ width:100px;
 </head>
 <body>
 """
-  start_localtime = time_float_to_human(data_start_time)
-  stop_localtime = time_float_to_human(data_stop_time)
+  show_complete_time = False
+  if data_stop_time - data_start_time > 24 * 60 * 60:
+    show_complete_time = True
+  start_localtime = time_float_to_human(data_start_time, show_complete_time)
+  stop_localtime = time_float_to_human(data_stop_time, show_complete_time)
   print ('<div id="chart"><b>WARNING: Visualizer disabled. '
          'If you see this message, download the HTML then open it.</b></div>')
   if "wake_lock_in" not in emit_dict and (getopt_power_data_file
@@ -1195,7 +1209,7 @@ width:100px;
     print "</ul>Showing result for %s" % bhemitter.match_list[0]
   print ("<pre>(Local time %s - %s, %dm elapsed)</pre>"
          % (start_localtime, stop_localtime,
-            (data_stop_time-data_start_time)/60))
+            (data_stop_time-data_start_time) / 60))
 
   print ("<p>\n"
          "Zoom: <input id=\"scale\" type=\"text\" value=\"100%\"></input>"
