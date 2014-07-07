@@ -23,7 +23,7 @@
 #   -timestamp | tee monsoon.out
 # ...let device run a while...
 # stop monsoon.py
-# collect bugreport
+# adb bugreport > bugreport.txt
 # ./historian.py -p monsoon.out bugreport.txt
 
 import collections
@@ -50,6 +50,7 @@ getopt_proc_name = ""
 getopt_show_all_wakelocks = False
 getopt_sort_by_power = True
 getopt_summarize_pct = -1
+getopt_report_filename = ""
 
 
 def usage():
@@ -67,6 +68,7 @@ def usage():
          "     line: <timestamp in epoch seconds> <amps>")
   print ("  -q TIME: quantize data on power row in buckets of TIME\n"
          "     seconds (default %d)" % getopt_power_quanta)
+  print "  -r NAME: report input file name as NAME in HTML."
   print ("  -s PCT: summarize certain useful rows with additional rows\n"
          "     showing percent time spent over PCT% in each.")
   print "  -t: sort power report by wakelock duration instead of charge"
@@ -110,7 +112,7 @@ def abbrev_timestr(s):
 
 def timestr_to_jsdate(t):
   lt = time.localtime(t)
-  return time.strftime("new Date(%y,%m,%d,%H,%M,%S)", lt)
+  return time.strftime("new Date(%Y,%m,%d,%H,%M,%S)", lt)
 
 
 def get_event_category(e):
@@ -288,10 +290,11 @@ def parse_argv():
   global getopt_debug, getopt_bill_extra_secs, getopt_power_quanta
   global getopt_sort_by_power, getopt_power_data_file, getopt_proc_name
   global getopt_summarize_pct, getopt_show_all_wakelocks
+  global getopt_report_filename
 
   try:
     opts, argv_rest = getopt.getopt(sys.argv[1:],
-                                    "ade:hn:p:q:s:tv", ["help"])
+                                    "ade:hn:p:q:r:s:tv", ["help"])
   except getopt.GetoptError as err:
     print "<pre>\n"
     print str(err)
@@ -305,6 +308,7 @@ def parse_argv():
       if o == "-n": getopt_proc_name = str(a)
       if o == "-p": getopt_power_data_file = a
       if o == "-q": getopt_power_quanta = int(a)
+      if o == "-r": getopt_report_filename = str(a)
       if o == "-s": getopt_summarize_pct = int(a)
       if o == "-t": getopt_sort_by_power = False
       if o == "-v": sync_time()
@@ -335,6 +339,9 @@ class Printer(object):
       ("wifi_scan", "#888888"),
       ("wifi_multicast", "#888888"),
       ("wifi_running", "#109618"),
+      ("phone_signal_strength", "#dc3912"),
+      ("wifi_suppl", "#119fc8"),
+      ("wifi_signal_strength", "#9900aa"),
       ("phone_scanning", "#dda0dd"),
       ("audio", "#990099"),
       ("screen", "#cbb69d"),
@@ -522,11 +529,13 @@ class LegacyFormatConverter(object):
       return "0"
 
     timestr = "+"
-    if line_time > 60 * 60 * 1000:
+    if delta > 24 * 60 * 60:
+      timestr += str(datet.day - 1) + datet.strftime("d%Hh%Mm%Ss")
+    elif delta > 60 * 60:
       timestr += datet.strftime("%-Hh%Mm%Ss")
-    elif line_time > 60 * 1000:
+    elif delta > 60:
       timestr += datet.strftime("%-Mm%Ss")
-    elif line_time > 1000:
+    elif delta > 1:
       timestr += datet.strftime("%-Ss")
 
     ms = datet.microsecond / 1000.0
@@ -595,6 +604,13 @@ class LegacyFormatConverter(object):
 class BHEmitter(object):
   """Process battery history section from bugreport.txt."""
   _omit_cats = ["temp", "volt", "brightness", "sensor", "proc"]
+  # categories that have "+" and "-" events. If we see an event in these
+  # categories starting at time 0 without +/- sign, treat it as a "+" event.
+  _transitional_cats = ["plugged", "running", "wake_lock", "gps", "sensor",
+                        "phone_in_call", "mobile_radio", "phone_scanning",
+                        "proc", "fg", "top", "sync", "wifi", "wifi_full_lock",
+                        "wifi_scan", "wifi_multicast", "wifi_running",
+                        "bluetooth", "audio", "video", "wake_lock_in"]
   _in_progress_dict = autovivify()  # events that are currently in progress
   _proc_dict = {}             # mapping of "proc" uid to human-readable name
   _search_proc_id = 0         # proc id of the getopt_proc_name
@@ -759,7 +775,8 @@ class BHEmitter(object):
     cat = get_event_category(event_str)
     subcat = get_event_subcat(cat, event_str)
     # events already in progress are treated as starting at time 0
-    if time_str == "0" and (cat == "proc" or cat == "wake_lock_in"):
+    if (time_str == "0" and is_standalone_event(event_str)
+        and cat in self._transitional_cats):
       event_str = "+" + event_str
     if is_proc_event(event_str): self.store_proc(event_str, highlight_dict)
 
@@ -1105,16 +1122,17 @@ def main():
 
   printer = Printer()
 
-  print """
-<!DOCTYPE html>
-<html>
-<head>
-"""
+  print "<!DOCTYPE html>\n<html><head>\n"
+  report_filename = argv_remainder[0]
+  if getopt_report_filename:
+    report_filename = getopt_report_filename
+  header = "Battery Historian analysis for %s" % report_filename
+  print "<title>" + header + "</title>"
+  print "<p>" + header + "</p>"
 
-  print "Battery historian analysis for %s :<p>" % argv_remainder[0]
   if legacy_mode:
     print("<p><b>WARNING:</b> legacy format detected; "
-          "history information is limited\n")
+          "history information is limited</p>\n")
 
   print """
 <script type="text/javascript" src="https://www.google.com/jsapi?autoload={'modules':[{'name':'visualization',
