@@ -15,7 +15,7 @@
 # limitations under the License.
 
 # TO USE: (see also usage() below)
-# adb shell dumpsys batterystats --enable full-wake-history
+# adb shell dumpsys batterystats --enable full-wake-history  (post-KitKat only)
 # adb shell dumpsys batterystats --reset
 # optionally start monsoon/power monitor logging:
 #   if device/host clocks are not synced, run historian.py -v
@@ -532,11 +532,11 @@ class LegacyFormatConverter(object):
     if delta > 24 * 60 * 60:
       timestr += str(datet.day - 1) + datet.strftime("d%Hh%Mm%Ss")
     elif delta > 60 * 60:
-      timestr += datet.strftime("%-Hh%Mm%Ss")
+      timestr += datet.strftime("%Hh%Mm%Ss").lstrip("0")
     elif delta > 60:
-      timestr += datet.strftime("%-Mm%Ss")
+      timestr += datet.strftime("%Mm%Ss").lstrip("0")
     elif delta > 1:
-      timestr += datet.strftime("%-Ss")
+      timestr += datet.strftime("%Ss").lstrip("0")
 
     ms = datet.microsecond / 1000.0
     timestr += "%03dms" % ms
