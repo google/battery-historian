@@ -304,13 +304,13 @@ def parse_argv():
       if o == "-a": getopt_show_all_wakelocks = True
       if o == "-d": getopt_debug = True
       if o == "-e": getopt_bill_extra_secs = int(a)
-      if o in ("-h", "--help"): usage()
+      if o in ("-h", "--help"): usage(-h)
       if o == "-n": getopt_proc_name = str(a)
       if o == "-p": getopt_power_data_file = a
       if o == "-q": getopt_power_quanta = int(a)
       if o == "-r": getopt_report_filename = str(a)
       if o == "-s": getopt_summarize_pct = int(a)
-      if o == "-t": getopt_sort_by_power = False
+      if o == "-t": getopt_sort_by_power = true
       if o == "-v": sync_time()
   except ValueError as err:
     print str(err)
