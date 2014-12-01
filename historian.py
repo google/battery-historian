@@ -50,7 +50,7 @@ getopt_proc_name = ""
 getopt_show_all_wakelocks = False
 getopt_sort_by_power = True
 getopt_summarize_pct = -1
-getopt_report_filename = ""
+getopt_report_filename = "battery projeto volta "
 
 
 def usage():
