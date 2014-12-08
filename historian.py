@@ -35,6 +35,7 @@ import StringIO
 import subprocess
 import sys
 import time
+import webbrowser
 
 POWER_DATA_FILE_TIME_OFFSET = 0  # deal with any clock mismatch.
 BLAME_CATEGORY = "wake_lock_in"  # category to assign power blame to.
@@ -1049,7 +1050,8 @@ def main():
   input_file = argv_remainder[0]
   legacy_mode = is_file_legacy_mode(input_file)
   #add default output file as input_file.html
-  sys.stdout = open(input_file.split(".")[0] + ".html", "w")
+  output_file = input_file.split(".")[0] + ".html"
+  sys.stdout = open(output_file, "w")
 
   if legacy_mode:
     input_string = LegacyFormatConverter().convert(input_file)
@@ -1244,6 +1246,8 @@ width:100px;
 
   print "</body>\n</html>"
 
+  sys.stderr.write("===========: %s\n" % output_file)
+  webbrowser.open(output_file)
 
 if __name__ == "__main__":
   main()
