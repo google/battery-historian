@@ -1082,6 +1082,8 @@ def main():
     # pull apart input line by spaces
     split_line = line.split()
     if len(split_line) < 4: continue
+    if not split_line[2].isdigit() or(int(split_line[2]) > 100
+                                       or int(split_line[2]) < 0): continue    #export error battery level line
     (line_time, _, line_battery_level, _) = split_line[:4]
     line_events = split_line[4:]
 
