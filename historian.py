@@ -1048,6 +1048,8 @@ def main():
   argv_remainder = parse_argv()
   input_file = argv_remainder[0]
   legacy_mode = is_file_legacy_mode(input_file)
+  #add default output file as input_file.html
+  sys.stdout = open(input_file.split(".")[0] + ".html", "w")
 
   if legacy_mode:
     input_string = LegacyFormatConverter().convert(input_file)
