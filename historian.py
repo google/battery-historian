@@ -618,6 +618,8 @@ class BHEmitter(object):
   match_list = []             # list of package names that match search string
   cat_list = []               # BLAME_CATEGORY summary data
 
+  charging_on = False
+
   def store_event(self, cat, subcat, event_str, event_time, timestr):
     self._in_progress_dict[cat][subcat] = (event_str, event_time, timestr)
     if getopt_debug:
@@ -758,6 +760,24 @@ class BHEmitter(object):
 
     add_emit_event(emit_dict, cat, event_name, start_time, end_time)
 
+  def convert_special_evens(self, event_str):
+    if "status" in event_str:
+      if event_str == "status=charging":
+        if not self.charging_on:
+          event_str = "+" + event_str
+          self.charging_on = True
+        else:
+          event_str = ""
+      else:
+        if self.charging_on:
+          event_str = "-" + event_str
+          self.charging_on = False
+        else:
+          event_str = ""
+
+    return event_str
+          
+          
   def handle_event(self, event_time, time_str, event_str,
                    emit_dict, time_dict, highlight_dict):
     """Handle an individual event.
@@ -775,6 +795,7 @@ class BHEmitter(object):
 
     cat = get_event_category(event_str)
     subcat = get_event_subcat(cat, event_str)
+      
     # events already in progress are treated as starting at time 0
     if (time_str == "0" and is_standalone_event(event_str)
         and cat in self._transitional_cats):
@@ -1100,7 +1121,9 @@ def main():
                              "battery_level=" + line_battery_level,
                              emit_dict, time_dict, highlight_dict)
     for event in line_events:
-      bhemitter.handle_event(event_time, line_time, event,
+      event = bhemitter.convert_special_evens(event)
+      if event.strip():
+        bhemitter.handle_event(event_time, line_time, event,
                              emit_dict, time_dict, highlight_dict)
 
     prev_battery_level = line_battery_level
