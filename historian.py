@@ -331,44 +331,45 @@ class Printer(object):
   # highlight_wake_lock(_in). All the other names specified
   # in _print_setting are the same as category names.
   _print_setting = [
-      ("battery_level", "#4070cf"),
-      ("top", "#dc3912"),
-      ("status", "#9ac658"),
-      ("health", "#888888"),
-      ("plug", "#888888"),
-      ("wifi_full_lock", "#888888"),
-      ("wifi_scan", "#888888"),
-      ("wifi_multicast", "#888888"),
-      ("wifi_running", "#109618"),
-      ("phone_signal_strength", "#dc3912"),
-      ("wifi_suppl", "#119fc8"),
-      ("wifi_signal_strength", "#9900aa"),
-      ("phone_scanning", "#dda0dd"),
-      ("audio", "#990099"),
-      ("screen", "#cbb69d"),
-      ("plugged", "#2e8b57"),
-      ("phone_in_call", "#cbb69d"),
-      ("wifi", "#119fc8"),
-      ("bluetooth", "#cbb69d"),
-      ("data_conn", "#4070cf"),
-      ("phone_state", "#dc3912"),
-      ("signal_strength", "#119fc8"),
-      ("video", "#cbb69d"),
-      ("low_power", "#109618"),
-      ("fg", "#dda0dd"),
-      ("sync", "#9900aa"),
-      ("wake_lock_pct", "#6fae11"),
-      ("wake_lock", "#cbb69d"),
-      ("highlight_wake_lock", "#4070cf"),
-      ("gps", "#ff9900"),
-      ("running_pct", "#6fae11"),
-      ("running", "#990099"),
-      ("wake_reason", "#b82e2e"),
-      ("wake_lock_in", "#ff33cc"),
-      ("highlight_wake_lock_in", "#dc3912"),
-      ("mobile_radio", "#aa0000"),
-      ("activepower", "#dd4477"),
-      ("power", "#ff2222")]
+      ("battery_level", "#4070cf", ""),
+      ("top", "#dc3912", ""),
+      ("status", "#9ac658", "status=charging"),
+      ("health", "#888888", "health=good"),
+      ("plug", "#888888", "plug=none"),
+      ("wifi_full_lock", "#888888", ""),
+      ("wifi_scan", "#888888", ""),
+      ("wifi_multicast", "#888888", ""),
+      ("wifi_running", "#109618", ""),
+      ("phone_signal_strength", "#dc3912", "phone_signal_strength=poor"),
+      ("wifi_suppl", "#119fc8", ""),
+      ("wifi_signal_strength", "#9900aa", ""),
+      ("phone_scanning", "#dda0dd", ""),
+      ("audio", "#990099", ""),
+      ("brightness", "#cbb69d", "brightness=dark"),
+      ("screen", "#cbb69d", ""),
+      ("plugged", "#2e8b57", ""),
+      ("phone_in_call", "#cbb69d", ""),
+      ("wifi", "#119fc8", ""),
+      ("bluetooth", "#cbb69d", ""),
+      ("data_conn", "#4070cf", ""),
+      ("phone_state", "#dc3912", "phone_state=off"),
+      ("signal_strength", "#119fc8", ""),
+      ("video", "#cbb69d", ""),
+      ("low_power", "#109618", ""),
+      ("fg", "#dda0dd", ""),
+      ("sync", "#9900aa", ""),
+      ("wake_lock_pct", "#6fae11", ""),
+      ("wake_lock", "#cbb69d", ""),
+      ("highlight_wake_lock", "#4070cf", ""),
+      ("gps", "#ff9900", ""),
+      ("running_pct", "#6fae11", ""),
+      ("running", "#990099", ""),
+      ("wake_reason", "#b82e2e", "wake_reason=0"),
+      ("wake_lock_in", "#ff33cc", ""),
+      ("highlight_wake_lock_in", "#dc3912", ""),
+      ("mobile_radio", "#aa0000", ""),
+      ("activepower", "#dd4477", ""),
+      ("power", "#ff2222", "")]
 
   def __init__(self):
     self._print_setting_cats = set()
@@ -618,7 +619,7 @@ class BHEmitter(object):
   match_list = []             # list of package names that match search string
   cat_list = []               # BLAME_CATEGORY summary data
 
-  charging_on = False
+  convert_status = []
 
   def store_event(self, cat, subcat, event_str, event_time, timestr):
     self._in_progress_dict[cat][subcat] = (event_str, event_time, timestr)
@@ -761,23 +762,31 @@ class BHEmitter(object):
     add_emit_event(emit_dict, cat, event_name, start_time, end_time)
 
   def convert_special_evens(self, event_str):
-    if "status" in event_str:
-      if event_str == "status=charging":
-        if not self.charging_on:
-          event_str = "+" + event_str
-          self.charging_on = True
+    for i in range(0, len(Printer()._print_setting)):
+      if not Printer()._print_setting[i][2].strip(): continue
+      key = Printer()._print_setting[i][2].split("=")[0]
+      value = Printer()._print_setting[i][2].split("=")[1]
+      #convert status event
+      if key in event_str:
+#         sys.stderr.write("Printer()._print_setting[i][2]: key=%s \n" %key)
+        if event_str == (key + "=" + value):
+          if not self.convert_status[i]:
+            event_str = "+" + event_str
+            self.convert_status[i] = True
+          else:
+            event_str = ""
         else:
-          event_str = ""
+          if self.convert_status[i]:
+            event_str = "-" + event_str
+            self.convert_status[i] = False
+          else:
+            event_str = ""
       else:
-        if self.charging_on:
-          event_str = "-" + event_str
-          self.charging_on = False
-        else:
-          event_str = ""
+        continue
+      return event_str
 
     return event_str
-          
-          
+                
   def handle_event(self, event_time, time_str, event_str,
                    emit_dict, time_dict, highlight_dict):
     """Handle an individual event.
@@ -1067,6 +1076,9 @@ def main():
   time_dict = {}              # total event time held per second
   highlight_dict = {}         # search result for -n option
 
+  for i in range(0, len(Printer()._print_setting)):
+    bhemitter.convert_status.append(False)
+#   sys.stderr.write("bhemitter.convert_status list are %s \n" %bhemitter.convert_status[:])
   argv_remainder = parse_argv()
   input_file = argv_remainder[0]
   legacy_mode = is_file_legacy_mode(input_file)
