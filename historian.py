@@ -39,7 +39,6 @@ import time
 POWER_DATA_FILE_TIME_OFFSET = 0  # deal with any clock mismatch.
 BLAME_CATEGORY = "wake_lock_in"  # category to assign power blame to.
 ROWS_TO_SUMMARIZE = ["wake_lock", "running"]  # -s: summarize these rows
-HISTORY_END_STRING = "Per-PID"
 
 getopt_debug = 0
 getopt_bill_extra_secs = 0
@@ -47,6 +46,7 @@ getopt_power_quanta = 15        # slice monsoon data this many seconds,
                                 # to avoid crashing visualizer
 getopt_power_data_file = False
 getopt_proc_name = ""
+getopt_highlight_category = ""
 getopt_show_all_wakelocks = False
 getopt_sort_by_power = True
 getopt_summarize_pct = -1
@@ -62,8 +62,9 @@ def usage():
          "     wakelock, or until the next wakelock is seen.  Useful for\n"
          "     accounting for modem power overhead.")
   print "  -h: print this message."
-  print ("  -n PROC: output another row containing only wakelocks from\n"
-         "     processes whose name matches PROC.")
+  print ("  -n [CATEGORY=]PROC: output another row containing only processes\n"
+         "     whose name matches uid of PROC in CATEGORY.\n"
+         "     If CATEGORY is not specified, search in wake_lock_in.")
   print ("  -p FILE: analyze FILE containing power data.  Format per\n"
          "     line: <timestamp in epoch seconds> <amps>")
   print ("  -q TIME: quantize data on power row in buckets of TIME\n"
@@ -110,9 +111,29 @@ def abbrev_timestr(s):
   return arr[0]+"s"
 
 
-def timestr_to_jsdate(t):
-  lt = time.localtime(t)
-  return time.strftime("new Date(%Y,%m,%d,%H,%M,%S)", lt)
+def timestr_to_jsdate(timestr):
+  return "new Date(%s * 1000)" % timestr
+
+
+def format_time(delta_time):
+  """Return a time string representing time past since initial event."""
+  if not delta_time:
+    return str(0)
+
+  timestr = "+"
+  datet = datetime.datetime.utcfromtimestamp(delta_time)
+
+  if delta_time > 24 * 60 * 60:
+    timestr += str(datet.day - 1) + datet.strftime("d%Hh%Mm%Ss")
+  elif delta_time > 60 * 60:
+    timestr += datet.strftime("%Hh%Mm%Ss").lstrip("0")
+  elif delta_time > 60:
+    timestr += datet.strftime("%Mm%Ss").lstrip("0")
+  elif delta_time > 1:
+    timestr += datet.strftime("%Ss").lstrip("0")
+  ms = datet.microsecond / 1000.0
+  timestr += "%03dms" % ms
+  return timestr
 
 
 def get_event_category(e):
@@ -223,12 +244,16 @@ def is_file_legacy_mode(input_file):
   """Autodetect legacy (K and earlier) format."""
   detection_on = False
   for line in fileinput.input(input_file):
-    if not detection_on and "Battery History" in line:
+    if not detection_on and line.startswith("Battery History"):
       detection_on = True
     if not detection_on:
       continue
 
-    line_time = line.split()[0]
+    split_line = line.split()
+    if not split_line:
+      continue
+  
+    line_time = split_line[0]
     if "+" not in line_time and "-" not in line_time:
       continue
 
@@ -285,10 +310,20 @@ def sync_time():
   sys.exit(0)
 
 
+def parse_search_option(cmd):
+  global getopt_proc_name, getopt_highlight_category
+  if "=" in cmd:
+    getopt_highlight_category = cmd.split("=")[0]
+    getopt_proc_name = cmd.split("=")[1]
+  else:
+    getopt_highlight_category = "wake_lock_in"
+    getopt_proc_name = cmd
+
+
 def parse_argv():
   """Parse argument and set up globals."""
   global getopt_debug, getopt_bill_extra_secs, getopt_power_quanta
-  global getopt_sort_by_power, getopt_power_data_file, getopt_proc_name
+  global getopt_sort_by_power, getopt_power_data_file
   global getopt_summarize_pct, getopt_show_all_wakelocks
   global getopt_report_filename
 
@@ -305,7 +340,7 @@ def parse_argv():
       if o == "-d": getopt_debug = True
       if o == "-e": getopt_bill_extra_secs = int(a)
       if o in ("-h", "--help"): usage()
-      if o == "-n": getopt_proc_name = str(a)
+      if o == "-n": parse_search_option(a)
       if o == "-p": getopt_power_data_file = a
       if o == "-q": getopt_power_quanta = int(a)
       if o == "-r": getopt_report_filename = str(a)
@@ -326,48 +361,50 @@ class Printer(object):
   """Organize and render the visualizer."""
   _default_color = "#4070cf"
 
-  # The highlighted wake_lock(_in) for -n option corresponds to
-  # highlight_wake_lock(_in). All the other names specified
+  # -n option is represented by "highlight". All the other names specified
   # in _print_setting are the same as category names.
   _print_setting = [
       ("battery_level", "#4070cf"),
+      ("plugged", "#2e8b57"),
+      ("screen", "#cbb69d"),
       ("top", "#dc3912"),
+      ("sync", "#9900aa"),
+      ("wake_lock_pct", "#6fae11"),
+      ("wake_lock", "#cbb69d"),
+      ("highlight", "#4070cf"),
+      ("running_pct", "#6fae11"),
+      ("running", "#990099"),
+      ("wake_reason", "#b82e2e"),
+      ("wake_lock_in", "#ff33cc"),
+      ("mobile_radio", "#aa0000"),
+      ("data_conn", "#4070cf"),
+      ("activepower", "#dd4477"),
+      ("power", "#ff2222"),
       ("status", "#9ac658"),
-      ("health", "#888888"),
-      ("plug", "#888888"),
+      ("reboot", "#ddff77"),
       ("wifi_full_lock", "#888888"),
       ("wifi_scan", "#888888"),
       ("wifi_multicast", "#888888"),
       ("wifi_running", "#109618"),
-      ("phone_signal_strength", "#dc3912"),
       ("wifi_suppl", "#119fc8"),
       ("wifi_signal_strength", "#9900aa"),
+      ("phone_signal_strength", "#dc3912"),
       ("phone_scanning", "#dda0dd"),
       ("audio", "#990099"),
-      ("screen", "#cbb69d"),
-      ("plugged", "#2e8b57"),
       ("phone_in_call", "#cbb69d"),
       ("wifi", "#119fc8"),
       ("bluetooth", "#cbb69d"),
-      ("data_conn", "#4070cf"),
       ("phone_state", "#dc3912"),
       ("signal_strength", "#119fc8"),
       ("video", "#cbb69d"),
       ("low_power", "#109618"),
       ("fg", "#dda0dd"),
-      ("sync", "#9900aa"),
-      ("wake_lock_pct", "#6fae11"),
-      ("wake_lock", "#cbb69d"),
-      ("highlight_wake_lock", "#4070cf"),
       ("gps", "#ff9900"),
-      ("running_pct", "#6fae11"),
-      ("running", "#990099"),
-      ("wake_reason", "#b82e2e"),
-      ("wake_lock_in", "#ff33cc"),
-      ("highlight_wake_lock_in", "#dc3912"),
-      ("mobile_radio", "#aa0000"),
-      ("activepower", "#dd4477"),
-      ("power", "#ff2222")]
+      ("health", "#888888"),
+      ("plug", "#888888"),
+      ("job", "#cbb69d")]
+
+  _ignore_categories = ["user", "userfg"]
 
   def __init__(self):
     self._print_setting_cats = set()
@@ -429,16 +466,21 @@ class Printer(object):
 
   def print_emit_dict(self, cat, emit_dict):
     for e in emit_dict[cat]:
-      print "['%s', '%s', %s, %s]," % (cat, e[0],
+      if cat == "wake_lock":
+        cat_name = "wake_lock *"
+      else:
+        cat_name = cat
+      print "['%s', '%s', %s, %s]," % (cat_name, e[0],
                                        timestr_to_jsdate(e[1]),
                                        timestr_to_jsdate(e[2]))
 
-  def print_highlight_dict(self, cat, highlight_dict):
-    catname = cat.replace("highlight_", getopt_proc_name + " ")
-    for e in highlight_dict[cat]:
-      print "['%s', '%s', %s, %s]," % (catname, e[0],
-                                       timestr_to_jsdate(e[1]),
-                                       timestr_to_jsdate(e[2]))
+  def print_highlight_dict(self, highlight_dict):
+    catname = getopt_proc_name + " " + getopt_highlight_category
+    if getopt_highlight_category in highlight_dict:
+      for e in highlight_dict[getopt_highlight_category]:
+        print "['%s', '%s', %s, %s]," % (catname, e[0],
+                                         timestr_to_jsdate(e[1]),
+                                         timestr_to_jsdate(e[2]))
 
   def print_events(self, emit_dict, highlight_dict):
     """print category data in the order of _print_setting.
@@ -451,23 +493,19 @@ class Printer(object):
     highlight_dict = self.aggregate_events(highlight_dict)
     cat_count = 0
 
-    # remove "wake_lock" if "wake_lock_in" is available
-    if("highlight_wake_lock_in" in highlight_dict and
-       "highlight_wake_lock" in highlight_dict):
-      del highlight_dict["highlight_wake_lock"]
-
     for i in range(0, len(self._print_setting)):
       cat = self._print_setting[i][0]
       if cat in emit_dict:
         self.print_emit_dict(cat, emit_dict)
         cat_count += 1
-      if cat in highlight_dict:
-        self.print_highlight_dict(cat, highlight_dict)
+      if cat == "highlight":
+        self.print_highlight_dict(highlight_dict)
 
     # handle category that is not included in _print_setting
     if cat_count < len(emit_dict):
       for cat in emit_dict:
-        if cat not in self._print_setting_cats:
+        if (cat not in self._print_setting_cats and
+            cat not in self._ignore_categories):
           sys.stderr.write("event category not found: %s\n" % cat)
           self.print_emit_dict(cat, emit_dict)
 
@@ -481,7 +519,7 @@ class Printer(object):
       if cat in emit_dict:
         color_string += "'%s', " % self._print_setting[i][1]
         cat_count += 1
-      if cat in highlight_dict:
+      if cat == "highlight" and highlight_dict:
         color_string += "'%s', " % self._print_setting[i][1]
         cat_count += 1
 
@@ -573,14 +611,13 @@ class LegacyFormatConverter(object):
       elif not history_start:
         continue
 
-      if line.isspace(): continue
-      if HISTORY_END_STRING in line or not line: break
+      if line.isspace(): break
 
       line = line.strip()
       arr = line.split()
       if len(arr) < 4: continue
 
-      p = re.compile('"[^"]*')
+      p = re.compile('"[^"]+"')
       line = p.sub(space_escape, line)
 
       split_line = line.split()
@@ -596,7 +633,6 @@ class LegacyFormatConverter(object):
                                      line_state, event_string)
       output_string += newline
 
-    output_string += HISTORY_END_STRING
     fileinput.close()
     return output_string
 
@@ -613,7 +649,7 @@ class BHEmitter(object):
                         "bluetooth", "audio", "video", "wake_lock_in"]
   _in_progress_dict = autovivify()  # events that are currently in progress
   _proc_dict = {}             # mapping of "proc" uid to human-readable name
-  _search_proc_id = 0         # proc id of the getopt_proc_name
+  _search_proc_id = -1        # proc id of the getopt_proc_name
   match_list = []             # list of package names that match search string
   cat_list = []               # BLAME_CATEGORY summary data
 
@@ -641,9 +677,9 @@ class BHEmitter(object):
     (proc_id, proc_name) = proc_pair.split(":", 1)
     self._proc_dict[proc_id] = proc_name    # may overwrite
     if getopt_proc_name and getopt_proc_name in proc_name and proc_id:
-      if proc_name not in self.match_list:
-        self.match_list.append(proc_name)
-      if self._search_proc_id == 0:
+      if proc_pair not in self.match_list:
+        self.match_list.append(proc_pair)
+      if self._search_proc_id == -1:
         self._search_proc_id = proc_id
       elif self._search_proc_id != proc_id:
         if (proc_name[1:-1] == getopt_proc_name or
@@ -669,7 +705,10 @@ class BHEmitter(object):
 
   def annotate_event_name(self, name):
     if "*alarm*" in name:
-      proc_pair = get_after_equal(name)
+      try:
+        proc_pair = get_after_equal(name)
+      except IndexError:
+        return name
       proc_id = proc_pair.split(":", 1)[0]
       name = name + ":" + self.get_proc_name(proc_id)
       if getopt_debug:
@@ -692,13 +731,21 @@ class BHEmitter(object):
           return "GCM"
     return name
 
-  def process_event_name(self, event_name, start_timestr, timestr):
+  def process_wakelock_event_name(self, start_name, start_id, end_name, end_id):
+    start_name = self.process_event_name(start_name)
+    end_name = self.process_event_name(end_name)
+    event_name = "first=%s:%s, last=%s:%s" % (start_id, start_name,
+                                              end_id, end_name)
+    return event_name
+
+  def process_event_timestr(self, start_timestr, end_timestr):
+    return "(%s-%s)" % (abbrev_timestr(start_timestr),
+                        abbrev_timestr(end_timestr))
+
+  def process_event_name(self, event_name):
     event_name = self.annotate_event_name(event_name)
     event_name = self.abbreviate_event_name(event_name)
-    short_event_name = event_name
-    event_name += "(%s-%s)" % (abbrev_timestr(start_timestr),
-                               abbrev_timestr(timestr))
-    return (event_name, short_event_name)
+    return event_name
 
   def track_event_parallelism_fn(self, start_time, time_this_quanta, time_dict):
     if start_time in time_dict:
@@ -718,32 +765,21 @@ class BHEmitter(object):
   def emit_event(self, cat, event_name, start_time, start_timestr,
                  end_event_name, end_time, end_timestr,
                  emit_dict, time_dict, highlight_dict):
-    (start_proc_id, start_proc_name) = get_proc_pair(event_name)
-    (end_proc_id, end_proc_name) = get_proc_pair(end_event_name)
-    (event_name, short_event_name) = self.process_event_name(event_name,
-                                                             start_timestr,
-                                                             end_timestr)
+    (start_pid, start_pname) = get_proc_pair(event_name)
+    (end_pid, end_pname) = get_proc_pair(end_event_name)
 
-    if "wake_lock" in cat:
-      end_event_name = self.process_event_name(end_event_name,
-                                               start_timestr, end_timestr)[0]
-      # +wake_lock/+wake_lock_in for -n option
-      if start_proc_id == self._search_proc_id:
-        add_emit_event(highlight_dict, "highlight_" + cat,
+    if cat == "wake_lock" and end_pname and end_pname != start_pname:
+      short_event_name = self.process_wakelock_event_name(
+          start_pname, start_pid, end_pname, end_pid)
+    else:
+      short_event_name = self.process_event_name(event_name)
+    event_name = short_event_name + self.process_event_timestr(start_timestr,
+                                                               end_timestr)
+
+    if getopt_highlight_category == cat:
+      if start_pid == self._search_proc_id or end_pid == self._search_proc_id:
+        add_emit_event(highlight_dict, cat,
                        event_name, start_time, end_time)
-      # -wake_lock for -n option
-      if (end_proc_name and end_proc_name != start_proc_name and
-          end_proc_id == self._search_proc_id):
-        add_emit_event(highlight_dict, "highlight_" + cat,
-                       end_event_name, start_time, end_time)
-      if start_proc_name != end_proc_name:
-        if end_proc_name:
-          add_emit_event(emit_dict, cat, end_event_name,
-                         start_time, end_time)
-        # do not emit +wake_lock event if it does not have
-        # an id and we already emit a -wake_lock event
-        if cat == "wake_lock" and end_proc_id and not start_proc_id:
-          return
 
     if cat == BLAME_CATEGORY:
       self.cat_list.append((short_event_name, start_time, end_time))
@@ -796,6 +832,12 @@ class BHEmitter(object):
         event_name = event_str
         start_time = event_time
         start_timestr = time_str
+
+        # Events that were still going on at the time of reboot
+        # should be marked as ending at the time of reboot.
+        if event_str == "reboot":
+          self.emit_remaining_events(event_time, time_str, emit_dict,
+                                     time_dict, highlight_dict)
 
       self.emit_event(cat, event_name, start_time, start_timestr,
                       event_str, event_time, time_str,
@@ -1033,18 +1075,34 @@ class PowerEmitter(object):
     print "total: %.3f mAh, %d events" % (total_mah, total_count)
 
 
+def adjust_reboot_time(line, event_time):
+  # Line delta time is not reset after reboot, but wall time will
+  # be printed after reboot finishes. This function returns how much
+  # we are off and actual reboot event time.
+  line = line.strip()
+  line = line.split("TIME: ", 1)[1]
+  st = time.strptime(line, "%Y-%m-%d-%H-%M-%S")
+  wall_time = time.mktime(st)
+  return wall_time - event_time, wall_time
+
+
 def main():
   data_start_time = 0.0
   data_stop_time = 0
   data_stop_timestr = ""
 
   on_mode = False
+  time_offset = 0.0
+  overflowed = False
+  reboot = False
   prev_battery_level = -1
   bhemitter = BHEmitter()
   emit_dict = {}              # maps event categories to events
   time_dict = {}              # total event time held per second
   highlight_dict = {}         # search result for -n option
-
+  is_first_data_line = True
+  is_dumpsys_format = False
+  
   argv_remainder = parse_argv()
   input_file = argv_remainder[0]
   legacy_mode = is_file_legacy_mode(input_file)
@@ -1057,6 +1115,7 @@ def main():
 
   while True:
     line = input_file.readline()
+    if not line: break
 
     if not on_mode and line.startswith("Battery History"):
       on_mode = True
@@ -1064,46 +1123,82 @@ def main():
     elif not on_mode:
       continue
 
+    if line.isspace(): break
+
     if "RESET:TIME: " in line:
       data_start_time = parse_reset_time(line)
       continue
-
-    if line.isspace(): continue
-    if HISTORY_END_STRING in line or not line: break
+    if "OVERFLOW" in line:
+      overflowed = True
+      break
+    if "START" in line:
+      reboot = True
+      continue
+    if "TIME: " in line:
+      continue
 
     # escape spaces within quoted regions
-    p = re.compile('"[^"]*"')
+    p = re.compile('"[^"]+"')
     line = p.sub(space_escape, line)
 
     # pull apart input line by spaces
     split_line = line.split()
     if len(split_line) < 4: continue
-    (line_time, _, line_battery_level, _) = split_line[:4]
-    line_events = split_line[4:]
+    (line_time, _, line_battery_level, fourth_field) = split_line[:4]
+
+    # "bugreport" output has an extra hex field vs "dumpsys", detect here.
+    if is_first_data_line:
+      is_first_data_line = False
+      try:
+        int(fourth_field, 16)
+      except ValueError:
+        is_dumpsys_format = True
+
+    if is_dumpsys_format:
+      line_events = split_line[3:]
+    else:
+      line_events = split_line[4:]
 
     fmt = (r"\+((?P<day>\d+)d)?((?P<hrs>\d+)h)?((?P<min>\d+)m)?"
            r"((?P<sec>\d+)s)?((?P<ms>\d+)ms)?$")
-    time_delta_s = parse_time(line_time, fmt)
+    time_delta_s = parse_time(line_time, fmt) + time_offset
     if time_delta_s < 0:
+      print "Warning: time went backwards: %s" % line
       continue
+
     event_time = data_start_time + time_delta_s
+    if reboot and "TIME:" in line:
+      # adjust offset using wall time
+      offset, event_time = adjust_reboot_time(line, event_time)
+      if offset < 0:
+        print "Warning: time went backwards: %s" % line
+        continue
+      time_offset += offset
+      time_delta_s = event_time - data_start_time
+      reboot = False
+      line_events = {"reboot"}
 
     if line_battery_level != prev_battery_level:
       # battery_level is not an actual event, it's on every line
-      bhemitter.handle_event(event_time, line_time,
-                             "battery_level=" + line_battery_level,
-                             emit_dict, time_dict, highlight_dict)
+      if line_battery_level.isdigit():
+        bhemitter.handle_event(event_time, format_time(time_delta_s),
+                               "battery_level=" + line_battery_level,
+                               emit_dict, time_dict, highlight_dict)
     for event in line_events:
-      bhemitter.handle_event(event_time, line_time, event,
+      bhemitter.handle_event(event_time, format_time(time_delta_s), event,
                              emit_dict, time_dict, highlight_dict)
 
     prev_battery_level = line_battery_level
     data_stop_time = event_time
-    data_stop_timestr = line_time
+    data_stop_timestr = format_time(time_delta_s)
+
+  input_file.close()
+  if not on_mode:
+    print "Battery history not present in bugreport."
+    return
 
   bhemitter.emit_remaining_events(data_stop_time, data_stop_timestr,
                                   emit_dict, time_dict, highlight_dict)
-  input_file.close()
 
   bhemitter.generate_summary_rows(emit_dict, data_start_time,
                                   data_stop_time)
@@ -1128,6 +1223,10 @@ def main():
     report_filename = getopt_report_filename
   header = "Battery Historian analysis for %s" % report_filename
   print "<title>" + header + "</title>"
+  if overflowed:
+    print ('<font size="5" color="red">Warning: History overflowed at %s, '
+           'many events may be missing.</font>' %
+           time_float_to_human(data_stop_time, True))
   print "<p>" + header + "</p>"
 
   if legacy_mode:
@@ -1210,21 +1309,30 @@ width:100px;
   stop_localtime = time_float_to_human(data_stop_time, show_complete_time)
   print ('<div id="chart"><b>WARNING: Visualizer disabled. '
          'If you see this message, download the HTML then open it.</b></div>')
-  if "wake_lock_in" not in emit_dict and (getopt_power_data_file
-                                          or getopt_proc_name):
-    print("<p><b>WARNING:</b>\n"
-          "<br>No information available about wake_lock_in.\n"
-          "<br>To enable full wakelock reporting: \n"
-          "<br>adb shell dumpsys batterystats"
-          "--enable full-wake-history</p>")
+  print("<p><b>WARNING:</b>\n"
+        "<br>*: wake_lock field only shows the first/last wakelock held \n"
+        "when the system is awake. For more detail, use wake_lock_in."
+        "<br>To enable full wakelock reporting (post-KitKat only) : \n"
+        "<br>adb shell dumpsys batterystats "
+        "--enable full-wake-history</p>")
 
-  if getopt_proc_name and len(bhemitter.match_list) > 1:
-    print("<p><b>WARNING:</b>\n"
-          "<br>Multiple match found on -n option <em>%s</em>"
-          "<ul>" % getopt_proc_name)
-    for match in bhemitter.match_list:
-      print "<li>%s</li>" % match
-    print "</ul>Showing result for %s" % bhemitter.match_list[0]
+  if getopt_proc_name:
+    if len(bhemitter.match_list) > 1:
+      print("<p><b>WARNING:</b>\n"
+            "<br>Multiple match found on -n option <b>%s</b>"
+            "<ul>" % getopt_proc_name)
+      for match in bhemitter.match_list:
+        print "<li>%s</li>" % match
+      print ("</ul>Showing search result for %s</p>"
+             % bhemitter.match_list[0].split(":", 1)[0])
+    elif not bhemitter.match_list:
+      print("<p><b>WARNING:</b>\n"
+            "<br>No match on -n option <b>%s</b></p>" % getopt_proc_name)
+
+    if not highlight_dict:
+      print ("Search - <b>%s</b> in <b>%s</b> - did not match any event"
+             % (getopt_proc_name, getopt_highlight_category))
+
   print ("<pre>(Local time %s - %s, %dm elapsed)</pre>"
          % (start_localtime, stop_localtime,
             (data_stop_time-data_start_time) / 60))
