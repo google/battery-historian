@@ -1113,10 +1113,7 @@ def main():
   else:
     input_file = open(input_file, "r")
 
-  while True:
-    line = input_file.readline()
-    if not line: break
-
+  for line in input_file:
     if not on_mode and line.startswith("Battery History"):
       on_mode = True
       continue
