@@ -31,7 +31,10 @@ import datetime
 import fileinput
 import getopt
 import re
-import StringIO
+try:
+    from io import StringIO
+except:
+    import StringIO
 import subprocess
 import sys
 import time
@@ -55,13 +58,13 @@ getopt_report_filename = ""
 
 def usage():
   """Print usage of the script."""
-  print "\nUsage: %s [OPTIONS] [FILE]\n" % sys.argv[0]
-  print "  -a: show all wakelocks (don't abbreviate system wakelocks)"
-  print "  -d: debug mode, output debugging info for this program"
+  print ("\nUsage: %s [OPTIONS] [FILE]\n" % sys.argv[0])
+  print ("  -a: show all wakelocks (don't abbreviate system wakelocks)")
+  print ("  -d: debug mode, output debugging info for this program")
   print ("  -e TIME: extend billing an extra TIME seconds after each\n"
          "     wakelock, or until the next wakelock is seen.  Useful for\n"
          "     accounting for modem power overhead.")
-  print "  -h: print this message."
+  print ("  -h: print this message.")
   print ("  -n [CATEGORY=]PROC: output another row containing only processes\n"
          "     whose name matches uid of PROC in CATEGORY.\n"
          "     If CATEGORY is not specified, search in wake_lock_in.")
@@ -69,12 +72,12 @@ def usage():
          "     line: <timestamp in epoch seconds> <amps>")
   print ("  -q TIME: quantize data on power row in buckets of TIME\n"
          "     seconds (default %d)" % getopt_power_quanta)
-  print "  -r NAME: report input file name as NAME in HTML."
+  print ("  -r NAME: report input file name as NAME in HTML.")
   print ("  -s PCT: summarize certain useful rows with additional rows\n"
          "     showing percent time spent over PCT% in each.")
-  print "  -t: sort power report by wakelock duration instead of charge"
-  print "  -v: synchronize device time before collecting power data"
-  print "\n"
+  print ("  -t: sort power report by wakelock duration instead of charge")
+  print ("  -v: synchronize device time before collecting power data")
+  print ("\n")
   sys.exit(1)
 
 
@@ -286,12 +289,12 @@ def swap(swap_list, first, second):
 def add_emit_event(emit_dict, cat, name, start, end):
   newevent = (name, int(start), int(end))
   if end < start:
-    print "BUG: end time before start time: %s %s %s<br>" % (name,
+    print("BUG: end time before start time: %s %s %s<br>" % (name,
                                                              start,
-                                                             end)
+                                                             end))
   else:
     if getopt_debug:
-      print "Stored emitted event: %s<br>" % str(newevent)
+      print("Stored emitted event: %s<br>" % str(newevent))
 
   if cat in emit_dict:
     emit_dict[cat].append(newevent)
@@ -331,8 +334,8 @@ def parse_argv():
     opts, argv_rest = getopt.getopt(sys.argv[1:],
                                     "ade:hn:p:q:r:s:tv", ["help"])
   except getopt.GetoptError as err:
-    print "<pre>\n"
-    print str(err)
+    print("<pre>\n")
+    print(str(err))
     usage()
   try:
     for o, a in opts:
@@ -348,7 +351,7 @@ def parse_argv():
       if o == "-t": getopt_sort_by_power = False
       if o == "-v": sync_time()
   except ValueError as err:
-    print str(err)
+    print(str(err))
     usage()
 
   if not argv_rest:
@@ -470,17 +473,17 @@ class Printer(object):
         cat_name = "wake_lock *"
       else:
         cat_name = cat
-      print "['%s', '%s', %s, %s]," % (cat_name, e[0],
+      print("['%s', '%s', %s, %s]," % (cat_name, e[0],
                                        timestr_to_jsdate(e[1]),
-                                       timestr_to_jsdate(e[2]))
+                                       timestr_to_jsdate(e[2])))
 
   def print_highlight_dict(self, highlight_dict):
     catname = getopt_proc_name + " " + getopt_highlight_category
     if getopt_highlight_category in highlight_dict:
       for e in highlight_dict[getopt_highlight_category]:
-        print "['%s', '%s', %s, %s]," % (catname, e[0],
+        print("['%s', '%s', %s, %s]," % (catname, e[0],
                                          timestr_to_jsdate(e[1]),
-                                         timestr_to_jsdate(e[2]))
+                                         timestr_to_jsdate(e[2])))
 
   def print_events(self, emit_dict, highlight_dict):
     """print category data in the order of _print_setting.
@@ -601,7 +604,7 @@ class LegacyFormatConverter(object):
     fileinput.close()
 
     if not self._end_time:
-      print "cannot find end time"
+      print("cannot find end time")
       sys.exit(1)
 
     for line in fileinput.input(input_file):
@@ -656,7 +659,7 @@ class BHEmitter(object):
   def store_event(self, cat, subcat, event_str, event_time, timestr):
     self._in_progress_dict[cat][subcat] = (event_str, event_time, timestr)
     if getopt_debug:
-      print "store_event: %s in %s/%s<br>" % (event_str, cat, subcat)
+      print("store_event: %s in %s/%s<br>" % (event_str, cat, subcat))
 
   def retrieve_event(self, cat, subcat):
     """Pop event from in-progress event dict if match exists."""
@@ -664,12 +667,12 @@ class BHEmitter(object):
       try:
         result = self._in_progress_dict[cat].pop(subcat)
         if getopt_debug:
-          print "retrieve_event: found %s/%s<br>" % (cat, subcat)
+          print("retrieve_event: found %s/%s<br>" % (cat, subcat))
         return (True, result)
       except KeyError:
         pass
     if getopt_debug:
-      print "retrieve_event: no match for event %s/%s<br>" % (cat, subcat)
+      print("retrieve_event: no match for event %s/%s<br>" % (cat, subcat))
     return (False, False)
 
   def store_proc(self, e, highlight_dict):
@@ -712,7 +715,7 @@ class BHEmitter(object):
       proc_id = proc_pair.split(":", 1)[0]
       name = name + ":" + self.get_proc_name(proc_id)
       if getopt_debug:
-        print "annotate_event_name: %s" % name
+        print("annotate_event_name: %s" % name)
     return name
 
   def abbreviate_event_name(self, name):
@@ -753,9 +756,9 @@ class BHEmitter(object):
     else:
       time_dict[start_time] = time_this_quanta
     if getopt_debug:
-      print "time_dict[%d] now %f added %f" % (start_time,
+      print("time_dict[%d] now %f added %f" % (start_time,
                                                time_dict[start_time],
-                                               time_this_quanta)
+                                               time_this_quanta))
 
   # track total amount of event time held per second quanta
   def track_event_parallelism(self, start_time, end_time, time_dict):
@@ -806,7 +809,7 @@ class BHEmitter(object):
       highlight_dict: A separate event dict for -n option
     """
     if getopt_debug:
-      print "<p>handle_event: %s at %s<br>" % (event_str, time_str)
+      print("<p>handle_event: %s at %s<br>" % (event_str, time_str))
 
     cat = get_event_category(event_str)
     subcat = get_event_subcat(cat, event_str)
@@ -978,7 +981,7 @@ class PowerEmitter(object):
       assert multiplier <= 1.0
     else:
       if getopt_debug:
-        print "get_range_power: no power data available"
+        print("get_range_power: no power data available")
       result = 0.0
     return result
 
@@ -1004,8 +1007,8 @@ class PowerEmitter(object):
       mah = as_to_mah(amps)
       sd.add(event_name, end_time - start_time, mah, start_time)
       if getopt_debug:
-        print "billed range %f %f at %fAs to %s<br>" % (start_time, end_time,
-                                                        amps, event_name)
+        print("billed range %f %f at %fAs to %s<br>" % (start_time, end_time,
+                                                        amps, event_name))
       self._synopsis_dict[event_name] = sd
 
   def handle_line(self, secs, amps, emit_dict):
@@ -1041,22 +1044,22 @@ class PowerEmitter(object):
 
     if report_power:
       avg_ma = self._total_amps/self._line_ctr
-      print "<p>Total power: %.3f mAh, avg %.3f" % (mah, avg_ma)
+      print("<p>Total power: %.3f mAh, avg %.3f" % (mah, avg_ma))
       top_mah = as_to_mah(self._total_top_amps)
-      print ("<br>Total power above awake "
-             "threshold (%.1fmA): %.3f mAh %.3f As" % (self._TOP_THRESH * 1000,
+      print("<br>Total power above awake "
+            "threshold (%.1fmA): %.3f mAh %.3f As" % (self._TOP_THRESH * 1000,
                                                        top_mah,
                                                        self._total_top_amps))
-      print "<br>%d samples, %d min<p>" % (self._line_ctr, self._line_ctr / 60)
+      print("<br>%d samples, %d min<p>" % (self._line_ctr, self._line_ctr / 60))
 
     if report_power and getopt_bill_extra_secs:
       print("<b>Power seen during each history event, including %d "
             "seconds after each event:" % getopt_bill_extra_secs)
     elif report_power:
-      print "<b>Power seen during each history event:"
+      print("<b>Power seen during each history event:")
     else:
-      print "<b>Event summary:"
-    print "</b><br><pre>"
+      print("<b>Event summary:")
+    print("</b><br><pre>")
 
     report_list = []
     total_mah = 0.0
@@ -1071,8 +1074,8 @@ class PowerEmitter(object):
       report_list.append((sort_term, v.to_str(mah, report_power)))
     report_list.sort(key=lambda tup: tup[0], reverse=True)
     for i in report_list:
-      print i[1]
-    print "total: %.3f mAh, %d events" % (total_mah, total_count)
+      print(i[1])
+    print("total: %.3f mAh, %d events" % (total_mah, total_count))
 
 
 def adjust_reboot_time(line, event_time):
@@ -1163,7 +1166,7 @@ def main():
            r"((?P<sec>\d+)s)?((?P<ms>\d+)ms)?$")
     time_delta_s = parse_time(line_time, fmt) + time_offset
     if time_delta_s < 0:
-      print "Warning: time went backwards: %s" % line
+      print("Warning: time went backwards: %s" % line)
       continue
 
     event_time = data_start_time + time_delta_s
@@ -1171,7 +1174,7 @@ def main():
       # adjust offset using wall time
       offset, event_time = adjust_reboot_time(line, event_time)
       if offset < 0:
-        print "Warning: time went backwards: %s" % line
+        print("Warning: time went backwards: %s" % line)
         continue
       time_offset += offset
       time_delta_s = event_time - data_start_time
@@ -1194,7 +1197,7 @@ def main():
 
   input_file.close()
   if not on_mode:
-    print "Battery history not present in bugreport."
+    print("Battery history not present in bugreport.")
     return
 
   bhemitter.emit_remaining_events(data_stop_time, data_stop_timestr,
@@ -1217,23 +1220,23 @@ def main():
 
   printer = Printer()
 
-  print "<!DOCTYPE html>\n<html><head>\n"
+  print("<!DOCTYPE html>\n<html><head>\n")
   report_filename = argv_remainder[0]
   if getopt_report_filename:
     report_filename = getopt_report_filename
   header = "Battery Historian analysis for %s" % report_filename
-  print "<title>" + header + "</title>"
+  print("<title>" + header + "</title>")
   if overflowed:
     print ('<font size="5" color="red">Warning: History overflowed at %s, '
            'many events may be missing.</font>' %
            time_float_to_human(data_stop_time, True))
-  print "<p>" + header + "</p>"
+  print("<p>" + header + "</p>")
 
   if legacy_mode:
     print("<p><b>WARNING:</b> legacy format detected; "
           "history information is limited</p>\n")
 
-  print """
+  print("""
 <script type="text/javascript" src="https://www.google.com/jsapi?autoload={'modules':[{'name':'visualization',
        'version':'1','packages':['timeline']}]}"></script>
 <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.1/jquery.min.js"></script>
@@ -1256,14 +1259,14 @@ function drawChart() {
     dataTable.addColumn({ type: 'date', id: 'Start' });
     dataTable.addColumn({ type: 'date', id: 'End' });
     dataTable.addRows([
-"""
+""")
   printer.print_events(emit_dict, highlight_dict)
-  print "]);"
+  print("]);")
 
   width = 3000      # default width
   height = 3000     # intial height
   printer.print_chart_options(emit_dict, highlight_dict, width, height)
-  print """
+  print("""
 
   //make sure allocate enough vertical space
   options['height'] = dataTable.getNumberOfRows() * 40;
@@ -1301,7 +1304,7 @@ width:100px;
 </style>
 </head>
 <body>
-"""
+""")
   show_complete_time = False
   if data_stop_time - data_start_time > 24 * 60 * 60:
     show_complete_time = True
@@ -1322,7 +1325,7 @@ width:100px;
             "<br>Multiple match found on -n option <b>%s</b>"
             "<ul>" % getopt_proc_name)
       for match in bhemitter.match_list:
-        print "<li>%s</li>" % match
+        print("<li>%s</li>" % match)
       print ("</ul>Showing search result for %s</p>"
              % bhemitter.match_list[0].split(":", 1)[0])
     elif not bhemitter.match_list:
@@ -1345,10 +1348,10 @@ width:100px;
 
   power_emitter.report()
 
-  print "<pre>Process table:"
-  print bhemitter.procs_to_str()
+  print("<pre>Process table:")
+  print(bhemitter.procs_to_str())
 
-  print "</body>\n</html>"
+  print("</body>\n</html>")
 
 
 if __name__ == "__main__":
