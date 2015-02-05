@@ -1,6 +1,6 @@
 #!/usr/bin/python
 
-# Copyright 2014 Google Inc. All rights reserved.
+# Copyright 2015 Google Inc. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -25,7 +25,7 @@
 # stop monsoon.py
 # adb bugreport > bugreport.txt
 # ./historian.py -p monsoon.out bugreport.txt
-
+import Privecy
 import collections
 import datetime
 import fileinput
@@ -35,7 +35,7 @@ import StringIO
 import subprocess
 import sys
 import time
-
+import battery
 POWER_DATA_FILE_TIME_OFFSET = 0  # deal with any clock mismatch.
 BLAME_CATEGORY = "wake_lock_in"  # category to assign power blame to.
 ROWS_TO_SUMMARIZE = ["wake_lock", "running"]  # -s: summarize these rows
@@ -44,10 +44,10 @@ getopt_debug = 0
 getopt_bill_extra_secs = 0
 getopt_power_quanta = 15        # slice monsoon data this many seconds,
                                 # to avoid crashing visualizer
-getopt_power_data_file = False
+getopt_power_data_file = True
 getopt_proc_name = ""
 getopt_highlight_category = ""
-getopt_show_all_wakelocks = False
+getopt_show_all_wakelocks = True
 getopt_sort_by_power = True
 getopt_summarize_pct = -1
 getopt_report_filename = ""
