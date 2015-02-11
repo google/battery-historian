@@ -1,6 +1,6 @@
 #!/usr/bin/python
 
-# Copyright 2014 Google Inc. All rights reserved.
+# Copyright 2015 Google Inc. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -25,7 +25,7 @@
 # stop monsoon.py
 # adb bugreport > bugreport.txt
 # ./historian.py -p monsoon.out bugreport.txt
-
+import Private
 import collections
 import datetime
 import fileinput
@@ -35,7 +35,7 @@ import StringIO
 import subprocess
 import sys
 import time
-
+import Battery
 POWER_DATA_FILE_TIME_OFFSET = 0  # deal with any clock mismatch.
 BLAME_CATEGORY = "wake_lock_in"  # category to assign power blame to.
 ROWS_TO_SUMMARIZE = ["wake_lock", "running"]  # -s: summarize these rows
@@ -157,13 +157,13 @@ def get_event_subcat(cat, e):
     is one of the categories tracked by concurrent_cat.
     Default subcategory is the empty string.
   """
-  concurrent_cat = {"wake_lock_in", "sync", "top"}
+  concurrent_cat = {"wake_lock_in", "sync", "top","Battery"}
   if cat in concurrent_cat:
     try:
       return get_after_equal(e)
     except IndexError:
       pass
-  return ""
+  return "ART"
 
 
 def get_proc_pair(e):
