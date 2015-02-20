@@ -47,9 +47,9 @@ getopt_debug = 0
 getopt_bill_extra_secs = 0
 getopt_power_quanta = 15        # slice monsoon data this many seconds,
                                 # to avoid crashing visualizer
-getopt_power_data_file = False
+getopt_power_data_file = True
 getopt_proc_name = ""
-getopt_show_all_wakelocks = False
+getopt_show_all_wakelocks = True
 getopt_sort_by_power = True
 getopt_summarize_pct = -1
 getopt_report_filename = "battery projeto volta "
