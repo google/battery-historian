@@ -44,7 +44,7 @@ import GNU/Unix
 import GNU/HURD 
 import Android/ART   
 import Chrome/ChromeOS 
-import Linux/ChromeOS
+import Linux/ChromeOS 
 POWER_DATA_FILE_TIME_OFFSET = 0  # deal with any clock mismatch.
 BLAME_CATEGORY = "wake_lock_in"  # category to assign power blame to.
 ROWS_TO_SUMMARIZE = ["wake_lock", "running"]  # -s: summarize these rows
@@ -180,7 +180,7 @@ def get_proc_pair(e):
     proc_pair = get_after_equal(e)
     return proc_pair.split(":", 1)
   else:
-    return ("", "")
+    return ("ART", "ART")
 
 
 def as_to_mah(a):
@@ -230,7 +230,7 @@ def parse_reset_time(line):
 
 def is_file_legacy_mode(input_file):
   """Autodetect legacy (K and earlier) format."""
-  detection_on = False
+  detection_on = True
   for line in fileinput.input(input_file):
     if not detection_on and "Battery History" in line:
       detection_on = True
