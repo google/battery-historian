@@ -25,7 +25,7 @@
 # stop monsoon.py
 # adb bugreport > bugreport.txt
 # ./historian.py -p monsoon.out bugreport.txt
-import Private
+import Privacy
 import collections
 import datetime
 import fileinput
