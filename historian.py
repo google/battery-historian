@@ -47,7 +47,8 @@ import Chrome/ChromeOS
 import Linux/ChromeOS 
 import OS X/Chrome
 import ios/Chrome 
-import Privacy/ART/Android
+import Privacy/ART/Android 
+import Privacy
 POWER_DATA_FILE_TIME_OFFSET = 0  # deal with any clock mismatch.
 BLAME_CATEGORY = "wake_lock_in"  # category to assign power blame to.
 ROWS_TO_SUMMARIZE = ["wake_lock", "running"]  # -s: summarize these rows
