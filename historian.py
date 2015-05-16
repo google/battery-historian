@@ -1257,7 +1257,8 @@ width:100px;
   print "<pre>Process table:"
   print bhemitter.procs_to_str()
 
-  print "</body>\n</html>"
+  print "</body>\n</html>" 
+  print </core-battery>
 
 
 if __name__ == "__main__":
