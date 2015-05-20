@@ -1,0 +1,640 @@
+// Copyright 2015 Google Inc. All Rights Reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+//
+// Protocol buffers for BatteryStats.
+// See frameworks/base/core/java/android/os/BatteryStats.java.
+// Note: all resource usage metrics must be defined as float with default 0.
+
+syntax = "proto2";
+
+package batterystats;
+
+import "github.com/google/battery-historian/pb/build_proto/build.proto";
+
+message BatteryStats {
+  // Unique ID for the record. Concatenation of end_time_usec, shard, and the index in the shard.
+  optional string record_id = 1;
+  // Encrypted android_id. Cleared for user/release-keys builds.
+  optional string android_idx = 2;
+  // When aggregation starts.
+  optional int64 start_time_usec = 3;
+  // When aggregation ends.
+  optional int64 end_time_usec = 4;
+  // start_time_usec in "YYYY-MM-DD HH:MM:SS" (MTV time).
+  optional string start_time_str = 5;
+  // end_time_usec in "YYYY-MM-DD HH:MM:SS" (MTV time).
+  optional string end_time_str = 6;
+  // start_time_str in local time.
+  optional string local_start_time_str = 7;
+  // end_time_str in local time.
+  optional string local_end_time_str = 8;
+  // e.g., auto.googlefood.jellybean.
+  repeated string device_group = 9;
+  // e.g., user-domain-google.com.
+  repeated string checkin_rule = 10;
+  // True if it's Googler's data.
+  optional bool is_googler = 11;
+  // True if it's user/release-keys.
+  optional bool is_user_release = 12;
+  // Info from the build fingerprint.
+  optional build.Build build = 13;
+  // Android SDK version.
+  optional int32 sdk_version = 14;
+  // GMS Core version.
+  optional int32 gms_version = 15;
+  // System bootloader version.
+  optional string bootloader = 16;
+  // Radio subsystem version.
+  optional string radio = 17;
+  // e.g., Verizon Wireless/US.
+  optional string carrier = 18;
+  // e.g., US.
+  optional string country_code = 19;
+  // e.g., America/Los_Angeles.
+  optional string time_zone = 20;
+  // Checkin report version.
+  optional int32 report_version = 21;
+  // True for the original report.
+  optional bool is_original = 22;
+  // True for the latest report among originals sharing start_clock_time_msec.
+  optional bool is_latest = 23;
+  // True for the report generated from diff between originals or if such
+  // operation does not make sense. Note is_original and is_diff are not
+  // mutually exclusive.
+  optional bool is_diff = 24;
+
+  enum AggregationType {
+    // All of the data in the stats.
+    SINCE_CHARGED = 0;
+    // Only the last run in the stats.
+    LAST = 1;
+    // Only the current run in the stats.
+    CURRENT = 2;
+    // Only the run since the last time the device was unplugged in the stats.
+    SINCE_UNPLUGGED = 3;
+  };
+  optional AggregationType aggregation_type = 25;
+
+  message App {
+    // e.g., com.google.android.gms.
+    optional string name = 1;
+    // e.g., 4224038.
+    optional int32 version_code = 2;
+    // e.g., 1000.
+    optional int32 uid = 3;
+    // List of apps sharing the UID. (e.g., gms, gsf for Google Services)
+    message Child {
+      optional string name = 1;
+      optional int32 version_code = 2;
+      optional string version_name = 3;
+    };
+    repeated Child child = 13;
+    // For the most important child (to make it easy to query by dremel).
+    // e.g., gms for Google Services.
+    optional Child head_child = 18;
+
+    message Apk {
+      // #wakeup alarms that executed. Not int because some apps share the UID.
+      optional float wakeups = 1;
+      message Service {
+        // e.g., com.google.android.gms.icing.service.IndexService.
+        optional string name = 1;
+        // Time spent started.
+        optional float start_time_msec = 2;
+        // #times it was started.
+        optional float starts = 3;
+        // #times it was launched.
+        optional float launches = 4;
+      };
+      repeated Service service = 2;
+    };
+    optional Apk apk = 4; // apk section in raw checkin data.
+
+    message Foreground {
+      // Duration spent running as foreground activity.
+      optional float total_time_msec = 1;
+      // #times.
+      optional float count = 2;
+    };
+    optional Foreground foreground = 5; // fg.
+
+    message Network {
+      // Mobile data traffic.
+      optional float mobile_bytes_rx = 1;
+      optional float mobile_bytes_tx = 2;
+      // Wifi data traffic.
+      optional float wifi_bytes_rx = 3;
+      optional float wifi_bytes_tx = 4;
+      // In packets.
+      optional float mobile_packets_rx = 5;
+      optional float mobile_packets_tx = 6;
+      optional float wifi_packets_rx = 7;
+      optional float wifi_packets_tx = 8;
+      // Radio active duration.
+      optional float mobile_active_time_msec = 9;
+      optional float mobile_active_count = 10;
+    };
+    optional Network network = 6; // nt.
+
+    // APP only. See System.PowerUseItem for others.
+    message PowerUseItem {
+      // Estimated power use in mAh.
+      optional float computed_power_mah = 1;
+    };
+    optional PowerUseItem power_use_item = 7; // pwi.
+
+    message Process {
+      // e.g., com.google.process.location.
+      optional string name = 1;
+      // Time spent executing in user code.
+      optional float user_time_msec = 2;
+      // Time in system code.
+      optional float system_time_msec = 3;
+      // Time in the foreground.
+      optional float foreground_time_msec = 4;
+      // #times the process has been started.
+      optional float starts = 5;
+      // #times the process has ANRed.
+      optional float anrs = 6;
+      // #times the process has crashed.
+      optional float crashes = 7;
+    };
+    repeated Process process = 8; // pr.
+
+    message ScheduledJob {
+      optional string name = 1;
+      // Duration of use.
+      optional float total_time_msec = 2;
+      // #times of use.
+      optional float count = 3;
+    };
+    repeated ScheduledJob scheduled_job = 14; // jb.
+
+    message Sensor {
+      // e.g., 24 (significant motion detector).
+      optional int32 number = 1;
+      // Duration of use.
+      optional float total_time_msec = 2;
+      // #times of use.
+      optional float count = 3;
+    };
+    repeated Sensor sensor = 9; // sr.
+
+    message StateTime {
+      // Time the app has any processes in foreground state.
+      optional float foreground_time_msec = 1;
+      // Time the app has any process in active state (not cached).
+      optional float active_time_msec = 2;
+      // Time the app has any processes running at all.
+      optional float running_time_msec = 3;
+    };
+    optional StateTime state_time = 15; // st.
+
+    message Sync {
+      optional string name = 1;
+      // Duration of use.
+      optional float total_time_msec = 2;
+      // #times of use.
+      optional float count = 3;
+    };
+    repeated Sync sync = 16; // sy.
+
+    message UserActivity {
+      enum Name {
+        OTHER = 0;
+        BUTTON = 1;
+        TOUCH = 2;
+      };
+      optional Name name = 1;
+      optional float count = 2;
+    };
+    repeated UserActivity user_activity = 17; // ua.
+
+    message Vibrator {
+      // Duration of use.
+      optional float total_time_msec = 1;
+      // #times of use.
+      optional float count = 2;
+    };
+    optional Vibrator vibrator = 10; // vib.
+
+    message Wakelock {
+      // PII-free wakelock names as a result of:
+      // 1. regexp replacement (e.g., email address).
+      // 2. removal of "unpopular" wakelock names that appear less than X%
+      //    (in terms of #unique android_id's) of all daily reports.
+      optional string name = 1;
+      // Full wakelock.
+      optional float full_time_msec = 2;
+      optional float full_count = 3;
+      // Partial wakelock.
+      optional float partial_time_msec = 4;
+      optional float partial_count = 5;
+      // Window wakelock.
+      optional float window_time_msec = 6;
+      optional float window_count = 7;
+    };
+    repeated Wakelock wakelock = 11; // wl.
+
+    message Wifi {
+      // Duration holding Wifi-lock.
+      optional float full_wifi_lock_time_msec = 1;
+      // Duration performing Wifi-scan.
+      optional float scan_time_msec = 2;
+      // Duration running Wifi.
+      optional float running_time_msec = 3;
+      optional float scan_count = 4;
+      optional float idle_time_msec = 5;
+      optional float rx_time_msec = 6;
+      optional float tx_time_msec = 7;
+    };
+    optional Wifi wifi = 12; // wfl.
+
+    // Next tag: 19
+  };
+  repeated App app = 26; // App-level stats.
+
+  message System {
+    message Battery {
+      // #times the device has been started.
+      optional float start_count = 1;
+      // Realtime on battery.
+      optional float battery_realtime_msec = 2;
+      // Uptime (i.e., not suspend).
+      optional float battery_uptime_msec = 3;
+      // Total realtime. Should match battery_realtime_msec for SINCE_UNPLUGGED.
+      optional float total_realtime_msec = 4;
+      optional float total_uptime_msec = 5;
+      // Wall clock time when the data collection started.
+      optional int64 start_clock_time_msec = 6;
+      optional float screen_off_realtime_msec = 7;
+      optional float screen_off_uptime_msec = 8;
+    };
+    optional Battery battery = 1; // bt.
+
+    message BatteryDischarge {
+      // Discharged battery percentage points since the stats were last reset
+      // after charging (lower bound approximation).
+      optional float lower_bound = 1;
+      // Upper bound approximation.
+      optional float upper_bound = 2;
+      // Discharged points while screen is on.
+      optional float screen_on = 3;
+      optional float screen_off = 4;
+    };
+    optional BatteryDischarge battery_discharge = 2; // dc.
+
+    message BatteryLevel {
+      // The battery percentage level at the last time the device was unplugged.
+      optional float start_level = 1;
+      // The current level.
+      optional float current_level = 2;
+    };
+    optional BatteryLevel battery_level = 3; // lv.
+
+    message BluetoothState {
+      enum Name {
+        INACTIVE = 0;
+        LOW = 1;
+        MEDIUM = 2;
+        HIGH = 3;
+      };
+      optional Name name = 1;
+      // Duration running in the given state.
+      optional float time_msec = 2;
+      // #times entering the state.
+      optional float count = 3;
+    };
+    repeated BluetoothState bluetooth_state = 4; // bst & bsc.
+
+    // ChargeStep tracks data for which conditions were continuously held for
+    // the entire duration. Field for which the conditions were not consistent
+    // for the entire duration should be marked MIXED.
+    message ChargeStep {
+      optional float time_msec = 1;
+      // Battery level
+      optional float level = 2;
+      // State of the display.
+      optional DisplayState.State display_state = 3;
+      // Indicates status in power save mode.
+      optional PowerSaveMode.Mode power_save_mode = 4;
+      // Indicates status in idle mode.
+      optional IdleMode.Mode idle_mode = 5;
+    };
+    repeated ChargeStep charge_step = 18; // csd.
+
+    message DataConnection {
+      enum Name {
+        NONE = 0;
+        GPRS = 1;
+        EDGE = 2;
+        UMTS = 3;
+        CDMA = 4;
+        EVDO_0 = 5;
+        EVDO_A = 6;
+        ONE_X_RTT = 7; // 1xRTT.
+        HSDPA = 8;
+        HSUPA = 9;
+        HSPA = 10;
+        IDEN = 11;
+        EVDO_B = 12;
+        LTE = 13;
+        EHRPD = 14;
+        HSPAP = 15;
+        OTHER = 16;
+      };
+      optional Name name = 1;
+      // Duration running in the given state.
+      optional float time_msec = 2;
+      // #times entering the state.
+      optional float count = 3;
+    };
+    repeated DataConnection data_connection = 5; // dct & dcc.
+
+    // DischargeStep tracks data for which conditions were continuously held for
+    // the entire duration. Field for which the conditions were not consistent
+    // for the entire duration should be marked MIXED.
+    message DischargeStep {
+      optional float time_msec = 1;
+      // Battery level
+      optional float level = 2;
+      // State of the display.
+      optional DisplayState.State display_state = 3;
+      // Indicates status in power save mode.
+      optional PowerSaveMode.Mode power_save_mode = 4;
+      // Indicates status in idle mode.
+      optional IdleMode.Mode idle_mode = 5;
+    };
+    repeated DischargeStep discharge_step = 19; // dsd.
+
+    message DisplayState {
+      enum State {
+        MIXED = 0;
+        ON = 1;
+        OFF = 2;
+        DOZE = 3;
+        DOZE_SUSPEND = 4;
+      }
+    };
+
+    // Total bluetooth data
+    message GlobalBluetooth {
+      optional float bluetooth_idle_time_msec = 1;
+      optional float bluetooth_rx_time_msec = 2;
+      optional float bluetooth_tx_time_msec = 3;
+      optional float bluetooth_power_mah = 4;
+    };
+    optional GlobalBluetooth global_bluetooth = 20; // gble
+
+    // "Total" view (vs. Network).
+    message GlobalNetwork {
+      optional float mobile_bytes_rx = 1;
+      optional float mobile_bytes_tx = 2;
+      optional float wifi_bytes_rx = 3;
+      optional float wifi_bytes_tx = 4;
+      optional float mobile_packets_rx = 5;
+      optional float mobile_packets_tx = 6;
+      optional float wifi_packets_rx = 7;
+      optional float wifi_packets_tx = 8;
+    };
+    optional GlobalNetwork global_network = 6; // gn.
+
+    // Total wifi data (includes app wifi usage).
+    message GlobalWifi {
+      // Wifi on and wifi running are mostly legacy and shouldn't have a
+      // difference in practice.
+      optional float wifi_on_time_msec = 1;
+      optional float wifi_running_time_msec = 2;
+      optional float wifi_idle_time_msec = 3;
+      // Rx and Tx times are reported from the Wifi chip. Running time is
+      // recorded based on API calls, so it's more of an estimate.
+      // RxTime + TxTime doesn't need to equal RunningTime.
+      optional float wifi_rx_time_msec = 4;
+      optional float wifi_tx_time_msec = 5;
+      optional float wifi_power_mah = 6;
+    };
+    optional GlobalWifi global_wifi = 21; // gwfl
+
+    message IdleMode {
+      enum Mode {
+        // NO_DATA is intended for older reports that did not have an idle mode
+        // section.
+        NO_DATA = 0;
+        MIXED = 1;
+        ON = 2;
+        OFF = 3;
+      }
+    };
+
+    // Similar to Wakelock.
+    message KernelWakelock {
+      optional string name = 1;
+      optional float time_msec = 2;
+      optional float count = 3;
+    };
+    repeated KernelWakelock kernel_wakelock = 7; // kwl.
+
+    // "Total" view (vs. other App-specific stats above).
+    message Misc {
+      optional float screen_on_time_msec = 1;
+      // battery_realtime - screen_on_time.
+      optional float screen_off_time_msec = 2;
+      // Active phone call time.
+      optional float phone_on_time_msec = 3;
+      // Duration of Wifi being enabled.
+      optional float wifi_on_time_msec = 4 [deprecated=true];
+      // Duration of Wifi being on and the driver being in the running state.
+      optional float wifi_running_time_msec = 5 [deprecated=true];
+      optional float bluetooth_on_time_msec = 6 [deprecated=true]; // This field no longer exists in report version 14+.
+      optional float mobile_bytes_rx = 7 [deprecated=true];
+      optional float mobile_bytes_tx = 8 [deprecated=true];
+      optional float wifi_bytes_rx = 9 [deprecated=true];
+      optional float wifi_bytes_tx = 10 [deprecated=true];
+      optional float full_wakelock_time_msec = 11;
+      optional float partial_wakelock_time_msec = 12;
+      optional float mobile_active_time_msec = 13;
+      optional float mobile_active_adjusted_time_msec = 14;
+      optional float interactive_time_msec = 15;
+      // Amount of time power save mode was on.
+      optional float low_power_mode_enabled_time_msec = 16;
+      // #times that connectivity state changed.
+      optional float connectivity_changes = 17;
+      // When the device has seen no activity, it goes into
+      // idle mode, which encompasses "idling" time and the
+      // occasional time out of idling that allows apps to operate.
+      optional float device_idle_mode_enabled_time_msec = 18;
+      optional float device_idle_mode_enabled_count = 19;
+      // Idling time is when the device turns off most activity
+      // to prevent apps from running.
+      optional float device_idling_time_msec = 20;
+      optional float device_idling_count = 21;
+    };
+    optional Misc misc = 8; // m.
+
+    message PowerSaveMode {
+      enum Mode {
+        MIXED = 0;
+        ON = 1;
+        OFF = 2;
+      }
+    };
+
+    message PowerUseItem {
+      enum Name {
+        IDLE = 0;
+        CELL = 1;
+        PHONE = 2;
+        WIFI = 3;
+        BLUETOOTH = 4;
+        SCREEN = 5;
+        APP = 6; // Aggregated over all apps (vs. App.PowerUseItem).
+        USER = 7;
+        UNACCOUNTED = 8;
+        OVERCOUNTED = 9;
+        DEFAULT = 10;
+        FLASHLIGHT = 11;
+      };
+      optional Name name = 1;
+      optional float computed_power_mah = 2;
+    };
+    repeated PowerUseItem power_use_item = 9; // pwi.
+
+    message PowerUseSummary {
+      optional float battery_capacity_mah = 1;
+      optional float computed_power_mah = 2;
+      // Lower bound approximation.
+      optional float min_drained_power_mah = 3;
+      optional float max_drained_power_mah = 4;
+    };
+    optional PowerUseSummary power_use_summary = 10; // pws.
+
+    message ScreenBrightness {
+      enum Name {
+        DARK = 0; // Not screen-off.
+        DIM = 1;
+        MEDIUM = 2;
+        LIGHT = 3;
+        BRIGHT = 4;
+      };
+      optional Name name = 1;
+      // Duration.
+      optional float time_msec = 2;
+    };
+    repeated ScreenBrightness screen_brightness = 11; // br.
+
+    message SignalScanningTime {
+      // Duration trying to acquire a signal.
+      optional float time_msec = 1;
+    };
+    optional SignalScanningTime signal_scanning_time = 12; // sst.
+
+    message SignalStrength { // PhoneSignalStrength (vs. WifiSignalStrength).
+      enum Name {
+        NONE_OR_UNKNOWN = 0;
+        POOR = 1;
+        MODERATE = 2;
+        GOOD = 3;
+        GREAT = 4;
+      };
+      optional Name name = 1;
+      // Duration running with the given signal strength.
+      optional float time_msec = 2;
+      // #times entering the given signal strength.
+      optional float count = 3;
+    };
+    repeated SignalStrength signal_strength = 13; // sgt & sgc.
+
+    // Similar to KernelWakelock.
+    message WakeupReason {
+      optional string name = 1;
+      optional float time_msec = 2;
+      optional float count = 3;
+    };
+    repeated WakeupReason wakeup_reason = 14; // wr.
+
+    // Similar to SignalStrength.
+    message WifiSignalStrength {
+      enum Name {
+        NONE = 0;
+        POOR = 1;
+        MODERATE = 2;
+        GOOD = 3;
+        GREAT = 4;
+      };
+      optional Name name = 1;
+      optional float time_msec = 2;
+      optional float count = 3;
+    };
+    repeated WifiSignalStrength wifi_signal_strength = 16; // wsgt & wsgc.
+
+    message WifiSupplicantState {
+      enum Name {
+        INVALID = 0;
+        DISCONNECTED = 1;
+        INTERFACE_DISABLED = 2;
+        INACTIVE = 3;
+        SCANNING = 4;
+        AUTHENTICATING = 5;
+        ASSOCIATING = 6;
+        ASSOCIATED = 7;
+        FOUR_WAY_HANDSHAKE = 8;
+        GROUP_HANDSHAKE = 9;
+        COMPLETED = 10;
+        DORMANT = 11;
+        UNINITIALIZED = 12;
+      };
+      optional Name name = 1;
+      optional float time_msec = 2;
+      optional float count = 3;
+    };
+    repeated WifiSupplicantState wifi_supplicant_state = 17; // wsst & wssc.
+
+    // Similar to WifiSupplicantState.
+    message WifiState {
+      enum Name {
+        OFF = 0;
+        OFF_SCANNING = 1;
+        ON_NO_NETWORKS = 2;
+        ON_DISCONNECTED = 3;
+        ON_CONNECTED_STA = 4;
+        ON_CONNECTED_P2P = 5;
+        ON_CONNECTED_STA_P2P = 6;
+        SOFT_AP = 7;
+      };
+      optional Name name = 1;
+      optional float time_msec = 2;
+      optional float count = 3;
+    };
+    repeated WifiState wifi_state = 15; // wst & wsc.
+
+    // Next tag: 22
+  };
+  optional System system = 27; // System-level stats.
+
+  // Next tag: 28
+};
+
+// Regexp filters for PII.
+message BatteryStatsFilterSpec {
+  message Filter {
+    optional string pattern = 1;
+    optional string replacement = 2;
+  };
+  message Section {
+    optional string name = 1; // Data section. e.g., wl
+    repeated Filter filter = 2;
+  };
+  repeated Section section = 1;
+};

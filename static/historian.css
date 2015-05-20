@@ -1,0 +1,41 @@
+.axis path, .axis line {
+  fill: none;
+  shape-rendering: crispEdges;
+}
+
+.axis path {
+  stroke: #000000;
+}
+
+.battery.level {
+  pointer-events: none;
+}
+
+.line {
+  fill: none;
+  shape-rendering: crispEdges;
+  stroke-width: 16px;
+}
+
+.line:hover {
+  opacity: 0.7;
+}
+
+div.tooltip {
+  background: #dddddd;
+  border: 2px solid #a1a1a1;
+  border-radius: 25px;
+  padding: 10px 0 10px 20px;
+  pointer-events: none;
+  position: absolute;
+}
+
+.hover {
+  pointer-events: none;
+}
+
+.vis-label {
+  font-size: 16px;
+  pointer-events: none;
+  text-anchor: end;
+}

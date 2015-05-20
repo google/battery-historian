@@ -1,0 +1,56 @@
+// Copyright 2015 Google Inc. All Rights Reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+//
+// Protocol buffer containing information about installed packages.
+// A Session consists of the battery summary of a day for a device.
+
+syntax = "proto2";
+
+package session;
+
+import "github.com/google/battery-historian/pb/usagestats_proto/android_battery_usage.proto";
+import "github.com/google/battery-historian/pb/usagestats_proto/android_package_info.proto";
+
+// Aggregated checkin stats that we will use to compute deltas.
+message Checkin {
+        optional int64 android_id = 1;
+
+        // Build fingerprint
+        optional string build_fingerprint = 2;
+
+        // Device
+        optional string device = 3;
+
+        // Timestamp of measurement
+        optional int64 bucket_snapshot_msec = 4;
+
+        // Duration of the collection
+        optional int64 bucket_duration_msec = 5;
+
+        // Checkin
+        optional string checkin = 6;
+
+        // Installed packages
+        repeated usagestats.PackageInfo packages = 7;
+
+        // Checkin/OTA groups for the device
+        //    e.g. auto.droidfood, auto.googlefood.lmp
+        repeated string groups = 10;
+
+        // System info uploaded directly from the device.
+        optional usagestats.SystemInfo system_info = 8;
+
+        // Next tag = 9 (skip 10)
+}

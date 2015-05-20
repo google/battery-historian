@@ -1,0 +1,99 @@
+.last-success {
+  text-align: right;
+}
+
+.logo {
+  font-size: 80px;
+}
+
+.logo img {
+  width: 150px;
+  height:150px;
+}
+
+.configurations tr:hover {
+  background-color: lightgrey;
+}
+
+.hidden {
+  display: none;
+}
+
+.progress {
+  position: relative;
+  width: 500px;
+  height: 40px;
+  margin: 50px auto;
+  padding: 1px;
+  border-radius: 5px;
+  background-color: #eee;
+  border: 1px #000 double;
+  clear: both;
+}
+
+.bar {
+  background-color: #B4F5B4;
+  width: 0%;
+  height: 40px;
+}
+
+.percent {
+  position: absolute;
+  display: inline-block;
+  top:13px;
+  left: 38%;
+}
+
+.summary-title {
+  font-weight:bold;
+  display: table-cell;
+  font-size: 1em;
+  width: 500px;
+}
+
+.show-hide {
+  position: relative;
+  vertical-align: top;
+  width: 10%;
+  height: 40%;
+  padding: 0;
+  font-size: 18px;
+  color: white;
+  text-align: center;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+  background: #2c3e50;
+  border: 4px;
+  border-bottom: 2px solid #22303f;
+  cursor: pointer;
+  -webkit-box-shadow: inset 0 -2px #22303f;
+  box-shadow: inset 0 -2px #22303f;
+}
+
+.show-hide:active {
+  top: 1px;
+  outline: none;
+  -webkit-box-shadow: none;
+  box-shadow: none;
+}
+
+table.tablesorter tbody tr.row-clickable {
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+table.tablesorter tbody tr.label-top td, table.tablesorter tbody tr td.label-top {
+  background: #CC99FF;
+}
+
+table.tablesorter tbody tr.label-high td, table.tablesorter tbody tr td.label-high {
+  background: #FFBFBF;
+}
+
+.tablesorter tbody tr.label-medium td, table.tablesorter tbody tr td.label-medium {
+  background: #FFFFCC;
+}
+
+table.tablesorter tr.odd:hover td, table.tablesorter tr:hover td {
+  background-color: grey;
+  color: #fff;
+}
