@@ -52,16 +52,22 @@ getopt_sort_by_power = True
 getopt_summarize_pct = -1
 getopt_report_filename = ""
 
+getopt_generate_chart_only = False
+getopt_disable_chart_drawing = False
+
 
 def usage():
   """Print usage of the script."""
   print "\nUsage: %s [OPTIONS] [FILE]\n" % sys.argv[0]
   print "  -a: show all wakelocks (don't abbreviate system wakelocks)"
+  print "  -c: disable drawing of chart"
   print "  -d: debug mode, output debugging info for this program"
   print ("  -e TIME: extend billing an extra TIME seconds after each\n"
          "     wakelock, or until the next wakelock is seen.  Useful for\n"
          "     accounting for modem power overhead.")
   print "  -h: print this message."
+  print ("  -m: generate output that can be embedded in an existing page.\n"
+         "     HTML header and body tags are not outputted.")
   print ("  -n [CATEGORY=]PROC: output another row containing only processes\n"
          "     whose name matches uid of PROC in CATEGORY.\n"
          "     If CATEGORY is not specified, search in wake_lock_in.")
@@ -136,6 +142,30 @@ def format_time(delta_time):
   return timestr
 
 
+def format_duration(dur_ms):
+  """Return a time string representing the duration in human readable format."""
+  if not dur_ms:
+    return "0ms"
+
+  ms = dur_ms % 1000
+  dur_ms = (dur_ms - ms) / 1000
+  secs = dur_ms % 60
+  dur_ms = (dur_ms - secs) / 60
+  mins = dur_ms % 60
+  hrs = (dur_ms - mins) / 60
+
+  out = ""
+  if hrs > 0:
+    out += "%dh" % hrs
+  if mins > 0:
+    out += "%dm" % mins
+  if secs > 0:
+    out += "%ds" % secs
+  if ms > 0 or not out:
+    out += "%dms" % ms
+  return out
+
+
 def get_event_category(e):
   e = e.lstrip("+-")
   earr = e.split("=")
@@ -178,7 +208,7 @@ def get_event_subcat(cat, e):
     is one of the categories tracked by concurrent_cat.
     Default subcategory is the empty string.
   """
-  concurrent_cat = {"wake_lock_in", "sync", "top"}
+  concurrent_cat = {"wake_lock_in", "sync", "top", "job", "conn"}
   if cat in concurrent_cat:
     try:
       return get_after_equal(e)
@@ -252,7 +282,6 @@ def is_file_legacy_mode(input_file):
     split_line = line.split()
     if not split_line:
       continue
-  
     line_time = split_line[0]
     if "+" not in line_time and "-" not in line_time:
       continue
@@ -326,10 +355,12 @@ def parse_argv():
   global getopt_sort_by_power, getopt_power_data_file
   global getopt_summarize_pct, getopt_show_all_wakelocks
   global getopt_report_filename
+  global getopt_generate_chart_only
+  global getopt_disable_chart_drawing
 
   try:
     opts, argv_rest = getopt.getopt(sys.argv[1:],
-                                    "ade:hn:p:q:r:s:tv", ["help"])
+                                    "acde:hmn:p:q:r:s:tv", ["help"])
   except getopt.GetoptError as err:
     print "<pre>\n"
     print str(err)
@@ -337,9 +368,11 @@ def parse_argv():
   try:
     for o, a in opts:
       if o == "-a": getopt_show_all_wakelocks = True
+      if o == "-c": getopt_disable_chart_drawing = True
       if o == "-d": getopt_debug = True
       if o == "-e": getopt_bill_extra_secs = int(a)
       if o in ("-h", "--help"): usage()
+      if o == "-m": getopt_generate_chart_only = True
       if o == "-n": parse_search_option(a)
       if o == "-p": getopt_power_data_file = a
       if o == "-q": getopt_power_quanta = int(a)
@@ -376,15 +409,20 @@ class Printer(object):
       ("running", "#990099"),
       ("wake_reason", "#b82e2e"),
       ("wake_lock_in", "#ff33cc"),
+      ("job", "#cbb69d"),
       ("mobile_radio", "#aa0000"),
       ("data_conn", "#4070cf"),
+      ("conn", "#ff6a19"),
       ("activepower", "#dd4477"),
-      ("power", "#ff2222"),
-      ("status", "#9ac658"),
-      ("reboot", "#ddff77"),
+      ("device_idle", "#37ff64"),
+      ("motion", "#4070cf"),
+      ("active", "#119fc8"),
+      ("power_save", "#ff2222"),
+      ("wifi", "#119fc8"),
       ("wifi_full_lock", "#888888"),
       ("wifi_scan", "#888888"),
       ("wifi_multicast", "#888888"),
+      ("wifi_radio", "#888888"),
       ("wifi_running", "#109618"),
       ("wifi_suppl", "#119fc8"),
       ("wifi_signal_strength", "#9900aa"),
@@ -392,17 +430,22 @@ class Printer(object):
       ("phone_scanning", "#dda0dd"),
       ("audio", "#990099"),
       ("phone_in_call", "#cbb69d"),
-      ("wifi", "#119fc8"),
       ("bluetooth", "#cbb69d"),
       ("phone_state", "#dc3912"),
       ("signal_strength", "#119fc8"),
       ("video", "#cbb69d"),
+      ("flashlight", "#cbb69d"),
       ("low_power", "#109618"),
       ("fg", "#dda0dd"),
       ("gps", "#ff9900"),
+      ("reboot", "#ddff77"),
+      ("power", "#ff2222"),
+      ("status", "#9ac658"),
       ("health", "#888888"),
       ("plug", "#888888"),
-      ("job", "#cbb69d")]
+      ("charging", "#888888"),
+      ("pkginst", "#cbb69d"),
+      ("pkgunin", "#cbb69d")]
 
   _ignore_categories = ["user", "userfg"]
 
@@ -645,8 +688,9 @@ class BHEmitter(object):
   _transitional_cats = ["plugged", "running", "wake_lock", "gps", "sensor",
                         "phone_in_call", "mobile_radio", "phone_scanning",
                         "proc", "fg", "top", "sync", "wifi", "wifi_full_lock",
-                        "wifi_scan", "wifi_multicast", "wifi_running",
-                        "bluetooth", "audio", "video", "wake_lock_in"]
+                        "wifi_scan", "wifi_multicast", "wifi_running", "conn",
+                        "bluetooth", "audio", "video", "wake_lock_in", "job",
+                        "device_idle", "wifi_radio"]
   _in_progress_dict = autovivify()  # events that are currently in progress
   _proc_dict = {}             # mapping of "proc" uid to human-readable name
   _search_proc_id = -1        # proc id of the getopt_proc_name
@@ -1073,6 +1117,7 @@ class PowerEmitter(object):
     for i in report_list:
       print i[1]
     print "total: %.3f mAh, %d events" % (total_mah, total_count)
+    print "</pre>\n"
 
 
 def adjust_reboot_time(line, event_time):
@@ -1086,7 +1131,76 @@ def adjust_reboot_time(line, event_time):
   return wall_time - event_time, wall_time
 
 
+def get_app_id(uid):
+  """Returns the app ID from a string.
+
+  Reverses and uses the methods defined in UserHandle.java to get
+  only the app ID.
+
+  Args:
+    uid: a string representing the uid printed in the history output
+
+  Returns:
+    An integer representing the specific app ID.
+  """
+  abr_uid_re = re.compile(r"u(?P<userId>\d+)(?P<aidType>[ias])(?P<appId>\d+)")
+  if not uid:
+    return 0
+  if uid.isdigit():
+    # 100000 is the range of uids allocated for a user.
+    return int(uid) % 100000
+  if abr_uid_re.match(uid):
+    match = abr_uid_re.search(uid)
+    try:
+      d = match.groupdict()
+      if d["aidType"] == "i":  # first isolated uid
+        return int(d["appId"]) + 99000
+      if d["aidType"] == "a":  # first application uid
+        return int(d["appId"]) + 10000
+      return int(d["appId"])  # app id wasn't modified
+    except IndexError:
+      sys.stderr.write("Abbreviated app UID didn't match properly")
+  return uid
+
+
+app_cpu_usage = {}
+
+
+def save_app_cpu_usage(uid, cpu_time):
+  uid = get_app_id(uid)
+  if uid in app_cpu_usage:
+    app_cpu_usage[uid] += cpu_time
+  else:
+    app_cpu_usage[uid] = cpu_time
+
+# Constants defined in android.net.ConnectivityManager
+conn_constants = {
+    "0": "TYPE_MOBILE",
+    "1": "TYPE_WIFI",
+    "2": "TYPE_MOBILE_MMS",
+    "3": "TYPE_MOBILE_SUPL",
+    "4": "TYPE_MOBILE_DUN",
+    "5": "TYPE_MOBILE_HIPRI",
+    "6": "TYPE_WIMAX",
+    "7": "TYPE_BLUETOOTH",
+    "8": "TYPE_DUMMY",
+    "9": "TYPE_ETHERNET",
+    "17": "TYPE_VPN",
+    }
+
+
 def main():
+  details_re = re.compile(r"^Details:\scpu=\d+u\+\d+s\s*(\((?P<appCpu>.*)\))?")
+  app_cpu_usage_re = re.compile(
+      r"(?P<uid>\S+)=(?P<userTime>\d+)u\+(?P<sysTime>\d+)s")
+  proc_stat_re = re.compile((r"^/proc/stat=(?P<usrTime>-?\d+)\s+usr,\s+"
+                             r"(?P<sysTime>-?\d+)\s+sys,\s+"
+                             r"(?P<ioTime>-?\d+)\s+io,\s+"
+                             r"(?P<irqTime>-?\d+)\s+irq,\s+"
+                             r"(?P<sirqTime>-?\d+)\s+sirq,\s+"
+                             r"(?P<idleTime>-?\d+)\s+idle.*")
+                           )
+
   data_start_time = 0.0
   data_stop_time = 0
   data_stop_timestr = ""
@@ -1102,10 +1216,17 @@ def main():
   highlight_dict = {}         # search result for -n option
   is_first_data_line = True
   is_dumpsys_format = False
-  
   argv_remainder = parse_argv()
   input_file = argv_remainder[0]
   legacy_mode = is_file_legacy_mode(input_file)
+  proc_stat_summary = {
+      "usr": 0,
+      "sys": 0,
+      "io": 0,
+      "irq": 0,
+      "sirq": 0,
+      "idle": 0,
+      }
 
   if legacy_mode:
     input_string = LegacyFormatConverter().convert(input_file)
@@ -1125,6 +1246,8 @@ def main():
 
     if line.isspace(): break
 
+    line = line.strip()
+
     if "RESET:TIME: " in line:
       data_start_time = parse_reset_time(line)
       continue
@@ -1140,6 +1263,43 @@ def main():
     # escape spaces within quoted regions
     p = re.compile('"[^"]+"')
     line = p.sub(space_escape, line)
+
+    if details_re.match(line):
+      match = details_re.search(line)
+      try:
+        d = match.groupdict()
+        if d["appCpu"]:
+          for app in d["appCpu"].split(", "):
+            app_match = app_cpu_usage_re.search(app)
+            try:
+              a = app_match.groupdict()
+              save_app_cpu_usage(a["uid"],
+                                 int(a["userTime"]) + int(a["sysTime"]))
+            except IndexError:
+              sys.stderr.write("App CPU usage line didn't match properly")
+      except IndexError:
+        sys.stderr.write("Details line didn't match properly")
+
+      continue
+    elif proc_stat_re.match(line):
+      match = proc_stat_re.search(line)
+      try:
+        d = match.groupdict()
+        if d["usrTime"]:
+          proc_stat_summary["usr"] += int(d["usrTime"])
+        if d["sysTime"]:
+          proc_stat_summary["sys"] += int(d["sysTime"])
+        if d["ioTime"]:
+          proc_stat_summary["io"] += int(d["ioTime"])
+        if d["irqTime"]:
+          proc_stat_summary["irq"] += int(d["irqTime"])
+        if d["sirqTime"]:
+          proc_stat_summary["sirq"] += int(d["sirqTime"])
+        if d["idleTime"]:
+          proc_stat_summary["idle"] += int(d["idleTime"])
+      except IndexError:
+        sys.stderr.write("proc/stat line didn't match properly")
+      continue
 
     # pull apart input line by spaces
     split_line = line.split()
@@ -1184,7 +1344,21 @@ def main():
         bhemitter.handle_event(event_time, format_time(time_delta_s),
                                "battery_level=" + line_battery_level,
                                emit_dict, time_dict, highlight_dict)
+
     for event in line_events:
+      # conn events need to be parsed in order to be useful
+      if event.startswith("conn"):
+        num, ev = get_after_equal(event).split(":")
+        if ev == "\"CONNECTED\"":
+          event = "+conn="
+        else:
+          event = "-conn="
+
+        if num in conn_constants:
+          event += conn_constants[num]
+        else:
+          event += "UNKNOWN"
+
       bhemitter.handle_event(event_time, format_time(time_delta_s), event,
                              emit_dict, time_dict, highlight_dict)
 
@@ -1217,7 +1391,8 @@ def main():
 
   printer = Printer()
 
-  print "<!DOCTYPE html>\n<html><head>\n"
+  if not getopt_generate_chart_only:
+    print "<!DOCTYPE html>\n<html><head>\n"
   report_filename = argv_remainder[0]
   if getopt_report_filename:
     report_filename = getopt_report_filename
@@ -1233,14 +1408,18 @@ def main():
     print("<p><b>WARNING:</b> legacy format detected; "
           "history information is limited</p>\n")
 
+  if not getopt_generate_chart_only:
+    print """
+      <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.1/jquery.min.js"></script>
+      <script type="text/javascript" src="https://www.google.com/jsapi?autoload={'modules':[{'name':'visualization','version':'1','packages':['timeline']}]}"></script>
+    """
+
+  print "<script type=\"text/javascript\">"
+
+  if not getopt_disable_chart_drawing:
+    print "google.setOnLoadCallback(drawChart);\n"
+
   print """
-<script type="text/javascript" src="https://www.google.com/jsapi?autoload={'modules':[{'name':'visualization',
-       'version':'1','packages':['timeline']}]}"></script>
-<script src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.1/jquery.min.js"></script>
-<script type="text/javascript">
-
-google.setOnLoadCallback(drawChart);
-
     var dataTable;
     var chart;
     var options;
@@ -1270,7 +1449,7 @@ function drawChart() {
   chart.draw(dataTable, options);
 
   //get vertical coordinate of scale bar
-  var svg = document.getElementsByTagName('svg')[0];
+  var svg = document.getElementById('chart').getElementsByTagName('svg')[0];
   var label = svg.children[2].children[0];
   var y = label.getAttribute('y');
   //plus height of scale bar
@@ -1283,6 +1462,8 @@ function drawChart() {
   svg.setAttribute('height', chart_height);
   var content = $('#chart').children()[0];
   $(content).css('height', chart_height);
+  var inner = $(content).children()[0];
+  $(inner).css('height', chart_height);
 }
 
 
@@ -1299,16 +1480,21 @@ function redrawChart() {
 width:100px;
 }
 </style>
-</head>
-<body>
 """
+  if not getopt_generate_chart_only:
+    print "</head>\n<body>\n"
+
   show_complete_time = False
   if data_stop_time - data_start_time > 24 * 60 * 60:
     show_complete_time = True
   start_localtime = time_float_to_human(data_start_time, show_complete_time)
   stop_localtime = time_float_to_human(data_stop_time, show_complete_time)
-  print ('<div id="chart"><b>WARNING: Visualizer disabled. '
-         'If you see this message, download the HTML then open it.</b></div>')
+
+  print "<div id=\"chart\">"
+  if not getopt_generate_chart_only:
+    print ("<b>WARNING: Visualizer disabled. "
+           "If you see this message, download the HTML then open it.</b>")
+  print "</div>"
   print("<p><b>WARNING:</b>\n"
         "<br>*: wake_lock field only shows the first/last wakelock held \n"
         "when the system is awake. For more detail, use wake_lock_in."
@@ -1345,10 +1531,35 @@ width:100px;
 
   power_emitter.report()
 
+  if app_cpu_usage:
+    print "<b>App CPU usage:</b>"
+    print "<table border=\"1\"><tr><td>UID</td><td>Duration</td></tr>"
+    for (uid, use) in sorted(app_cpu_usage.items(), key=lambda x: -x[1]):
+      print "<tr><td>%s</td>" % uid
+      print "<td>%s</td></tr>" % format_duration(use)
+    print "</table>"
+
+  print "<br /><b>Proc/stat summary</b><ul>"
+  print "<li>Total User Time: %s</li>" % format_duration(
+      proc_stat_summary["usr"])
+  print "<li>Total System Time: %s</li>" % format_duration(
+      proc_stat_summary["sys"])
+  print "<li>Total IO Time: %s</li>" % format_duration(
+      proc_stat_summary["io"])
+  print "<li>Total Irq Time: %s</li>" % format_duration(
+      proc_stat_summary["irq"])
+  print "<li>Total Soft Irq Time: %s</li>" % format_duration(
+      proc_stat_summary["sirq"])
+  print "<li>Total Idle Time: %s</li>" % format_duration(
+      proc_stat_summary["idle"])
+  print "</ul>"
+
   print "<pre>Process table:"
   print bhemitter.procs_to_str()
+  print "</pre>\n"
 
-  print "</body>\n</html>"
+  if not getopt_generate_chart_only:
+    print "</body>\n</html>"
 
 
 if __name__ == "__main__":

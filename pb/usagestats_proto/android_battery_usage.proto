@@ -1,0 +1,66 @@
+// Copyright 2015 Google Inc. All Rights Reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+//
+// Protocol buffer containing information about installed packages.
+
+syntax = "proto2";
+
+package usagestats;
+
+import "github.com/google/battery-historian/pb/usagestats_proto/android_package_info.proto";
+
+message SystemInfo {
+
+  // Installed Package List
+  repeated PackageInfo installed_packages = 1;
+
+  // e.g. hammerhead-userdebug L MASTER eng.xx... dev-keys Build
+  optional string build_display = 2;
+
+  // e.g. google/hammerhead/hammerhead:L/MASTER/
+  //        eng.abcd.20140304.184123:userdebug/dev-keys
+  optional string build_fingerprint = 3;
+
+  // Bootloader version e.g. HHZ11k
+  optional string bootloader = 4;
+
+  // e.g. T-Mobile
+  optional string network_operator = 5;
+
+  // e.g. userdebug
+  optional string build_type = 6;
+
+  // e.g. hammerhead
+  optional string device = 7;
+
+  // e.g. M8974A-2.0.50.1.02
+  optional string baseband_radio = 8;
+
+  // e.g. hammerhead
+  optional string hardware = 9;
+
+  // Checkin/OTA groups for the device
+  //    e.g. auto.droidfood, auto.googlefood.lmp
+  repeated string groups = 10;
+
+  // e.g. 22
+  optional int32 sdk_version = 11;
+
+  // e.g. ES
+  optional string country_code = 12;
+
+  // e.g. Europe/London
+  optional string time_zone = 13;
+}
