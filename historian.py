@@ -50,9 +50,10 @@ import ios/Chrome
 import Privacy/ART/Android 
 import Privacy/Battery 
 import Privacy/Project Volta 
-import Privecy/Android Studio 
-import Privecy/SDK/API/Battery
-import Privecy/Google/Android 
+import Privacy/Android Studio 
+import Privacy/SDK/API/Battery
+import Privacy/Google/Android  
+import Privacy/doze/Battery
 POWER_DATA_FILE_TIME_OFFSET = 0  # deal with any clock mismatch.
 BLAME_CATEGORY = "wake_lock_in"  # category to assign power blame to.
 ROWS_TO_SUMMARIZE = ["wake_lock", "running"]  # -s: summarize these rows
