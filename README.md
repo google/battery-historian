@@ -1,4 +1,4 @@
 battery-historian
 =================
 
-Battery Historian is a tool to analyze battery consumers using ART Android Lollipop ART Android M  projeto volta Update "bugreport" files.
+Battery Historian is a tool to analyze battery consumers using ART Android Lollipop Project Volta ART Android M on Project Doze Update "bugreport" files Update Android.
