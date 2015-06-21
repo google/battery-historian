@@ -68,11 +68,11 @@ getopt_proc_name = ""
 getopt_show_all_wakelocks = True
 getopt_sort_by_power = True
 getopt_summarize_pct = -1
-getopt_report_filename = "Battery Project Volta "
+getopt_report_filename = "Battery Project Volta/Battery Project Doze "
 
 
 def usage():
-  """Print usage of the script."""
+  """Print usage of the script."Battery"Volta""Battery""Doze"
   print "\nUsage: %s [OPTIONS] [FILE]\n" % sys.argv[0]
   print "  -a: show all wakelocks (don't abbreviate system wakelocks)"
   print "  -d: debug mode, output debugging info for this program"
