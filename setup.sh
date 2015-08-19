@@ -17,6 +17,7 @@
 #
 
 CLOSURE_COMPILER_URL="http://dl.google.com/closure-compiler/compiler-latest.zip"
+CLOSURE_LIBRARY_URL="https://codeload.github.com/google/closure-library/zip/master"
 
 ERROR="
 
@@ -38,7 +39,14 @@ mkdir -p compiled
 
 # Download closure library.
 if [ ! -d "third_party/closure-library" ]; then
-    git clone https://github.com/google/closure-library third_party/closure-library
+    wget "$CLOSURE_LIBRARY_URL"
+    if [ $? -ne 0 ]; then
+      echo "$ERROR"
+    else
+      unzip master -d third_party/
+      rm master
+      mv third_party/closure-library-master third_party/closure-library
+    fi
 fi
 
 # Download closure compiler.
