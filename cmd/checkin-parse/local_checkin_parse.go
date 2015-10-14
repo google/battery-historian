@@ -23,10 +23,10 @@ import (
 
 	"github.com/golang/protobuf/proto"
 
-	sessionpb "github.com/google/battery-historian/pb/session_proto"
-	"github.com/google/battery-historian/packageutils"
-	"github.com/google/battery-historian/checkinutil"
 	"github.com/google/battery-historian/checkinparse"
+	"github.com/google/battery-historian/checkinutil"
+	"github.com/google/battery-historian/packageutils"
+	sessionpb "github.com/google/battery-historian/pb/session_proto"
 )
 
 var (
