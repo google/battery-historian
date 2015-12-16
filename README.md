@@ -112,7 +112,7 @@ $ go run exec/local_history_parse.go --summary=totalTime --input=bugreport.txt
 Support
 -------
 
-- G+ Community (Discussion Thread: Battery Historian): https://plus.google.com/b/108967384991768947849/communities/114791428968349268860
+- G+ Community (Discussion Thread: Battery Historian): https://plus.google.com/communities/112943340699633396715
 
 If you've found an error in this sample, please file an issue:
 <https://github.com/google/battery-historian/issues>
