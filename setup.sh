@@ -58,7 +58,7 @@ third_party/closure-library/closure/bin/build/depswriter.py --root="third_party/
 java -jar third_party/closure-compiler/compiler.jar --closure_entry_point historian.Historian \
       --js js/*.js \
       --js third_party/closure-library/closure/goog/base.js \
-      --js third_party/closure-library/closure/goog/** \
+      --js third_party/closure-library/closure/goog/**/*.js \
       --only_closure_dependencies \
       --generate_exports \
       --js_output_file compiled/historian-optimized.js \
