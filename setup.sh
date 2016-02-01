@@ -16,7 +16,7 @@
 # limitations under the License.
 #
 
-CLOSURE_COMPILER_URL="http://dl.google.com/closure-compiler/compiler-latest.zip"
+CLOSURE_COMPILER_URL="http://dl.google.com/closure-compiler/compiler-20150315.zip"
 
 ERROR="
 
@@ -28,10 +28,11 @@ and unzip into the third_party/closure-compiler/ directory, then rerun this scri
 
 "
 
-
-# To cleanup
-# rm -r third_party
-# rm -r compiled
+if [ "$1" == "--rebuild_all" ];
+then
+  rm -r third_party
+  rm -r compiled
+fi
 
 mkdir -p third_party
 mkdir -p compiled
@@ -47,7 +48,7 @@ if [ ! -d "third_party/closure-compiler" ]; then
     if [ $? -ne 0 ]; then
       echo "$ERROR"
     else
-      unzip third_party/closure-compiler/compiler-latest.zip -d third_party/closure-compiler
+      unzip third_party/closure-compiler/compiler-20150315.zip -d third_party/closure-compiler
     fi
 fi
 
