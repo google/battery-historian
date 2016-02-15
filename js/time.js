@@ -56,9 +56,9 @@ historian.time.getDate = function(t) {
 historian.time.getTime = function(t) {
   var d = new Date(t);
   return (
-      historian.time.padTime_(d.getHours()) + ':' +
-      historian.time.padTime_(d.getMinutes()) + ':' +
-      historian.time.padTime_(d.getSeconds()));
+      historian.time.padTime_(d.getUTCHours()) + ':' +
+      historian.time.padTime_(d.getUTCMinutes()) + ':' +
+      historian.time.padTime_(d.getUTCSeconds()));
 };
 
 
