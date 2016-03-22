@@ -1,5 +1,5 @@
 <!--
-Copyright 2015 Google Inc. All rights reserved.
+Copyright 2016 Google Inc. All rights reserved.
 Licensed under the Apache License, Version 2.0 (the "License"); you may not use
 this file except in compliance with the License. You may obtain a copy of the
 License at
@@ -11,32 +11,86 @@ specific language governing permissions and limitations under the License.
 -->
 
 {{ define "content" }}
-    <h3 id="top">Upload Bugreport</h3>
-    <form class="form-signin" method="post" enctype="multipart/form-data">
-      <fieldset>
-        <input type="file" name="myfiles" id="myfiles">
-        <input type="submit" name="submit" value="Submit">
-      </fieldset>
-    </form>
+<p id="processingError" style="display:none" class="alert alert-danger"></p>
+<div id="file-upload">
+  <link rel="stylesheet" href="/static/upload.css?ver={{.ResVersion}}">
+  <h1>Upload Bugreport</h1>
+  <p>Both .txt and .zip bug reports are accepted.</p>
+  <form class="form-signin" method="post" enctype="multipart/form-data">
+    <fieldset style="margin-bottom: 10px">
+      <span class="btn btn-default btn-file btn-browse">
+        <span class="glyphicon glyphicon-folder-open"></span>
+        Browse
+        <input type="file" name="bugreport" id="bugreport">
+      </span>
+      <span id="bugreport-filename" class="filename">Choose a Bugreport File</span>
+    </fieldset>
 
-    <div class="progress" style="display: none">
-      <div class="bar"></div>
-      <div class="percent">0%</div>
+    <div class="btn btn-default btn-file btn-xs extra-option" id="add-kernel">
+      <span class="glyphicon glyphicon-plus"></span>
+      Kernel Wakesource Trace
+    </div>
+    <div class="btn btn-default btn-file btn-xs extra-option" id="add-powermonitor">
+      <span class="glyphicon glyphicon-plus"></span>
+      Powermonitor File
+    </div>
+    <div class="btn btn-default btn-file btn-xs extra-option" id="add-comparison">
+      <span class="glyphicon glyphicon-chevron-right"></span>
+      Switch to Bugreport Comparison
     </div>
 
-    <script src="//www.gstatic.com/external_hosted/jquery_form/jquery.form.min.js" charset="utf-8"></script>
-    <script type="text/javascript" src="/static/upload.js"></script>
-    <script type="text/javascript" src="//www.gstatic.com/external_hosted/d3/d3.js"></script>
+    <fieldset id="extra-options" style="margin-top: 10px;">
+      <div id="comparison-option" style="display: none;">
+        <span class="btn btn-default btn-file btn-browse">
+          <span class="glyphicon glyphicon-folder-open"></span>
+          Browse
+          <input type="file" name="bugreport2" id="bugreport2">
+        </span>
+        <span id="bugreport2-filename" class="filename">Choose a Second Bugreport File</span>
+        <span class="btn btn-default glyphicon glyphicon-remove" id="remove-comparison">
+      </div>
+      <div id="kernel-option" style="display: none;">
+        <span class="btn btn-default btn-file btn-browse">
+          <span class="glyphicon glyphicon-folder-open"></span>
+          Browse
+          <input type="file" name="kernel" id="kernel">
+        </span>
+        <span class="filename">
+          <span id="kernel-filename">Choose a Kernel Wakesource Trace File</span>
+        </span>
+        <span class="btn btn-default glyphicon glyphicon-remove" id="remove-kernel">
+      </div>
+      <div id="powermonitor-option" style="display: none;">
+        <span class="btn btn-default btn-file btn-browse">
+          <span class="glyphicon glyphicon-folder-open"></span>
+          Browse
+          <input type="file" name="powermonitor" id="powermonitor">
+        </span>
+        <span id="powermonitor-filename" class="filename">Choose a Powermonitor File</span>
+        <span class="btn btn-default glyphicon glyphicon-remove" id="remove-powermonitor">
+      </div>
+    </fieldset>
 
-  {{ if .IsOptimizedJs}}
-    <script src="/compiled/historian-optimized.js"></script>
+    <input id="upload-submit" type="submit" name="submit" value="Submit" class="btn btn-primary btn-submit" style="display:none">
+  </form>
+
+  <div class="progress" style="display:none">
+    <div class="progress-bar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">0%</div>
+  </div>
+
+  <script src="//www.gstatic.com/external_hosted/jquery_form/jquery.form.min.js" charset="utf-8"></script>
+
+  <script type="text/javascript" src="//cdnjs.cloudflare.com/ajax/libs/d3/3.5.15/d3.js"></script>
+  {{ if .IsOptimizedJs }}
+  <script src="/compiled/historian-optimized.js?ver={{.ResVersion}}"></script>
   {{ else }}
-    <!-- Need to load Closure in header. -->
-    <script>CLOSURE_NO_DEPS=true</script>
-    <script type="text/javascript" src="/third_party/closure-library/closure/goog/base.js"></script>
-    <script type="text/javascript" src="/compiled/historian_deps-runfiles.js"></script>
-    <script type="text/javascript">
-      goog.require('historian.Historian');
-    </script>
+  <!-- Need to load Closure in header. -->
+  <script>CLOSURE_NO_DEPS=true</script>
+  <script type="text/javascript" src="/third_party/closure-library/closure/goog/base.js"></script>
+  <script type="text/javascript" src="/compiled/historian_deps-runfiles.js"></script>
+  <script type="text/javascript">
+    goog.require('historian.upload');
+  </script>
   {{ end }}
+</div>
 {{ end }}

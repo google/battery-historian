@@ -1,0 +1,125 @@
+<!--
+Copyright 2016 Google Inc. All rights reserved.
+Licensed under the Apache License, Version 2.0 (the "License"); you may not use
+this file except in compliance with the License. You may obtain a copy of the
+License at
+      http://www.apache.org/licenses/LICENSE-2.0
+Unless required by applicable law or agreed to in writing, software distributed
+under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
+CONDITIONS OF ANY KIND, either express or implied. See the License for the
+specific language governing permissions and limitations under the License.
+-->
+
+{{define "history"}}
+<h4 id="top">Number of times unplugged: {{.Count}}</h4>
+{{range $key, $value := .UnplugSummaries}}
+  <a id="top-link-{{$key}}" href="#"><ul>Summary {{$key}}</ul></a>
+  {{.LevelDrop}} pct drop @ <b>{{printf "%.2f" .LevelDropPerHour}} %/hr</b> over {{.Duration}} <br/>
+  <div id="tm-range-{{$key}}">
+    (<span>{{.SummaryStart}}</span> -
+    <span>{{.SummaryEnd}}</span>)
+  </div>
+{{end}}
+<hr>
+
+{{range $key, $value := .UnplugSummaries}}
+  <div id="history-summary-{{$key}}" class="summary-wrapper" style="display: none">
+    <h3><b>Summary {{$key}}</b></h3>
+    <div id="DeviceStateSummary" class="summary-title">
+      <span>Device State Summary:</span>
+    </div>
+  <div>
+    <table id="nocheckin" class="summary-content to-datatable">
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th title="name of device state">Name</th>
+          <th title="average frequency">Count / Hr</th>
+          <th title="average duration">Seconds / Hr</th>
+          <th title="total count for each state">Total Num</th>
+          <th title="total duration for each state" class="duration">Total Duration</th>
+          <th title="max duration for each state" class="duration">Max Duration</th>
+        </tr>
+      </thead>
+      <tbody>
+        <!-- Table contents-->
+        {{range $id, $stat := $value.SystemStats}}
+          <tr>
+            <td>{{$id}}</td>
+            <td>{{$stat.Name}}</td>
+            <td>{{printf "%.2f" $stat.NumRate}}</td>
+            <td>{{printf "%.2f" $stat.DurationRate}}</td>
+            <td>{{$stat.Num}}</td>
+            <td>{{$stat.TotalDuration}}</td>
+            <td>{{$stat.MaxDuration}}</td>
+          </tr>
+        {{end}}
+      </tbody>
+    </table>
+  </div>
+
+  {{range $brstat := $value.BreakdownStats}}
+  {{if $brstat.Stats }}
+  <div id="{{$brstat.Metric}}" class="summary-title-inline">
+    <span>{{$brstat.Metric}}:</span>
+  </div>
+  {{if or (eq $brstat.Metric "FirstWakelockAfterSuspend") (eq $brstat.Metric "DetailedWakelockSummary")}}
+  <div class="sliding">
+    <table id="nocheckin" class="summary-content to-datatable">
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th title="name of each entry in the summary">Name</th>
+          <th title="average frequency">Count / Hr</th>
+          <th title="total count for each entry">Total Num</th>
+        </tr>
+      </thead>
+      <tbody>
+        <!-- Table contents -->
+        {{range $id, $stat := $brstat.Stats}}
+        <tr>
+          <td>{{$id}}</td>
+          <td>{{$stat.Name}}</td>
+          <td>{{printf "%.2f" $stat.NumRate}}</td>
+          <td>{{$stat.Num}}</td>
+        </tr>
+        {{end}}
+      </tbody>
+    </table>
+  </div>
+  {{else}}
+  <div class="sliding">
+    <table id="nocheckin" class="summary-content to-datatable">
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th title="name of each entry in the summary">Name</th>
+          <th title="average frequency">Count / Hr</th>
+          <th title="average duration">Seconds / Hr</th>
+          <th title="total count for each entry">Total Num</th>
+          <th title="total duration for each entry" class="duration">Total Duration</th>
+          <th title="max duration for each entry" class="duration">Max Duration</th>
+        </tr>
+      </thead>
+      <tbody>
+        <!-- Table contents-->
+        {{range $id, $stat := $brstat.Stats}}
+        <tr>
+          <td>{{$id}}</td>
+          <td>{{$stat.Name}}</td>
+          <td>{{printf "%.2f" $stat.NumRate}}</td>
+          <td>{{printf "%.2f" $stat.DurationRate}}</td>
+          <td>{{$stat.Num}}</td>
+          <td>{{$stat.TotalDuration}}</td>
+          <td>{{$stat.MaxDuration}}</td>
+        </tr>
+        {{end}}
+      </tbody>
+    </table>
+  </div>
+  {{end}}
+  {{end}}
+  {{end}}
+  </div>
+{{end}}
+{{end}}

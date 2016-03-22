@@ -1,0 +1,1033 @@
+<!--
+Copyright 2016 Google Inc. All rights reserved.
+Licensed under the Apache License, Version 2.0 (the "License"); you may not use
+this file except in compliance with the License. You may obtain a copy of the
+License at
+      http://www.apache.org/licenses/LICENSE-2.0
+Unless required by applicable law or agreed to in writing, software distributed
+under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
+CONDITIONS OF ANY KIND, either express or implied. See the License for the
+specific language governing permissions and limitations under the License.
+-->
+
+{{define "checkin"}}
+<div class="summary-title" id="aggregated-checkin">
+   <span>Aggregated Checkin Stats:</span>
+</div>
+<div>
+  <table id="checkin" class="summary-content to-datatable no-paging no-ordering no-searching no-info">
+    <thead>
+      <tr>
+        <th>Metric</th>
+        <th>Value ({{index .Filename 0}})</th>
+        <th>Value ({{index .Filename 1}})</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Screen Off Discharge Rate (%/hr) </td>
+        {{with .CheckinSummary}}
+        {{range .}}
+        <td>{{printf "%.2f  (Discharged: %.f%%)" .ScreenOffDischargeRatePerHr.V .ScreenOffDischargePoints}}</td>
+        {{end}}
+        {{end}}
+      </tr>
+      <tr>
+        <td>Screen On Discharge Rate (%/hr) </td>
+        {{with .CheckinSummary}}
+        {{range .}}
+        <td>{{printf "%.2f  (Discharged: %.f%%)" .ScreenOnDischargeRatePerHr.V .ScreenOnDischargePoints}}</td>
+        {{end}}
+        {{end}}
+      </tr>
+      <tr>
+        <td>Screen On Time (%)</td>
+        {{with .CheckinSummary}}
+        {{range .}}
+        <td>{{printf "%s (%.2f%%)" .ScreenOnTime.V .ScreenOnTimePercentage}}</td>
+        {{end}}
+        {{end}}
+      </tr>
+      <tr>
+        <td>Screen Off Uptime</td>
+        {{with .CheckinSummary}}
+        {{range .}}
+        <td>{{printf "%s (%.2f%%)" .ScreenOffUptime.V .ScreenOffUptimePercentage}}</td>
+        {{end}}
+        {{end}}
+      </tr>
+      <tr data-jump="#userspace-wakelocks" class="row-clickable table-jump">
+        <td>Userspace Wakelock Time</td>
+        {{with .CheckinSummary}}
+        {{range .}}
+        <td>{{printf "%s (%.2f%%)" .PartialWakelockTime.V .PartialWakelockTimePercentage}}</td>
+        {{end}}
+        {{end}}
+      </tr>
+      <tr data-jump="#kernel-wakesources" class="row-clickable table-jump">
+        <td>Kernel Overhead Time</td>
+        {{with .CheckinSummary}}
+        {{range .}}
+        <td>{{printf "%s (%.2f%%)" .KernelOverheadTime.V .KernelOverheadTimePercentage}}</td>
+        {{end}}
+        {{end}}
+      </tr>
+      <tr data-jump="#mobile-traffic" class="row-clickable table-jump">
+        <td>Mobile KBs/hr</td>
+        {{with .CheckinSummary}}
+        {{range .}}
+        <td>{{printf "%.2f" .MobileKiloBytesPerHr.V }}</td>
+        {{end}}
+        {{end}}
+      </tr>
+      <tr data-jump="#wifi-traffic" class="row-clickable table-jump">
+        <td>WiFi KBs/hr</td>
+        {{with .CheckinSummary}}
+        {{range .}}
+        <td>{{printf "%.2f" .WifiKiloBytesPerHr.V }}</td>
+        {{end}}
+        {{end}}
+      </tr>
+      <tr data-jump="#mobile-active" class="row-clickable table-jump">
+        <td>Mobile Active Time</td>
+        {{with .CheckinSummary}}
+        {{range .}}
+        <td>{{printf "%s (%.2f%%)" .MobileActiveTime.V .MobileActiveTimePercentage}}</td>
+        {{end}}
+        {{end}}
+      </tr>
+      <tr>
+        <td>Signal Scanning Time</td>
+        {{with .CheckinSummary}}
+        {{range .}}
+        <td>{{printf "%s (%.2f%%)" .SignalScanningTime.V .SignalScanningTimePercentage}}</td>
+        {{end}}
+        {{end}}
+      </tr>
+      <tr>
+        <td>Full Wakelock Time</td>
+        {{with .CheckinSummary}}
+        {{range .}}
+        <td>{{printf "%s (%.2f%%)" .FullWakelockTime.V .FullWakelockTimePercentage}}</td>
+        {{end}}
+        {{end}}
+      </tr>
+      <tr>
+        <td>Interactive Time</td>
+        {{with .CheckinSummary}}
+        {{range .}}
+        <td>{{printf "%s (%.2f%%)" .InteractiveTime.V .InteractiveTimePercentage}}</td>
+        {{end}}
+        {{end}}
+      </tr>
+      <tr>
+        <td>Phone Call Time</td>
+        {{with .CheckinSummary}}
+        {{range .}}
+        <td>{{printf "%s (%.2f%%)" .PhoneCallTime.V .PhoneCallTimePercentage}}</td>
+        {{end}}
+        {{end}}
+      </tr>
+      <tr>
+        <td>Device Idle Mode Enabled Time</td>
+        {{with .CheckinSummary}}
+        {{range .}}
+        <td>{{printf "%s (%.2f%%)" .DeviceIdleModeEnabledTime.V .DeviceIdleModeEnabledTimePercentage}}</td>
+        {{end}}
+        {{end}}
+      </tr>
+      <tr>
+        <td>Device Idling Time</td>
+        {{with .CheckinSummary}}
+        {{range .}}
+        <td>{{printf "%s (%.2f%%)" .DeviceIdlingTime.V .DeviceIdlingTimePercentage}}</td>
+        {{end}}
+        {{end}}
+      </tr>
+    </tbody>
+  </table>
+</div>
+<br><br>
+<div title="Highlights differences between data from the two files which are greater than the selected threshold percentage.">
+  <label class="threshold-label">Highlight columns where the difference between the 2 files &gt;=</label>
+  <select id="thresholdSelector" class="btn btn-default" data-toggle="tooltip" name="Pkg Name" >
+    <option value="500">Default (5x)</option>
+    <option value="25">25%</option>
+    <option value="50">50%</option>
+    <option value="75">75%</option>
+    <option value="200">2x</option>
+    <option value="300">3x</option>
+    <option value="500">5x</option>
+  </select>
+</div>
+{{if .CombinedCheckinData.DevicePowerEstimatesCombined}}
+<div class="summary-title-inline" id="device-power-estimates">
+  <span>Device's Power Estimates:</span>
+</div>
+<div class="summary-content sliding">
+  <table class="to-datatable">
+    <colgroup>
+      <col span="1" style="width: 50%;">
+      <col span="1" style="width: 20%;">
+      <col span="1" style="width: 15%;">
+      <col span="1" style="width: 15%;">
+    </colgroup>
+    <thead>
+      <tr>
+        <th>Name</th>
+        <th>Diff Battery (%) Consumed</th>
+        <th>#1 Battery (%) Consumed</th>
+        <th>#2 Battery (%) Consumed</th>
+      </tr>
+    </thead>
+    <tbody>
+      {{range $i, $ent := .CombinedCheckinData.DevicePowerEstimatesCombined}}
+      <tr>
+        <td>{{.Name}}</td>
+        <td>{{printf "%.2f" $ent.PercentageDiff}}</td>
+        {{with index $ent.Entries 0}}
+        <td td bgcolor="#E5E4E2">{{printf "%.2f" .Percent}}</td>
+        {{end}}
+        {{with index $ent.Entries 1}}
+        <td bgcolor="#FFF8DC">{{printf "%.2f" .Percent}}</td>
+        {{end}}
+      </tr>
+      {{end}}
+    </tbody>
+  </table>
+</div>
+{{end}}
+<div class="summary-title-inline" id="userspace-wakelocks">
+  <span>Userspace Wakelocks:</span>
+</div>
+<div class="summary-content sliding">
+  <table class="to-datatable">
+    <colgroup>
+      <col span="1" style="width: 28%;">
+      <col span="1" style="width: 7%;">
+      <col span="1" style="width: 7%;">
+      <col span="1" style="width: 7%;">
+      <col span="1" style="width: 8%;">
+      <col span="1" style="width: 8%;">
+      <col span="1" style="width: 7%;">
+      <col span="1" style="width: 7%;">
+      <col span="1" style="width: 7%;">
+      <col span="1" style="width: 7%;">
+      <col span="1" style="width: 7%;">
+    </colgroup>
+    <thead>
+      <tr>
+        <th>Name</th>
+        <th>Diff Sec/Hr</th>
+        <th>#1 Sec/Hr</th>
+        <th>#2 Sec/Hr</th>
+        <th class="duration">#1 Total Duration</th>
+        <th class="duration">#2 Total Duration</th>
+        <th>Diff Count/Hr</th>
+        <th>#1 Count/Hr</th>
+        <th>#2 Count/Hr</th>
+        <th>#1 Total Count</th>
+        <th>#2 Total Count</th>
+      </tr>
+    </thead>
+    <tbody>
+      {{range $i, $ent := .CombinedCheckinData.UserspaceWakelocksCombined}}
+      <tr>
+        <td>{{.Name}}</td>
+        <td>{{printf "%.2f" $ent.SecondsPerHrDiff}}</td>
+        {{with index $ent.Entries 0}}
+        <td bgcolor="#E5E4E2">{{printf "%.2f" .SecondsPerHr}}</td>
+        {{end}}
+        {{with index $ent.Entries 1}}
+        <td bgcolor="#FFF8DC">{{printf "%.2f" .SecondsPerHr}}</td>
+        {{end}}
+         {{with index $ent.Entries 0}}
+        <td bgcolor="#E5E4E2">{{.Duration}}</td>
+        {{end}}
+        {{with index $ent.Entries 1}}
+        <td bgcolor="#FFF8DC">{{.Duration}}</td>
+        {{end}}
+
+        <td>{{printf "%.2f" $ent.CountPerHourDiff}}</td>
+        {{with index $ent.Entries 0}}
+        <td bgcolor="#E5E4E2">{{printf "%.2f" .CountPerHour}}</td>
+        {{end}}
+        {{with index $ent.Entries 1}}
+        <td bgcolor="#FFF8DC">{{printf "%.2f" .CountPerHour}}</td>
+        {{end}}
+         {{with index $ent.Entries 0}}
+        <td bgcolor="#E5E4E2">{{.Count}}</td>
+        {{end}}
+        {{with index $ent.Entries 1}}
+        <td bgcolor="#FFF8DC">{{.Count}}</td>
+        {{end}}
+      </tr>
+      {{end}}
+    </tbody>
+  </table>
+</div>
+{{if .CombinedCheckinData.SyncTasksCombined}}
+<div class="summary-title-inline" id="syncmanager-syncs">
+  <span>SyncManager Syncs:</span>
+</div>
+<div class="summary-content sliding">
+  <table class="to-datatable">
+    <colgroup>
+      <col span="1" style="width: 28%;">
+      <col span="1" style="width: 7%;">
+      <col span="1" style="width: 7%;">
+      <col span="1" style="width: 7%;">
+      <col span="1" style="width: 8%;">
+      <col span="1" style="width: 8%;">
+      <col span="1" style="width: 7%;">
+      <col span="1" style="width: 7%;">
+      <col span="1" style="width: 7%;">
+      <col span="1" style="width: 7%;">
+      <col span="1" style="width: 7%;">
+    </colgroup>
+    <thead>
+      <tr>
+        <th>Name</th>
+        <th>Diff Sec/Hr</th>
+        <th>#1 Sec/Hr</th>
+        <th>#2 Sec/Hr</th>
+        <th class="duration">#1 Total Duration</th>
+        <th class="duration">#2 Total Duration</th>
+        <th>Diff Count / Hr</th>
+        <th>#1 Count / Hr</th>
+        <th>#2 Count / Hr</th>
+        <th>#1 Total Count</th>
+        <th>#2 Total Count</th>
+      </tr>
+    </thead>
+    <tbody>
+      {{range $i, $ent := .CombinedCheckinData.SyncTasksCombined}}
+      <tr>
+        <td>{{.Name}}</td>
+        <td>{{printf "%.2f" $ent.SecondsPerHrDiff}}</td>
+        {{with index $ent.Entries 0}}
+        <td bgcolor="#E5E4E2">{{printf "%.2f" .SecondsPerHr}}</td>
+        {{end}}
+        {{with index $ent.Entries 1}}
+        <td bgcolor="#FFF8DC">{{printf "%.2f" .SecondsPerHr}}</td>
+        {{end}}
+        {{with index $ent.Entries 0}}
+        <td bgcolor="#E5E4E2">{{.Duration}}</td>
+        {{end}}
+        {{with index $ent.Entries 1}}
+        <td bgcolor="#FFF8DC">{{.Duration}}</td>
+        {{end}}
+        <td >{{printf "%.2f" $ent.CountPerHourDiff}}</td>
+        {{with index $ent.Entries 0}}
+        <td bgcolor="#E5E4E2">{{printf "%.2f" .CountPerHour}}</td>
+        {{end}}
+        {{with index $ent.Entries 1}}
+        <td bgcolor="#FFF8DC">{{printf "%.2f" .CountPerHour}}</td>
+        {{end}}
+        {{with index $ent.Entries 0}}
+        <td bgcolor="#E5E4E2">{{.Count}}</td>
+        {{end}}
+        {{with index $ent.Entries 1}}
+        <td bgcolor="#FFF8DC">{{.Count}}</td>
+        {{end}}
+      </tr>
+      {{end}}
+    </tbody>
+  </table>
+</div>
+{{end}}
+{{if .CombinedCheckinData.CPUUsageCombined}}
+<div class="summary-title-inline" id="cpu-use">
+  <span>CPU Usage By App:</span>
+</div>
+<div class="summary-content sliding">
+  <table class="to-datatable">
+    <colgroup>
+      <col span="1" style="width: 50%;">
+      <col span="1" style="width: 20%;">
+      <col span="1" style="width: 15%;">
+      <col span="1" style="width: 15%;">
+    </colgroup>
+    <thead>
+      <tr>
+        <th>Name</th>
+        <th>Diff Battery Use</th>
+        <th>#1 Battery Use</th>
+        <th>#2 Battery Use</th>
+      </tr>
+    </thead>
+    <tbody>
+      {{range $i, $ent := .CombinedCheckinData.CPUUsageCombined}}
+      <tr>
+        <td>{{.Name}}</td>
+        <td>{{printf "%.2f" $ent.PowerPctDiff}}</td>
+        {{with index $ent.Entries 0}}
+        <td bgcolor="#E5E4E2">{{printf "%.2f" .PowerPct}}</td>
+        {{end}}
+        {{with index $ent.Entries 1}}
+        <td bgcolor="#FFF8DC">{{printf "%.2f" .PowerPct}}</td>
+        {{end}}
+      </tr>
+      {{end}}
+    </tbody>
+  </table>
+</div>
+{{end}}
+{{if .CombinedCheckinData.TopMobileActiveAppsCombined}}
+<div class="summary-title-inline" id="mobile-active">
+  <span>Mobile Radio Activity Per App:</span>
+</div>
+<div class="summary-content sliding">
+  <table class="to-datatable">
+     <colgroup>
+      <col span="1" style="width: 28%;">
+      <col span="1" style="width: 7%;">
+      <col span="1" style="width: 7%;">
+      <col span="1" style="width: 7%;">
+      <col span="1" style="width: 8%;">
+      <col span="1" style="width: 8%;">
+      <col span="1" style="width: 7%;">
+      <col span="1" style="width: 7%;">
+      <col span="1" style="width: 7%;">
+      <col span="1" style="width: 7%;">
+      <col span="1" style="width: 7%;">
+    </colgroup>
+    <thead>
+       <tr>
+        <th>Name</th>
+        <th>Diff Sec/Hr</th>
+        <th>#1 Sec/Hr</th>
+        <th>#2 Sec/Hr</th>
+        <th class="duration">#1 Total Duration</th>
+        <th class="duration">#2 Total Duration</th>
+        <th>Diff Count/Hr</th>
+        <th>#1 Count/Hr</th>
+        <th>#2 Count/Hr</th>
+        <th>#1 Total Count</th>
+        <th>#2 Total Count</th>
+      </tr>
+    </thead>
+    <tbody>
+      {{range $i, $ent := .CombinedCheckinData.TopMobileActiveAppsCombined}}
+      <tr>
+        <td>{{.Name}}</td>
+        <td>{{printf "%.2f" $ent.SecondsPerHrDiff}}</td>
+        {{with index $ent.Entries 0}}
+        <td bgcolor="#E5E4E2">{{printf "%.2f" .SecondsPerHr}}</td>
+        {{end}}
+        {{with index $ent.Entries 1}}
+        <td bgcolor="#FFF8DC">{{printf "%.2f" .SecondsPerHr}}</td>
+        {{end}}
+        {{with index $ent.Entries 0}}
+        <td bgcolor="#E5E4E2">{{.Duration}}</td>
+        {{end}}
+        {{with index $ent.Entries 1}}
+        <td bgcolor="#FFF8DC">{{.Duration}}</td>
+        {{end}}
+        <td>{{printf "%.2f" $ent.CountPerHourDiff}}</td>
+        {{with index $ent.Entries 0}}
+        <td bgcolor="#E5E4E2">{{printf "%.2f" .CountPerHour}}</td>
+        {{end}}
+        {{with index $ent.Entries 1}}
+        <td bgcolor="#FFF8DC">{{printf "%.2f" .CountPerHour}}</td>
+        {{end}}
+        {{with index $ent.Entries 0}}
+        <td bgcolor="#E5E4E2">{{.Count}}</td>
+        {{end}}
+        {{with index $ent.Entries 1}}
+        <td bgcolor="#FFF8DC">{{.Count}}</td>
+        {{end}}
+      </tr>
+      {{end}}
+    </tbody>
+  </table>
+</div>
+{{end}}
+{{if .CombinedCheckinData.TopMobileTrafficAppsCombined}}
+<div class="summary-title-inline" id="mobile-traffic">
+  <span>Mobile Traffic Per App:</span>
+</div>
+<div class="summary-content sliding">
+  <table class="to-datatable">
+    <colgroup>
+      <col span="1" style="width: 50%;">
+      <col span="1" style="width: 10%;">
+      <col span="1" style="width: 10%;">
+      <col span="1" style="width: 10%;">
+      <col span="1" style="width: 10%;">
+      <col span="1" style="width: 10%;">
+    </colgroup>
+    <thead>
+      <tr>
+        <th>Name</th>
+        <th>Diff MB / Hr</th>
+        <th>#1 MB / Hr</th>
+        <th>#2 MB / Hr</th>
+        <th>#1 Total MB</th>
+        <th>#2 Total MB</th>
+      </tr>
+    </thead>
+    <tbody>
+      {{range $i, $ent := .CombinedCheckinData.TopMobileTrafficAppsCombined}}
+      <tr>
+        <td>{{.Name}}</td>
+        <td>{{printf "%.2f" $ent.MobileMegaBytesPerHourDiff}}</td>
+        {{with index $ent.Entries 0}}
+        <td bgcolor="#E5E4E2">{{printf "%.2f" .MobileMegaBytesPerHour}}</td>
+        {{end}}
+        {{with index $ent.Entries 1}}
+        <td bgcolor="#FFF8DC">{{printf "%.2f" .MobileMegaBytesPerHour}}</td>
+        {{end}}
+        {{with index $ent.Entries 0}}
+        <td bgcolor="#E5E4E2">{{printf "%.2f" .MobileMegaBytes}}</td>
+        {{end}}
+        {{with index $ent.Entries 1}}
+        <td bgcolor="#FFF8DC">{{printf "%.2f" .MobileMegaBytes}}</td>
+        {{end}}
+      </tr>
+      {{end}}
+    </tbody>
+  </table>
+</div>
+{{end}}
+{{if .CombinedCheckinData.WifiFullLockActivityCombined}}
+<div class="summary-title-inline" id="wifi-full-activity">
+  <span>WiFi Full Lock Activity Per App:</span>
+</div>
+<div class="summary-content sliding">
+  <table class="to-datatable">
+    <colgroup>
+      <col span="1" style="width: 50%;">
+      <col span="1" style="width: 10%;">
+      <col span="1" style="width: 10%;">
+      <col span="1" style="width: 10%;">
+      <col span="1" style="width: 10%;">
+      <col span="1" style="width: 10%;">
+    </colgroup>
+    <thead>
+      <tr>
+        <th>Name</th>
+        <th>Diff Sec/Hr</th>
+        <th>#1 Sec/Hr</th>
+        <th>#2 Sec/Hr</th>
+        <th class="duration">#1 Total Duration</th>
+        <th class="duration">#2 Total Duration</th>
+      </tr>
+    </thead>
+    <tbody>
+      {{range $i, $ent := .CombinedCheckinData.WifiFullLockActivityCombined}}
+      <tr>
+        <td>{{.Name}}</td>
+        <td>{{printf "%.2f" $ent.SecondsPerHrDiff}}</td>
+        {{with index $ent.Entries 0}}
+        <td bgcolor="#E5E4E2">{{printf "%.2f" .SecondsPerHr}}</td>
+        {{end}}
+        {{with index $ent.Entries 1}}
+        <td bgcolor="#FFF8DC">{{printf "%.2f" .SecondsPerHr}}</td>
+        {{end}}
+         {{with index $ent.Entries 0}}
+        <td bgcolor="#E5E4E2">{{.Duration}}</td>
+        {{end}}
+        {{with index $ent.Entries 1}}
+        <td bgcolor="#FFF8DC">{{.Duration}}</td>
+        {{end}}
+      </tr>
+      {{end}}
+    </tbody>
+  </table>
+</div>
+{{end}}
+{{if .CombinedCheckinData.TopWifiTrafficAppsCombined}}
+<div class="summary-title-inline" id="wifi-traffic">
+  <span>WiFi Traffic Per App:</span>
+</div>
+<div class="summary-content sliding">
+  <table class="to-datatable">
+    <colgroup>
+      <col span="1" style="width: 50%;">
+      <col span="1" style="width: 10%;">
+      <col span="1" style="width: 10%;">
+      <col span="1" style="width: 10%;">
+      <col span="1" style="width: 10%;">
+      <col span="1" style="width: 10%;">
+    </colgroup>
+    <thead>
+      <tr>
+        <th>Name</th>
+        <th>Diff MB / Hr</th>
+        <th>#1 MB / Hr</th>
+        <th>#2 MB / Hr</th>
+        <th>#1 MB</th>
+        <th>#2 MB</th>
+      </tr>
+    </thead>
+    <tbody>
+      {{range $i, $ent := .CombinedCheckinData.TopWifiTrafficAppsCombined}}
+      <tr>
+        <td>{{.Name}}</td>
+        <td>{{printf "%.2f" $ent.WifiMegaBytesPerHourDiff}}</td>
+        {{with index $ent.Entries 0}}
+        <td bgcolor="#E5E4E2">{{printf "%.2f" .WifiMegaBytesPerHour}}</td>
+        {{end}}
+        {{with index $ent.Entries 1}}
+        <td bgcolor="#FFF8DC">{{printf "%.2f" .WifiMegaBytesPerHour}}</td>
+        {{end}}
+         {{with index $ent.Entries 0}}
+        <td bgcolor="#E5E4E2">{{printf "%.2f" .WifiMegaBytes}}</td>
+        {{end}}
+        {{with index $ent.Entries 1}}
+        <td bgcolor="#FFF8DC">{{printf "%.2f" .WifiMegaBytes}}</td>
+        {{end}}
+      </tr>
+      {{end}}
+    </tbody>
+  </table>
+</div>
+{{end}}
+{{if .CombinedCheckinData.KernelWakelocksCombined}}
+<div class="summary-title-inline" id="kernel-wakesources">
+  <span>Kernel Wakesources:</span>
+</div>
+<div class="summary-content sliding">
+  <table class="to-datatable">
+     <colgroup>
+      <col span="1" style="width: 28%;">
+      <col span="1" style="width: 7%;">
+      <col span="1" style="width: 7%;">
+      <col span="1" style="width: 7%;">
+      <col span="1" style="width: 8%;">
+      <col span="1" style="width: 8%;">
+      <col span="1" style="width: 7%;">
+      <col span="1" style="width: 7%;">
+      <col span="1" style="width: 7%;">
+      <col span="1" style="width: 7%;">
+      <col span="1" style="width: 7%;">
+    </colgroup>
+    <thead>
+      <tr>
+        <th>Name</th>
+        <th>Diff Sec/Hr</th>
+        <th>#1 Sec/Hr</th>
+        <th>#2 Sec/Hr</th>
+        <th class="duration">#1 Total Duration</th>
+        <th class="duration">#2 Total Duration</th>
+        <th>Diff Count/Hr</th>
+        <th>#1 Count/Hr</th>
+        <th>#2 Count/Hr</th>
+        <th>#1 Total Count</th>
+        <th>#2 Total Count</th>
+      </tr>
+    </thead>
+    <tbody>
+      {{range $i, $ent := .CombinedCheckinData.KernelWakelocksCombined}}
+      <tr>
+        <td>{{.Name}}</td>
+        <td>{{printf "%.2f" $ent.SecondsPerHrDiff}}</td>
+        {{with index $ent.Entries 0}}
+        <td bgcolor="#E5E4E2">{{printf "%.2f" .SecondsPerHr}}</td>
+        {{end}}
+        {{with index $ent.Entries 1}}
+        <td bgcolor="#FFF8DC">{{printf "%.2f" .SecondsPerHr}}</td>
+        {{end}}
+         {{with index $ent.Entries 0}}
+        <td bgcolor="#E5E4E2">{{.Duration}}</td>
+        {{end}}
+        {{with index $ent.Entries 1}}
+        <td bgcolor="#FFF8DC">{{.Duration}}</td>
+        {{end}}
+        <td>{{printf "%.2f" $ent.CountPerHourDiff}}</td>
+        {{with index $ent.Entries 0}}
+        <td bgcolor="#E5E4E2">{{printf "%.2f" .CountPerHour}}</td>
+        {{end}}
+        {{with index $ent.Entries 1}}
+        <td bgcolor="#FFF8DC">{{printf "%.2f" .CountPerHour}}</td>
+        {{end}}
+         {{with index $ent.Entries 0}}
+        <td bgcolor="#E5E4E2">{{.Count}}</td>
+        {{end}}
+        {{with index $ent.Entries 1}}
+        <td bgcolor="#FFF8DC">{{.Count}}</td>
+        {{end}}
+      </tr>
+      {{end}}
+    </tbody>
+  </table>
+</div>
+{{end}}
+{{if .CombinedCheckinData.WakeupReasonsCombined}}
+<div class="summary-title-inline" id="kernel-reasons">
+  <span>Kernel Wakeup Reasons:</span>
+</div>
+<div class="summary-content sliding">
+  <table class="to-datatable">
+     <colgroup>
+      <col span="1" style="width: 28%;">
+      <col span="1" style="width: 7%;">
+      <col span="1" style="width: 7%;">
+      <col span="1" style="width: 7%;">
+      <col span="1" style="width: 8%;">
+      <col span="1" style="width: 8%;">
+      <col span="1" style="width: 7%;">
+      <col span="1" style="width: 7%;">
+      <col span="1" style="width: 7%;">
+      <col span="1" style="width: 7%;">
+      <col span="1" style="width: 7%;">
+    </colgroup>
+    <thead>
+      <tr>
+        <th>Name</th>
+        <th>Diff Sec/Hr</th>
+        <th>#1 Sec/Hr</th>
+        <th>#2 Sec/Hr</th>
+        <th class="duration">#1 Total Duration</th>
+        <th class="duration">#2 Total Duration</th>
+        <th>Diff Count/Hr</th>
+        <th>#1 Count/Hr</th>
+        <th>#2 Count/Hr</th>
+        <th>#1 Total Count</th>
+        <th>#2 Total Count</th>
+      </tr>
+    </thead>
+    <tbody>
+      {{range $i, $ent := .CombinedCheckinData.WakeupReasonsCombined}}
+      <tr>
+        <td>{{.Name}}</td>
+        <td>{{printf "%.2f" $ent.SecondsPerHrDiff}}</td>
+        {{with index $ent.Entries 0}}
+        <td bgcolor="#E5E4E2">{{printf "%.2f" .SecondsPerHr}}</td>
+        {{end}}
+        {{with index $ent.Entries 1}}
+        <td bgcolor="#FFF8DC">{{printf "%.2f" .SecondsPerHr}}</td>
+        {{end}}
+         {{with index $ent.Entries 0}}
+        <td bgcolor="#E5E4E2">{{.Duration}}</td>
+        {{end}}
+        {{with index $ent.Entries 1}}
+        <td bgcolor="#FFF8DC">{{.Duration}}</td>
+        {{end}}
+        <td>{{printf "%.2f" $ent.CountPerHourDiff}}</td>
+        {{with index $ent.Entries 0}}
+        <td bgcolor="#E5E4E2">{{printf "%.2f" .CountPerHour}}</td>
+        {{end}}
+        {{with index $ent.Entries 1}}
+        <td bgcolor="#FFF8DC">{{printf "%.2f" .CountPerHour}}</td>
+        {{end}}
+        {{with index $ent.Entries 0}}
+        <td bgcolor="#E5E4E2">{{.Count}}</td>
+        {{end}}
+        {{with index $ent.Entries 1}}
+        <td bgcolor="#FFF8DC">{{.Count}}</td>
+        {{end}}
+      </tr>
+      {{end}}
+    </tbody>
+  </table>
+</div>
+{{end}}
+{{if .CombinedCheckinData.AppWakeupsCombined}}
+<div class="summary-title-inline" id="wakeups">
+  <span>App Wakeup Alarms:</span>
+</div>
+<div class="summary-content sliding">
+  <table class="to-datatable">
+    <colgroup>
+      <col span="1" style="width: 50%;">
+      <col span="1" style="width: 10%;">
+      <col span="1" style="width: 10%;">
+      <col span="1" style="width: 10%;">
+      <col span="1" style="width: 10%;">
+      <col span="1" style="width: 10%;">
+    </colgroup>
+    <thead>
+      <tr>
+        <th>Name</th>
+        <th>Diff (Count/Hr)</th>
+        <th>#1 Count/Hr</th>
+        <th>#2 Count/Hr</th>
+        <th>#1 Count</th>
+        <th>#2 Count</th>
+      </tr>
+    </thead>
+    <tbody>
+      {{range $i, $ent := .CombinedCheckinData.AppWakeupsCombined}}
+      <tr>
+        <td>{{.Name}}</td>
+        <td>{{printf "%.2f" $ent.CountPerHrDiff}}</td>
+        {{with index $ent.Entries 0}}
+        <td bgcolor="#E5E4E2">{{printf "%.2f" .CountPerHr}}</td>
+        {{end}}
+        {{with index $ent.Entries 1}}
+        <td bgcolor="#FFF8DC">{{printf "%.2f" .CountPerHr}}</td>
+        {{end}}
+         {{with index $ent.Entries 0}}
+        <td bgcolor="#E5E4E2">{{.Count}}</td>
+        {{end}}
+        {{with index $ent.Entries 1}}
+        <td bgcolor="#FFF8DC">{{.Count}}</td>
+        {{end}}
+      </tr>
+      {{end}}
+    </tbody>
+  </table>
+</div>
+{{end}}
+{{if .CombinedCheckinData.ANRAndCrashCombined}}
+<div class="summary-title-inline" id="anr-crash">
+  <span>App ANRs and Crashes:</span>
+</div>
+<div class="summary-content sliding">
+  <table class="to-datatable">
+    <colgroup>
+      <col span="1" style="width: 40%;">
+      <col span="1" style="width: 10%;">
+      <col span="1" style="width: 10%;">
+      <col span="1" style="width: 10%;">
+      <col span="1" style="width: 10%;">
+      <col span="1" style="width: 10%;">
+      <col span="1" style="width: 10%;">
+    </colgroup>
+    <thead>
+      <tr>
+        <th>Name (App Name : Process Name)</th>
+        <th>Diff ANRs</th>
+        <th>#1 ANRs</th>
+        <th>#2 ANRs</th>
+        <th>Diff Crashes</th>
+        <th>#1 Crashes</th>
+        <th>#2 Crashes</th>
+      </tr>
+    </thead>
+    <tbody>
+      {{range $i, $ent := .CombinedCheckinData.ANRAndCrashCombined}}
+      <tr>
+        <td>{{.Name}}</td>
+        <td>{{.ANRCountDiff}}</td>
+        {{with index $ent.Entries 0}}
+        <td bgcolor="#E5E4E2">{{.ANRCount}}</td>
+        {{end}}
+        {{with index $ent.Entries 1}}
+        <td bgcolor="#FFF8DC">{{.ANRCount}}</td>
+        {{end}}
+        <td>{{.CrashCountDiff}}</td>
+        {{with index $ent.Entries 0}}
+        <td bgcolor="#E5E4E2">{{.CrashCount}}</td>
+        {{end}}
+        {{with index $ent.Entries 1}}
+        <td bgcolor="#FFF8DC">{{.CrashCount}}</td>
+        {{end}}
+      </tr>
+      {{end}}
+  </table>
+</div>
+{{end}}
+{{if .CombinedCheckinData.GPSUseCombined}}
+<div class="summary-title-inline" id="gps-use">
+  <span>GPS Use By App:</span>
+</div>
+<div class="summary-content sliding">
+  <table class="to-datatable">
+    <colgroup>
+      <col span="1" style="width: 28%;">
+      <col span="1" style="width: 7%;">
+      <col span="1" style="width: 7%;">
+      <col span="1" style="width: 7%;">
+      <col span="1" style="width: 8%;">
+      <col span="1" style="width: 8%;">
+      <col span="1" style="width: 7%;">
+      <col span="1" style="width: 7%;">
+      <col span="1" style="width: 7%;">
+      <col span="1" style="width: 7%;">
+      <col span="1" style="width: 7%;">
+    </colgroup>
+    <thead>
+       <tr>
+        <th>Name</th>
+        <th>Diff Sec/Hr</th>
+        <th>#1 Sec/Hr</th>
+        <th>#2 Sec/Hr</th>
+        <th class="duration">#1 Total Duration</th>
+        <th class="duration">#2 Total Duration</th>
+        <th>Diff Count/Hr</th>
+        <th>#1 Count/Hr</th>
+        <th>#2 Count/Hr</th>
+        <th>#1 Total Count</th>
+        <th>#2 Total Count</th>
+      </tr>
+    </thead>
+    <tbody>
+      {{range $i, $ent := .CombinedCheckinData.GPSUseCombined}}
+      <tr>
+        <td>{{.Name}}</td>
+        <td>{{printf "%.2f" $ent.SecondsPerHrDiff}}</td>
+        {{with index $ent.Entries 0}}
+        <td bgcolor="#E5E4E2">{{printf "%.2f" .SecondsPerHr}}</td>
+        {{end}}
+        {{with index $ent.Entries 1}}
+        <td bgcolor="#FFF8DC">{{printf "%.2f" .SecondsPerHr}}</td>
+        {{end}}
+        {{with index $ent.Entries 0}}
+        <td bgcolor="#E5E4E2">{{.Duration}}</td>
+        {{end}}
+        {{with index $ent.Entries 1}}
+        <td bgcolor="#FFF8DC">{{.Duration}}</td>
+        {{end}}
+        <td>{{printf "%.2f" $ent.CountPerHourDiff}}</td>
+        {{with index $ent.Entries 0}}
+        <td bgcolor="#E5E4E2">{{printf "%.2f" .CountPerHour}}</td>
+        {{end}}
+        {{with index $ent.Entries 1}}
+        <td bgcolor="#FFF8DC">{{printf "%.2f" .CountPerHour}}</td>
+        {{end}}
+        {{with index $ent.Entries 0}}
+        <td bgcolor="#E5E4E2">{{.Count}}</td>
+        {{end}}
+        {{with index $ent.Entries 1}}
+        <td bgcolor="#FFF8DC">{{.Count}}</td>
+        {{end}}
+      </tr>
+      {{end}}
+    </tbody>
+  </table>
+</div>
+{{end}}
+{{if .CombinedCheckinData.CameraUseCombined}}
+<div class="summary-title-inline" id="camera-use">
+  <span>Camera Use By App:</span>
+</div>
+<div class="summary-content sliding">
+  <table class="to-datatable">
+    <colgroup>
+      <col span="1" style="width: 28%;">
+      <col span="1" style="width: 7%;">
+      <col span="1" style="width: 7%;">
+      <col span="1" style="width: 7%;">
+      <col span="1" style="width: 8%;">
+      <col span="1" style="width: 8%;">
+      <col span="1" style="width: 7%;">
+      <col span="1" style="width: 7%;">
+      <col span="1" style="width: 7%;">
+      <col span="1" style="width: 7%;">
+      <col span="1" style="width: 7%;">
+    </colgroup>
+    <thead>
+       <tr>
+        <th>Name</th>
+        <th>Diff Sec/Hr</th>
+        <th>#1 Sec/Hr</th>
+        <th>#2 Sec/Hr</th>
+        <th class="duration">#1 Total Duration</th>
+        <th class="duration">#2 Total Duration</th>
+        <th>Diff Count/Hr</th>
+        <th>#1 Count/Hr</th>
+        <th>#2 Count/Hr</th>
+        <th>#1 Total Count</th>
+        <th>#2 Total Count</th>
+      </tr>
+    </thead>
+    <tbody>
+      {{range $i, $ent := .CombinedCheckinData.CameraUseCombined}}
+      <tr>
+        <td>{{.Name}}</td>
+        <td>{{printf "%.2f" $ent.SecondsPerHrDiff}}</td>
+        {{with index $ent.Entries 0}}
+        <td bgcolor="#E5E4E2">{{printf "%.2f" .SecondsPerHr}}</td>
+        {{end}}
+        {{with index $ent.Entries 1}}
+        <td bgcolor="#FFF8DC">{{printf "%.2f" .SecondsPerHr}}</td>
+        {{end}}
+        {{with index $ent.Entries 0}}
+        <td bgcolor="#E5E4E2">{{.Duration}}</td>
+        {{end}}
+        {{with index $ent.Entries 1}}
+        <td bgcolor="#FFF8DC">{{.Duration}}</td>
+        {{end}}
+        <td>{{printf "%.2f" $ent.CountPerHourDiff}}</td>
+        {{with index $ent.Entries 0}}
+        <td bgcolor="#E5E4E2">{{printf "%.2f" .CountPerHour}}</td>
+        {{end}}
+        {{with index $ent.Entries 1}}
+        <td bgcolor="#FFF8DC">{{printf "%.2f" .CountPerHour}}</td>
+        {{end}}
+        {{with index $ent.Entries 0}}
+        <td bgcolor="#E5E4E2">{{.Count}}</td>
+        {{end}}
+        {{with index $ent.Entries 1}}
+        <td bgcolor="#FFF8DC">{{.Count}}</td>
+        {{end}}
+      </tr>
+      {{end}}
+    </tbody>
+  </table>
+</div>
+{{end}}
+{{if .CombinedCheckinData.FlashlightUseCombined}}
+<div class="summary-title-inline" id="flashlight-use">
+  <span>Flashlight Use By App:</span>
+</div>
+<div class="summary-content sliding">
+  <table class="to-datatable">
+     <colgroup>
+      <col span="1" style="width: 28%;">
+      <col span="1" style="width: 7%;">
+      <col span="1" style="width: 7%;">
+      <col span="1" style="width: 7%;">
+      <col span="1" style="width: 8%;">
+      <col span="1" style="width: 8%;">
+      <col span="1" style="width: 7%;">
+      <col span="1" style="width: 7%;">
+      <col span="1" style="width: 7%;">
+      <col span="1" style="width: 7%;">
+      <col span="1" style="width: 7%;">
+    </colgroup>
+    <thead>
+      <tr>
+        <th>Name</th>
+        <th>Diff Sec/Hr</th>
+        <th>#1 Sec/Hr</th>
+        <th>#2 Sec/Hr</th>
+        <th class="duration">#1 Total Duration</th>
+        <th class="duration">#2 Total Duration</th>
+        <th>Diff Count/Hr</th>
+        <th>#1 Count/Hr</th>
+        <th>#2 Count/Hr</th>
+        <th>#1 Total Count</th>
+        <th>#2 Total Count</th>
+      </tr>
+    </thead>
+    <tbody>
+      {{range $i, $ent := .CombinedCheckinData.FlashlightUseCombined}}
+      <tr>
+        <td>{{.Name}}</td>
+        <td>{{printf "%.2f" $ent.SecondsPerHrDiff}}</td>
+        {{with index $ent.Entries 0}}
+        <td bgcolor="#E5E4E2">{{printf "%.2f" .SecondsPerHr}}</td>
+        {{end}}
+        {{with index $ent.Entries 1}}
+        <td bgcolor="#FFF8DC">{{printf "%.2f" .SecondsPerHr}}</td>
+        {{end}}
+        {{with index $ent.Entries 0}}
+        <td bgcolor="#E5E4E2">{{.Duration}}</td>
+        {{end}}
+        {{with index $ent.Entries 1}}
+        <td bgcolor="#FFF8DC">{{.Duration}}</td>
+        {{end}}
+        <td>{{printf "%.2f" $ent.CountPerHourDiff}}</td>
+        {{with index $ent.Entries 0}}
+        <td bgcolor="#E5E4E2">{{printf "%.2f" .CountPerHour}}</td>
+        {{end}}
+        {{with index $ent.Entries 1}}
+        <td bgcolor="#FFF8DC">{{printf "%.2f" .CountPerHour}}</td>
+        {{end}}
+         {{with index $ent.Entries 0}}
+        <td bgcolor="#E5E4E2">{{.Count}}</td>
+        {{end}}
+        {{with index $ent.Entries 1}}
+        <td bgcolor="#FFF8DC">{{.Count}}</td>
+        {{end}}
+      </tr>
+      {{end}}
+    </tbody>
+  </table>
+</div>
+{{end}}
+{{end}}

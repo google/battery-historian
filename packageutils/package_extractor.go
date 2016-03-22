@@ -1,4 +1,4 @@
-// Copyright 2015 Google Inc. All Rights Reserved.
+// Copyright 2016 Google Inc. All Rights Reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -24,7 +24,7 @@ import (
 
 	"github.com/golang/protobuf/proto"
 
-	"github.com/google/battery-historian/parseutils"
+	"github.com/google/battery-historian/historianutils"
 
 	usagepb "github.com/google/battery-historian/pb/usagestats_proto"
 )
@@ -33,31 +33,34 @@ import (
 const timeFormat = "2006-01-02 15:04:05"
 
 var (
-	// serviceDumpRE is a regular expression to match the beginning of a service dump.
-	serviceDumpRE = regexp.MustCompile(`^DUMP\s+OF\s+SERVICE\s+(?P<service>\S+):`)
-
-	// uidRE is a regular expression to match a uid line in the appops section (ie 'Uid 1000:').
+	// uidRE is a regular expression to match a uid line in the appops section (eg. 'Uid 1000:').
 	uidRE = regexp.MustCompile(`^Uid\s+(?P<uid>\S+):`)
 
-	// userIDRE is a regular expression to match a userId line in the package dump section (ie 'userId=1000 gids=[3003]').
-	userIDRE = regexp.MustCompile(`^userId=(?P<uid>\S+)\s+gids.*`)
+	// userIDRE is a regular expression to match a userId line in the package dump section (eg. 'userId=1000 gids=[3003]').
+	userIDRE = regexp.MustCompile(`^userId=(?P<uid>\d+)(\s+gids.*)?`)
 
-	// appOpsPackageRE is a regular expression to match a package line in the appops dump section (ie. 'Package android:')
+	// appOpsPackageRE is a regular expression to match a package line in the appops dump section (eg. 'Package android:')
 	appOpsPackageRE = regexp.MustCompile(`Package\s+(?P<package>\S+):`)
 
-	// packageDumpPackageRE is a regular expression to match a package line in the package dump section (ie. 'Package android:')
+	// packageDumpPackageRE is a regular expression to match a package line in the package dump section (eg. 'Package android:')
 	packageDumpPackageRE = regexp.MustCompile(`Package\s+\[(?P<package>\S+)\]\s+\(.*`)
 
-	// packageDumpVersionCodeRE is a regular expression to match a version code line in the package dump section (ie. 'versionCode=94 targetSdk=19')
+	// packageDumpCompatRE is a regular expression to match a compat name line in the package dump section (eg. 'compat name=')
+	packageDumpCompatRE = regexp.MustCompile(`compat name=(?P<package>\S+)`)
+
+	// packageDumpVersionCodeRE is a regular expression to match a version code line in the package dump section (eg. 'versionCode=94 targetSdk=19')
 	packageDumpVersionCodeRE = regexp.MustCompile(`versionCode=(?P<versionCode>\d+)\stargetSdk=\d+`)
 
-	// packageDumpVersionNameRE is a regular expression to match a version name line in the package dump section (ie. 'versionName=4.0.3')
+	// packageDumpVersionNameRE is a regular expression to match a version name line in the package dump section (eg. 'versionName=4.0.3')
 	packageDumpVersionNameRE = regexp.MustCompile(`versionName=(?P<versionName>\S+)`)
 
-	// firstInstallTimeRE is a regular expression to match the firstInstallTime line in the package dump section (ie. 'firstInstallTime=2014-12-05 14:23:12')
+	// packageDumpSharedUserRE is a regular expression to match a SharedUser line in the package dump section (eg. 'sharedUser=SharedUserSetting{d4e2481 android.uid.bluetooth/1002}')
+	packageDumpSharedUserRE = regexp.MustCompile(`sharedUser=SharedUserSetting{\S+\s+(?P<label>\S+)/(?P<uid>\d+)}`)
+
+	// firstInstallTimeRE is a regular expression to match the firstInstallTime line in the package dump section (eg. 'firstInstallTime=2014-12-05 14:23:12')
 	firstInstallTimeRE = regexp.MustCompile("firstInstallTime=(?P<time>.*)")
 
-	// lastUpdateTimeRE is a regular expression to match the lastUpdateTime line in the package dump section (ie. 'lastUpdateTime=2014-12-05 18:23:12')
+	// lastUpdateTimeRE is a regular expression to match the lastUpdateTime line in the package dump section (eg. 'lastUpdateTime=2014-12-05 18:23:12')
 	lastUpdateTimeRE = regexp.MustCompile("lastUpdateTime=(?P<time>.*)")
 )
 
@@ -75,27 +78,27 @@ func extractAppsFromAppOpsDump(s string) (map[string]*usagepb.PackageInfo, []err
 Loop:
 	for _, line := range strings.Split(s, "\n") {
 		line = strings.TrimSpace(line)
-		if m, result := parseutils.SubexpNames(serviceDumpRE, line); m {
+		if m, result := historianutils.SubexpNames(historianutils.ServiceDumpRE, line); m {
 			switch in := result["service"] == "appops"; {
 			case inAppOpsSection && !in: // Just exited the App Ops section
 				break Loop
 			case in:
 				inAppOpsSection = true
-				continue Loop
+				continue
 			default: // Random section
-				continue Loop
+				continue
 			}
 		}
 		if !inAppOpsSection {
 			continue
 		}
-		if m, result := parseutils.SubexpNames(uidRE, line); m {
+		if m, result := historianutils.SubexpNames(uidRE, line); m {
 			curUID, err = AppIDFromString(result["uid"])
 			if err != nil {
 				errs = append(errs, err)
 			}
 		}
-		if m, result := parseutils.SubexpNames(appOpsPackageRE, line); m {
+		if m, result := historianutils.SubexpNames(appOpsPackageRE, line); m {
 			pkg := result["package"]
 			pkgs[pkg] = &usagepb.PackageInfo{
 				PkgName: proto.String(pkg),
@@ -120,15 +123,15 @@ func extractAppsFromPackageDump(s string) (map[string]*usagepb.PackageInfo, []er
 Loop:
 	for _, line := range strings.Split(s, "\n") {
 		line = strings.TrimSpace(line)
-		if m, result := parseutils.SubexpNames(serviceDumpRE, line); m {
+		if m, result := historianutils.SubexpNames(historianutils.ServiceDumpRE, line); m {
 			switch in := result["service"] == "package"; {
 			case inPackageDumpSection && !in: // Just exited package dump section
 				break Loop
 			case in:
 				inPackageDumpSection = true
-				continue Loop
+				continue
 			default: // Random section
-				continue Loop
+				continue
 			}
 		}
 		if !inPackageDumpSection {
@@ -137,7 +140,7 @@ Loop:
 		switch line {
 		case "Packages:":
 			inCurrentSection = true
-			continue Loop
+			continue
 		case "Hidden system packages:":
 			inCurrentSection = false
 			break Loop
@@ -145,14 +148,20 @@ Loop:
 		if !inCurrentSection {
 			continue
 		}
-		if m, result := parseutils.SubexpNames(packageDumpPackageRE, line); m {
+		if m, result := historianutils.SubexpNames(packageDumpPackageRE, line); m {
 			if curPkg != nil {
 				pkgs[curPkg.GetPkgName()] = curPkg
 			}
 			curPkg = &usagepb.PackageInfo{
 				PkgName: proto.String(result["package"]),
 			}
-		} else if m, result := parseutils.SubexpNames(userIDRE, line); m {
+		} else if m, result := historianutils.SubexpNames(packageDumpCompatRE, line); m {
+			if curPkg == nil {
+				errs = append(errs, errors.New("found compat line before package line"))
+				continue
+			}
+			curPkg.PkgName = proto.String(result["package"])
+		} else if m, result := historianutils.SubexpNames(userIDRE, line); m {
 			if curPkg == nil {
 				errs = append(errs, errors.New("found userId line before package line"))
 				continue
@@ -162,7 +171,7 @@ Loop:
 				errs = append(errs, err)
 			}
 			curPkg.Uid = proto.Int32(uid)
-		} else if m, result := parseutils.SubexpNames(packageDumpVersionCodeRE, line); m {
+		} else if m, result := historianutils.SubexpNames(packageDumpVersionCodeRE, line); m {
 			if curPkg == nil {
 				errs = append(errs, errors.New("found versionCode line before package line"))
 				continue
@@ -173,13 +182,13 @@ Loop:
 				continue
 			}
 			curPkg.VersionCode = proto.Int32(int32(vc))
-		} else if m, result := parseutils.SubexpNames(packageDumpVersionNameRE, line); m {
+		} else if m, result := historianutils.SubexpNames(packageDumpVersionNameRE, line); m {
 			if curPkg == nil {
 				errs = append(errs, errors.New("found versionName line before package line"))
 				continue
 			}
 			curPkg.VersionName = proto.String(result["versionName"])
-		} else if m, result := parseutils.SubexpNames(firstInstallTimeRE, line); m {
+		} else if m, result := historianutils.SubexpNames(firstInstallTimeRE, line); m {
 			if curPkg == nil {
 				errs = append(errs, errors.New("found firstInstallTime line before package line"))
 				continue
@@ -189,7 +198,7 @@ Loop:
 				errs = append(errs, err)
 			}
 			curPkg.FirstInstallTime = proto.Int64(t.UnixNano() / int64(time.Millisecond))
-		} else if m, result := parseutils.SubexpNames(lastUpdateTimeRE, line); m {
+		} else if m, result := historianutils.SubexpNames(lastUpdateTimeRE, line); m {
 			if curPkg == nil {
 				errs = append(errs, errors.New("found lastUpdateTime line before package line"))
 				continue
@@ -199,6 +208,20 @@ Loop:
 				errs = append(errs, err)
 			}
 			curPkg.LastUpdateTime = proto.Int64(t.UnixNano() / int64(time.Millisecond))
+		} else if m, result := historianutils.SubexpNames(packageDumpSharedUserRE, line); m {
+			if curPkg == nil {
+				errs = append(errs, errors.New("found sharedUser line before package line"))
+				continue
+			}
+			uid, err := AppIDFromString(result["uid"])
+			if err != nil {
+				errs = append(errs, err)
+			}
+			if curPkg.GetUid() != uid {
+				errs = append(errs, errors.New("sharedUser uid is different from package uid"))
+				continue
+			}
+			curPkg.SharedUserId = proto.String(result["label"])
 		}
 	}
 

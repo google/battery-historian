@@ -1,41 +1,167 @@
+/**
+ * Copyright 2016 Google Inc. All Rights Reserved.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 .axis path, .axis line {
   fill: none;
   shape-rendering: crispEdges;
+  stroke: black;
+}
+
+.axis text {
+  font-size: .9em;
 }
 
 .axis path {
   stroke: #000000;
 }
 
-.battery.level {
-  pointer-events: none;
+.bars-group > rect {
+  stroke: none;
 }
 
-.line {
+.bars-group > rect:hover {
+  stroke: black;
+}
+
+.historian-tooltip {
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid #aaa;
+  border-radius: 4px;
+  font-size: .85em;
+  padding: 5px 10px;
+  pointer-events: none;
+  position: absolute;
+  white-space: pre;
+}
+
+.time-point {
+  pointer-events: none;
+  stroke: black;
+}
+
+.level-highlighted {
+  stroke: red;
+  stroke-width: 4;
+}
+
+.level-left {
+  text-anchor: end;
+}
+
+.level-legend rect {
+  fill: black;
+}
+
+.level-line {
+  stroke: black;
+  stroke-width: 3;
   fill: none;
-  shape-rendering: crispEdges;
-  stroke-width: 16px;
 }
 
-.line:hover {
-  opacity: 0.7;
+line.level-summary {
+  stroke-width: 4;
+  stroke-linecap: round;
+  fill: none;
 }
 
-div.tooltip {
-  background: #dddddd;
-  border: 2px solid #a1a1a1;
-  border-radius: 25px;
-  padding: 10px 0 10px 20px;
+line.level-summary.filtered {
+  stroke: #ccc;
+}
+
+rect.level-summary {
+  fill-opacity: 0.2;
   pointer-events: none;
+}
+
+.level {
+  pointer-events: none;
+}
+
+.level-line.powermonitor {
+  opacity: 0.3;
+}
+
+.level-timeinfo {
+  background-color: rgba(255, 255, 255, .95);
+  border: 1px solid #aaa;
+  font-size: .85em;
+  padding : .5em 1em;
+  pointer-events: none;
+  position: absolute;
+  white-space: nowrap;
+}
+
+.series-divider {
+  stroke: lightgray;
+}
+
+.series-level rect {
+  fill: red;
+  fill-opacity: 0;
+}
+
+.series-level rect:hover {
+  fill-opacity: .2;
+  stroke: black;
+}
+
+.series-label {
+  font-size: .95em;
+  text-anchor: end;
+}
+
+.series-label.unreliable {
+  fill: grey;
+}
+
+.threshold-label {
+  padding-bottom: 20px;
+  font-size: 14pt;
+  padding-bottom: 20px;
+}
+
+#panel-historian .graph {
   position: absolute;
 }
 
-.hover {
-  pointer-events: none;
+#panel-historian .panel-body {
+  padding-left: 4%;
+  padding-right: 4%;
 }
 
-.vis-label {
-  font-size: 16px;
-  pointer-events: none;
-  text-anchor: end;
+table.values-table td {
+ border: 1px solid gray;
+ padding: 0 10px;
+}
+
+.scrollable-menu {
+  height: auto;
+  max-height: 500px;
+  overflow-x: hidden;
+}
+
+.selectable-level-metric {
+  cursor: pointer;
+}
+
+rect.bar, circle.bar {
+  stroke-opacity: 0;
+  stroke-width: 7px;
+}
+
+rect.bar:hover, circle.bar:hover {
+  stroke-opacity: 0.5;
 }

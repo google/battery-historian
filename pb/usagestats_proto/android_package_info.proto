@@ -1,4 +1,4 @@
-// Copyright 2015 Google Inc. All Rights Reserved.
+// Copyright 2016 Google Inc. All Rights Reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -36,4 +36,17 @@ message PackageInfo {
 
   // The sharedUserId assigned to this package by the device.
   optional int32 uid = 6;
+
+  // The string label of the sharedUserId this package claims, if any.
+  optional string shared_user_id = 7;
+
+  // Whether or not the package is a system app (was installed in the device's
+  // system image).
+  // http://developer.android.com/reference/android/content/pm/ApplicationInfo.html#FLAG_SYSTEM
+  optional bool is_system_app = 8;
+
+  // Whether or not the package has been installed as an update to a built-in
+  // system app. This boolean is meaningless if is_system_app is false.
+  // http://developer.android.com/reference/android/content/pm/ApplicationInfo.html#FLAG_UPDATED_SYSTEM_APP
+  optional bool is_updated_system_app = 9;
 }

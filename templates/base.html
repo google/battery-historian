@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <!--
-Copyright 2015 Google Inc. All rights reserved.
+Copyright 2016 Google Inc. All rights reserved.
 Licensed under the Apache License, Version 2.0 (the "License"); you may not use
 this file except in compliance with the License. You may obtain a copy of the
 License at
@@ -13,19 +13,89 @@ specific language governing permissions and limitations under the License.
 
 <html lang="en">
   <head>
-    <link rel="stylesheet" href="//www.gstatic.com/external_hosted/jquery_tablesorter/v2_16_4/theme.blue.css">
     <link rel="stylesheet" href="//ajax.googleapis.com/ajax/libs/jqueryui/1.11.4/themes/hot-sneaks/jquery-ui.css">
     <script src="//ajax.googleapis.com/ajax/libs/jquery/1.11.2/jquery.min.js"></script>
     <script src="//ajax.googleapis.com/ajax/libs/jqueryui/1.11.2/jquery-ui.min.js"></script>
-    <link type="text/css" rel="stylesheet" href="/static/stylesheet.css">
-    <link type="text/css" rel="stylesheet" href="/static/historian.css">
-    <script type="text/javascript" src="https://www.google.com/jsapi"></script>
-    <script src="//www.gstatic.com/external_hosted/jquery_tablesorter/v2_16_4/jquery.tablesorter.min.js" charset="utf-8"></script>
 
-    <title>Battery Historian 2.0</title>
+    <link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/select2/3.5.4/select2.css">
+    <link rel="stylesheet" href="//cdn.datatables.net/1.10.9/css/jquery.dataTables.css">
+    <script src="//cdnjs.cloudflare.com/ajax/libs/select2/3.5.4/select2.js"></script>
+    <script src="//cdn.datatables.net/1.10.9/js/jquery.dataTables.js"></script>
+    <script src="//cdnjs.cloudflare.com/ajax/libs/moment.js/2.10.0/moment.js"></script>
+    <script src="//cdnjs.cloudflare.com/ajax/libs/moment-timezone/0.4.0/moment-timezone-with-data.js"></script>
+
+    <script type="text/javascript" src="https://www.google.com/jsapi"></script>
+    <link rel="stylesheet" href="//maxcdn.bootstrapcdn.com/bootstrap/3.3.6/css/bootstrap.min.css">
+    <script src="//maxcdn.bootstrapcdn.com/bootstrap/3.3.6/js/bootstrap.min.js"></script>
+
+    <script src="//cdnjs.cloudflare.com/ajax/libs/flot/0.8.3/jquery.flot.min.js" type="text/javascript"></script>
+    <script src="/third_party/flot-axislabels/jquery.flot.axislabels.js?ver={{.ResVersion}}" type="text/javascript"></script>
+    <script src="//www.benjaminbuffet.com/public/js/jquery.flot.orderBars.js" type="text/javascript"></script>
+    <script src="//cdnjs.cloudflare.com/ajax/libs/flot/0.8.3/jquery.flot.pie.min.js" type="text/javascript"></script>
+
+    <link type="text/css" rel="stylesheet" href="/static/stylesheet.css?ver={{.ResVersion}}">
+    <link type="text/css" rel="stylesheet" href="/static/historian.css?ver={{.ResVersion}}">
+    <link type="text/css" rel="stylesheet" href="/static/histogram.css?ver={{.ResVersion}}">
+
+    <title>Battery Historian</title>
   </head>
 
-  <body style="padding-left:  5%">
-  {{ template "body" . }}
+  <body>
+    <nav class="navbar navbar-inverse navbar-fixed-top">
+      <div class="container-fluid">
+        <div class="navbar-header">
+          <a href="/" class="navbar-brand">Battery Historian</a>
+        </div>
+        <div id="navbar" class="collapse navbar-collapse">
+          <ul id="menu-top" class="nav navbar-nav navbar-right" style="display: none">
+            <li id="historian-series-groups" class="dropdown sdk-version-21">
+              <a href="#" class="dropdown-toggle" data-toggle="dropdown">Historian V2<span class="caret"></span></a>
+              <ul id="menu-data" class="dropdown-menu scrollable-menu">
+                <li class="dropdown-header">Configure metrics shown</li>
+              </ul>
+            </li>
+            <li class="dropdown sdk-version-21">
+              <a href="#" id="views-dropdown" class="dropdown-toggle" data-toggle="dropdown">Views<span class="caret"></span></a>
+              <ul id="menu-views" class="dropdown-menu">
+                <li><a href="#" id="menu-fileinfo">
+                  <span class="glyphicon glyphicon-ok glyphicon-inline-left"></span>
+                  <span>File Info</span>
+                </a></li>
+                <li><a href="#" id="menu-historian">
+                  <span class="glyphicon glyphicon-ok glyphicon-inline-left"></span>
+                  <span>Historian</span>
+                </a></li>
+                <li class="comparison"><a href="#" id="menu-historian2">
+                  <span class="glyphicon glyphicon-ok glyphicon-inline-left"></span>
+                  <span>Historian #2</span>
+                </a></li>
+              </ul>
+            </li>
+            <li><a href="/" id="new-report">Analyze a new bugreport</a></li>
+          </ul>
+        </div>
+      </div>
+    </nav>
+    <div class="alert alert-warning historian-note" style="display: none">
+      <strong>Note: </strong>
+      <span>Note Content</span>
+      <button type="button" class="close" data-dismiss="alert">
+        <span>&times;</span>
+      </button>
+    </div>
+    <div id="body-contents" class="container-fluid" style="padding-top: 60px">
+      {{template "body" .}}
+    </div>
+    <div class="modal fade" id="dialog" tabindex="-1">
+      <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+          <div class="modal-header">
+            <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span>&times;</span></button>
+            <h4 class="modal-title"></h4>
+          </div>
+          <div class="modal-body"></div>
+        </div>
+      </div>
+    </div>
   </body>
 </html>

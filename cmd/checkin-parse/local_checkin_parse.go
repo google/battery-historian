@@ -1,4 +1,4 @@
-// Copyright 2015 Google Inc. All Rights Reserved.
+// Copyright 2016 Google Inc. All Rights Reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// local_checkin_parse parses checkin format of batterystats into a batterystats proto.
 package main
 
 import (
@@ -19,9 +20,11 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
+	"strings"
 	"time"
 
 	"github.com/golang/protobuf/proto"
+	"github.com/google/battery-historian/bugreportutils"
 	"github.com/google/battery-historian/checkinparse"
 	"github.com/google/battery-historian/checkinutil"
 	"github.com/google/battery-historian/packageutils"
@@ -47,8 +50,16 @@ func main() {
 		log.Fatalf("Cannot open the file %s: %v", *inputFile, err)
 	}
 
-	br := string(c)
-	s := &sessionpb.Checkin{Checkin: proto.String(br)}
+	br, fname, err := bugreportutils.ExtractBugReport(*inputFile, c)
+	if err != nil {
+		log.Fatalf("Error getting file contents: %v", err)
+	}
+	fmt.Printf("Parsing %s\n", fname)
+	bs := bugreportutils.ExtractBatterystatsCheckin(br)
+	if strings.Contains(bs, "Exception occurred while dumping") {
+		log.Fatalf("Exception found in battery dump.")
+	}
+	s := &sessionpb.Checkin{Checkin: proto.String(bs)}
 	pkgs, errs := packageutils.ExtractAppsFromBugReport(br)
 	if len(errs) > 0 {
 		log.Fatalf("Errors encountered when getting package list: %v", errs)

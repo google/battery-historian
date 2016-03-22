@@ -1,4 +1,4 @@
-// Copyright 2015 Google Inc. All Rights Reserved.
+// Copyright 2016 Google Inc. All Rights Reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -15,27 +15,6 @@
 package presenter
 
 const (
-	// Checkin Summary Stats: Prefixed with C
-	cUptimeSecsPerHr                = "UptimeSecsPerHr"
-	cScreenOffUptimeSecsPerHr       = "ScreenOffUptimeSecsPerHr"
-	cScreenOnTimeSecsPerHr          = "ScreenOnTimeSecsPerHr"
-	cPartialWakelockTimeSecsPerHr   = "PartialWakelockTimeSecsPerHr"
-	cKernelOverheadTimeSecsPerHr    = "KernelOverheadTimeSecsPerHr"
-	cSignalScanningTimeSecsPerHr    = "SignalScanningTimeSecsPerHr"
-	cMobileActiveTimeSecsPerHr      = "MobileActiveTimeSecsPerHr"
-	cWifiOnTimeSecsPerHr            = "WifiOnTimeSecsPerHr"
-	cWifiIdleTimeSecsPerHr          = "WifiIdleTimeSecsPerHr"
-	cWifiTransmitTimeSecsPerHr      = "WifiTransmitTimeSecsPerHr"
-	cBluetoothIdleTimeSecsPerHr     = "BluetoothIdleTimeSecsPerHr"
-	cBluetoothTransmitTimeSecsPerHr = "BluetoothTransmitTimeSecsPerHr"
-
-	cScreenOffDichargeRatePerHr  = "ScreenOffDichargeRatePerHr"
-	cScreenOnDichargeRatePerHr   = "ScreenOnDichargeRatePerHr"
-	cMobileKiloBytesPerHr        = "MobileKiloBytesPerHr"
-	cWifiKiloBytesPerHr          = "WifiKiloBytesPerHr"
-	cWifiDischargeRatePerHr      = "WifiDischargeRatePerHr"
-	cBluetoothDischargeRatePerHr = "BluetoothDischargeRatePerHr"
-
 	// History Summary Stats: Prefixed with H
 	hScreenOn          = "ScreenOn"
 	hScreenOnNumPerHr  = "ScreenOnNumPerHr"
@@ -89,17 +68,43 @@ const (
 	hTotalSyncNumPerHr  = "TotalSyncNumPerHr"
 	hTotalSyncSecsPerHr = "TotalSyncSecsPerHr"
 
-	hIdleModeOn          = "IdleModeOn"
-	hIdleModeOnNumPerHr  = "IdleModeOnNumPerHr"
-	hIdleModeOnSecsPerHr = "IdleModeOnSecsPerHr"
+	hLowPowerModeOn          = "PowerSaveModeOn"
+	hLowPowerModeOnNumPerHr  = "PowerSaveModeOnNumPerHr"
+	hLowPowerModeOnSecsPerHr = "PowerSaveModeOnSecsPerHr"
+
+	hWifiRunning          = "WifiRunning"
+	hWifiRunningNumPerHr  = "WifiRunningNumPerHr"
+	hWifiRunningSecsPerHr = "WifiRunningSecsPerHr"
+
+	hWifiRadio          = "WifiRadio"
+	hWifiRadioNumPerHr  = "WifiRadioNumPerHr"
+	hWifiRadioSecsPerHr = "WifiRadioSecsPerHr"
+
+	hFlashlightOn          = "FlashlightOn"
+	hFlashlightOnNumPerHr  = "FlashlightOnNumPerHr"
+	hFlashlightOnSecsPerHr = "FlashlightOnSecsPerHr"
+
+	hAudioOn          = "AudioOn "
+	hAudioOnNumPerHr  = "AudioOnNumPerHr"
+	hAudioOnSecsPerHr = "AudioOnSecsPerHr"
+
+	hVideoOn          = "VideoOn"
+	hVideoOnNumPerHr  = "VideoOnNumPerHr"
+	hVideoOnSecsPerHr = "VideoOnSecsPerHr"
 
 	// Multi variable stats
-	hDataConnectionSummary     = "DataConnectionSummary"
-	hConnectivitySummary       = "ConnectivitySummary"
-	hPerAppSyncSummary         = "PerAppSyncSummary"
-	hWakeupReasonSummary       = "WakeupReasonSummary"
-	hPhoneStateSummary         = "PhoneStateSummary"
-	hForegroundProcessSummary  = "ForegroundProcessSummary"
-	hFirstWakelockAfterSuspend = "FirstWakelockAfterSuspend"
-	hScheduledJobSummary       = "ScheduledJobSummary"
+	hIdleModeSummary            = "DozeModeSummary"
+	hDataConnectionSummary      = "DataConnectionSummary"
+	hConnectivitySummary        = "ConnectivitySummary"
+	hPerAppSyncSummary          = "PerAppSyncSummary"
+	hWakeupReasonSummary        = "WakeupReasonSummary"
+	hPhoneStateSummary          = "PhoneStateSummary"
+	hForegroundProcessSummary   = "ForegroundProcessSummary"
+	hFirstWakelockAfterSuspend  = "FirstWakelockAfterSuspend"
+	hDetailedWakelockSummary    = "DetailedWakelockSummary"
+	hScheduledJobSummary        = "ScheduledJobSummary"
+	hWifiSupplSummary           = "WifiSupplicantSummary"
+	hPhoneSignalStrengthSummary = "PhoneSignalStrengthSummary"
+	hWifiSignalStrengthSummary  = "WifiSignalStrengthSummary"
+	hTopApplicationSummary      = "TopApplicationSummary"
 )

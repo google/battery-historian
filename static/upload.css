@@ -1,0 +1,71 @@
+/**
+ * Copyright 2016 Google Inc. All Rights Reserved.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+.btn-browse {
+  background-color: #eee;
+  z-index: 1;
+}
+
+.btn-file {
+  position: relative;
+  overflow: hidden;
+}
+
+.btn-file input {
+  position: absolute;
+  top: 0px;
+  left: 0px;
+  font-size: 50px;
+  opacity: 0;
+}
+
+.extra-option {
+  width: 200px;
+}
+
+.filename {
+  padding: 6px 12px;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  border-color: #ccc;
+  display: inline-block;
+  width: 400px;
+  text-align: center;
+  vertical-align: bottom;
+  position: relative;
+  left: -10px;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.glyphicon {
+  margin-right: 5px;
+}
+
+.progress {
+  display: none;
+  width: 500px;
+  margin-top: 20px;
+}
+
+#extra-options > div {
+  margin-bottom: 2px;
+}
+
+#upload-submit {
+  margin-top: -30px;
+  float: right;
+}

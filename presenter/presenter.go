@@ -1,4 +1,4 @@
-// Copyright 2015 Google Inc. All Rights Reserved.
+// Copyright 2016 Google Inc. All Rights Reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -17,182 +17,151 @@
 package presenter
 
 import (
-	"bytes"
 	"fmt"
 	"html/template"
+	"math"
 	"sort"
-	"strconv"
+	"strings"
 	"time"
 
 	"github.com/golang/protobuf/proto"
-
-	"github.com/google/battery-historian/checkinparse"
+	"github.com/google/battery-historian/aggregated"
+	"github.com/google/battery-historian/bugreportutils"
+	"github.com/google/battery-historian/historianutils"
 	"github.com/google/battery-historian/parseutils"
-
 	bspb "github.com/google/battery-historian/pb/batterystats_proto"
 )
 
-type mDuration struct {
-	V time.Duration
-	L string // Low, Medium, High
+func abs(x float32) float32 {
+	if x < 0 {
+		return -x
+	}
+	return x
 }
 
-type mFloat32 struct {
-	V float32
-	L string // Low, Medium, High
+func absInt32(x int32) int32 {
+	if x < 0 {
+		return -x
+	}
+	return x
+}
+
+// userActivity contains a processed form of the UserActivity proto found in github.com/google/battery-historian/pb/batterystats.proto.
+type userActivity struct {
+	Type  string
+	Count float32
+}
+
+// AppStat contains the parsed app data from a bugreport.
+// This contains the raw App proto in github.com/google/battery-historian/pb/batterystats.proto
+// but includes some custom fields that need to be processed before conversion to JS.
+type AppStat struct {
+	DevicePowerPrediction float32
+	CPUPowerPrediction    float32 // Device estimated power use due to CPU usage.
+	RawStats              *bspb.BatteryStats_App
+	Sensor                []bugreportutils.SensorInfo
+	UserActivity          []userActivity
 }
 
 // HTMLData is the main structure passed to the frontend HTML template containing all analysis items.
 type HTMLData struct {
 	SDKVersion      int
+	DeviceID        string
 	DeviceModel     string
-	HistorianCsv    string
 	Historian       template.HTML
 	Count           int
 	UnplugSummaries []UnplugSummary
-	CheckinSummary  checkin
+	CheckinSummary  aggregated.Checkin
 	Error           string
 	Warning         string
 	Filename        string
-	AppStats        []*bspb.BatteryStats_App
+	AppStats        []AppStat
+	Overflow        bool
 }
 
-// WakelockData contains stats about wakelocks.
-type WakelockData struct {
-	Name     string
-	UID      int32
-	Count    float32
-	Duration time.Duration
-	Level    int // Low, Medium, High
+// CombinedCheckinSummary is the combined structure for the 2 files being compared
+type CombinedCheckinSummary struct {
+	UserspaceWakelocksCombined   []ActivityDataDiff
+	KernelWakelocksCombined      []ActivityDataDiff
+	SyncTasksCombined            []ActivityDataDiff
+	WakeupReasonsCombined        []ActivityDataDiff
+	TopMobileActiveAppsCombined  []ActivityDataDiff
+	TopMobileTrafficAppsCombined []NetworkTrafficDataDiff
+	TopWifiTrafficAppsCombined   []NetworkTrafficDataDiff
+	DevicePowerEstimatesCombined []PowerUseDataDiff
+	WifiFullLockActivityCombined []ActivityDataDiff
+	GPSUseCombined               []ActivityDataDiff
+	CameraUseCombined            []ActivityDataDiff
+	FlashlightUseCombined        []ActivityDataDiff
+	AppWakeupsCombined           []RateDataDiff
+	ANRAndCrashCombined          []anrCrashDataDiff
+	CPUUsageCombined             []cpuDataDiff
 }
 
-// PowerUseData contains percentage battery consumption for apps and system elements.
-type PowerUseData struct {
-	Name    string
-	UID     int32
-	Percent float32 // Percentage of total consumption
+// MultiFileHTMLData is the main structure passed to the frontend HTML template
+// containing all analysis items for both the files.
+type MultiFileHTMLData struct {
+	SDKVersion          []int
+	MinSDKVersion       int // This holds the minimum of the SDK Versions for both the files.
+	DeviceID            []string
+	DeviceModel         []string
+	Historian           []template.HTML
+	Count               []int
+	UnplugSummaries     [][]UnplugSummary
+	CheckinSummary      []aggregated.Checkin
+	CombinedCheckinData CombinedCheckinSummary
+	Filename            []string
+	Error               string
+	Warning             string
+	Overflow            bool
+	AppStats            []AppStat
 }
 
-// byPercent sorts applications by percentage battery used.
-type byPercent []*PowerUseData
-
-func (a byPercent) Len() int      { return len(a) }
-func (a byPercent) Swap(i, j int) { a[i], a[j] = a[j], a[i] }
-
-// Less sorts by decreasing time order then increasing alphabetic order to break the tie.
-func (a byPercent) Less(i, j int) bool {
-	if x, y := a[i].Percent, a[j].Percent; x != y {
-		return x > y
-	}
-	return a[i].Name < a[j].Name
-}
-
-// MobileActiveData contains the total amount of time an application actively used the mobile network.
-type MobileActiveData struct {
-	Name     string
-	UID      int32
-	Duration time.Duration
-}
-
-// byTime sorts MobileActiveData by the time used.
-type byTime []*MobileActiveData
-
-func (m byTime) Len() int      { return len(m) }
-func (m byTime) Swap(i, j int) { m[i], m[j] = m[j], m[i] }
-
-// Less sorts by decreasing time order then increasing alphabetic order to break the tie.
-func (m byTime) Less(i, j int) bool {
-	if x, y := m[i].Duration, m[j].Duration; x != y {
-		return x > y
-	}
-	return m[i].Name < m[j].Name
-}
-
-// NetworkTrafficData contains the total amount of bytes transferred over mobile and wifi.
-type NetworkTrafficData struct {
-	Name                           string
-	UID                            int32
-	WifiMegaBytes, MobileMegaBytes float32
-}
-
-// byMobileBytes sorts NetworkTrafficData by the amount of bytes transferred over mobile.
-type byMobileBytes []*NetworkTrafficData
-
-func (n byMobileBytes) Len() int      { return len(n) }
-func (n byMobileBytes) Swap(i, j int) { n[i], n[j] = n[j], n[i] }
-
-// Less sorts in decreasing order.
-func (n byMobileBytes) Less(i, j int) bool {
-	return n[i].MobileMegaBytes > n[j].MobileMegaBytes
-}
-
-// byWifiBytes sorts NetworkTrafficData by the amount of bytes transferred over mobile.
-type byWifiBytes []*NetworkTrafficData
-
-func (n byWifiBytes) Len() int      { return len(n) }
-func (n byWifiBytes) Swap(i, j int) { n[i], n[j] = n[j], n[i] }
-
-// Less sorts in decreasing order.
-func (n byWifiBytes) Less(i, j int) bool {
-	return n[i].WifiMegaBytes > n[j].WifiMegaBytes
-}
-
-func min(x, y int) int {
-	if x < y {
-		return x
-	}
-	return y
-}
-
-// CheckinSummary contains the aggregated batterystats data for a bugreport.
-type checkin struct {
-	Device           string
-	Build            string
-	BuildFingerprint string
-	ReportVersion    int32
-
-	ScreenOffDischargePoints float32
-	ScreenOnDischargePoints  float32
-	MiscPercentage           float32
-	BatteryCapacity          float32 // mAh
-	ActualDischarge          float32 // mAh
-	EstimatedDischarge       float32 // mAh
-	WifiDischargePoints      float32
-	BluetoothDischargePoints float32
-
-	Realtime          time.Duration
-	ScreenOffRealtime time.Duration
-
-	Uptime                mDuration
-	ScreenOffUptime       mDuration
-	ScreenOnTime          mDuration
-	PartialWakelockTime   mDuration
-	KernelOverheadTime    mDuration
-	SignalScanningTime    mDuration
-	MobileActiveTime      mDuration
-	WifiOnTime            mDuration
-	WifiIdleTime          mDuration
-	WifiTransmitTime      mDuration // tx + rx
-	BluetoothIdleTime     mDuration
-	BluetoothTransmitTime mDuration // tx + rx
-
-	ScreenOffDichargeRatePerHr  mFloat32
-	ScreenOnDichargeRatePerHr   mFloat32
-	MobileKiloBytesPerHr        mFloat32
-	WifiKiloBytesPerHr          mFloat32
-	WifiDischargeRatePerHr      mFloat32
-	BluetoothDischargeRatePerHr mFloat32
-
-	UserspaceWakelocks []WakelockData
-	KernelWakelocks    []WakelockData
-	SyncTasks          []WakelockData
-
-	TopMobileActiveApps []MobileActiveData
-
-	TopMobileTrafficApps []NetworkTrafficData
-	TopWifiTrafficApps   []NetworkTrafficData
-
-	TopBatteryConsumingEntities []PowerUseData
+// HistogramStats is the struct that contains all the checkin metrics
+// which are passed to HTML in order to generate the histogram charts.
+type HistogramStats struct {
+	//Screen Data
+	ScreenOffDischargeRatePerHr aggregated.MFloat32
+	ScreenOnDischargeRatePerHr  aggregated.MFloat32
+	ScreenOffUptimePercentage   float32
+	ScreenOnTimePercentage      float32
+	// Data Transfer
+	MobileKiloBytesPerHr            aggregated.MFloat32
+	WifiKiloBytesPerHr              aggregated.MFloat32
+	WifiDischargeRatePerHr          aggregated.MFloat32
+	BluetoothDischargeRatePerHr     aggregated.MFloat32
+	WifiOnTimePercentage            float32
+	WifiTransmitTimePercentage      float32
+	BluetoothTransmitTimePercentage float32
+	BluetoothOnTimePercentage       float32
+	// Wakelock Data
+	PartialWakelockTimePercentage float32
+	KernelOverheadTimePercentage  float32
+	FullWakelockTimePercentage    float32
+	// Usage Data
+	SignalScanningTimePercentage        float32
+	MobileActiveTimePercentage          float32
+	PhoneCallTimePercentage             float32
+	DeviceIdlingTimePercentage          float32
+	InteractiveTimePercentage           float32
+	DeviceIdleModeEnabledTimePercentage float32
+	LowPowerModeEnabledTimePercentage   float32
+	// App Data
+	TotalAppGPSUseTimePerHour  float32
+	TotalAppANRCount           int32
+	TotalAppCrashCount         int32
+	TotalAppSyncsPerHr         float32
+	TotalAppWakeupsPerHr       float32
+	TotalAppCPUPowerPct        float32
+	TotalAppFlashlightUsePerHr float32
+	TotalAppCameraUsePerHr     float32
+	ConnectivityChanges        float32
+	// Pie charts data.
+	ScreenBrightness   map[string]float32
+	SignalStrength     map[string]float32
+	WifiSignalStrength map[string]float32
+	BluetoothState     map[string]float32
+	DataConnection     map[string]float32
 }
 
 // UnplugSummary contains stats processed from battery history during discharge intervals.
@@ -230,7 +199,7 @@ type internalDist struct {
 	parseutils.Dist
 }
 
-func (d internalDist) print(device, name string, duration time.Duration) DurationStats {
+func (d internalDist) print(name string, duration time.Duration) DurationStats {
 	ds := DurationStats{
 		Name:          name,
 		NumRate:       float64(d.Num) / duration.Hours(),
@@ -242,7 +211,7 @@ func (d internalDist) print(device, name string, duration time.Duration) Duratio
 	return ds
 }
 
-func mapPrint(device, name string, m map[string]parseutils.Dist, duration time.Duration) MultiDurationStats {
+func mapPrint(name string, m map[string]parseutils.Dist, duration time.Duration) MultiDurationStats {
 	var stats []parseutils.MultiDist
 	for k, v := range m {
 		stats = append(stats, parseutils.MultiDist{Name: k, Stat: v})
@@ -266,248 +235,50 @@ func mapPrint(device, name string, m map[string]parseutils.Dist, duration time.D
 	return MultiDurationStats{Metric: name, Stats: ds}
 }
 
-func parseCheckinData(c *bspb.BatteryStats) checkin {
-	if c == nil {
-		return checkin{}
-	}
-
-	realtime := time.Duration(c.System.Battery.GetBatteryRealtimeMsec()) * time.Millisecond
-
-	out := checkin{
-		Device:           c.Build.GetDevice(),
-		Build:            c.Build.GetBuildId(),
-		BuildFingerprint: c.Build.GetFingerprint(),
-		ReportVersion:    c.GetReportVersion(),
-
-		Realtime:          realtime,
-		ScreenOffRealtime: time.Duration(c.System.Battery.GetScreenOffRealtimeMsec()) * time.Millisecond,
-
-		ScreenOffDischargePoints: c.System.BatteryDischarge.GetScreenOff(),
-		ScreenOnDischargePoints:  c.System.BatteryDischarge.GetScreenOn(),
-
-		BatteryCapacity:    c.System.PowerUseSummary.GetBatteryCapacityMah(),
-		EstimatedDischarge: c.System.PowerUseSummary.GetComputedPowerMah(),
-		ActualDischarge:    (c.System.PowerUseSummary.GetMinDrainedPowerMah() + c.System.PowerUseSummary.GetMaxDrainedPowerMah()) / 2,
-
-		// Uptime is the same as screen-off uptime + screen on time
-		Uptime: mDuration{
-			V: (time.Duration(c.System.Battery.GetBatteryUptimeMsec()) * time.Millisecond),
-		},
-
-		ScreenOffUptime: mDuration{
-			V: (time.Duration(c.System.Battery.GetScreenOffUptimeMsec()) * time.Millisecond),
-		},
-
-		ScreenOnTime: mDuration{
-			V: (time.Duration(c.System.Misc.GetScreenOnTimeMsec()) * time.Millisecond),
-		},
-
-		PartialWakelockTime: mDuration{
-			V: (time.Duration(c.System.Misc.GetPartialWakelockTimeMsec()) * time.Millisecond),
-		},
-
-		KernelOverheadTime: mDuration{
-			V: (time.Duration(c.System.Battery.GetScreenOffUptimeMsec()-c.System.Misc.GetPartialWakelockTimeMsec()) * time.Millisecond),
-		},
-
-		SignalScanningTime: mDuration{
-			V: (time.Duration(c.System.SignalScanningTime.GetTimeMsec()) * time.Millisecond),
-		},
-
-		MobileActiveTime: mDuration{
-			V: (time.Duration(c.System.Misc.GetMobileActiveTimeMsec()) * time.Millisecond),
-		},
-	}
-
-	out.MiscPercentage = 100 * (out.ActualDischarge - out.EstimatedDischarge) / out.BatteryCapacity
-
-	out.MobileKiloBytesPerHr = mFloat32{V: (c.System.GlobalNetwork.GetMobileBytesRx() + c.System.GlobalNetwork.GetMobileBytesTx()) / (1024 * float32(realtime.Hours()))}
-	out.WifiKiloBytesPerHr = mFloat32{V: (c.System.GlobalNetwork.GetWifiBytesRx() + c.System.GlobalNetwork.GetWifiBytesTx()) / (1024 * float32(realtime.Hours()))}
-
-	if c.GetReportVersion() >= 14 {
-		out.WifiOnTime = mDuration{V: time.Duration(c.System.GlobalWifi.GetWifiOnTimeMsec()) * time.Millisecond}
-		out.WifiIdleTime = mDuration{V: time.Duration(c.System.GlobalWifi.GetWifiIdleTimeMsec()) * time.Millisecond}
-		out.WifiTransmitTime = mDuration{V: time.Duration(c.System.GlobalWifi.GetWifiRxTimeMsec()+c.System.GlobalWifi.GetWifiTxTimeMsec()) * time.Millisecond}
-		out.WifiDischargePoints = 100 * c.System.GlobalWifi.GetWifiPowerMah() / c.GetSystem().GetPowerUseSummary().GetBatteryCapacityMah()
-		out.WifiDischargeRatePerHr = mFloat32{
-			V: 100 * c.System.GlobalWifi.GetWifiPowerMah() / c.GetSystem().GetPowerUseSummary().GetBatteryCapacityMah() / float32(realtime.Hours()),
-		}
-
-		out.BluetoothIdleTime = mDuration{V: time.Duration(c.System.GlobalBluetooth.GetBluetoothIdleTimeMsec()) * time.Millisecond}
-		out.BluetoothTransmitTime = mDuration{V: time.Duration(c.System.GlobalBluetooth.GetBluetoothRxTimeMsec()+c.System.GlobalBluetooth.GetBluetoothTxTimeMsec()) * time.Millisecond}
-		out.BluetoothDischargePoints = 100 * c.System.GlobalBluetooth.GetBluetoothPowerMah() / c.GetSystem().GetPowerUseSummary().GetBatteryCapacityMah()
-		out.BluetoothDischargeRatePerHr = mFloat32{
-			V: 100 * c.System.GlobalBluetooth.GetBluetoothPowerMah() / c.GetSystem().GetPowerUseSummary().GetBatteryCapacityMah() / float32(realtime.Hours()),
-		}
-	}
-
-	if s := c.System.Battery.GetScreenOffRealtimeMsec(); s > 0 {
-		out.ScreenOffDichargeRatePerHr = mFloat32{V: 60 * 60 * 1000 * c.System.BatteryDischarge.GetScreenOff() / s}
-	}
-	if s := c.System.Misc.GetScreenOnTimeMsec(); s > 0 {
-		out.ScreenOnDichargeRatePerHr = mFloat32{V: 60 * 60 * 1000 * c.System.BatteryDischarge.GetScreenOn() / s}
-	}
-
-	// Top Partial Wakelocks by time and count
-	var pwl []*checkinparse.WakelockInfo
-	for _, app := range c.App {
-		for _, pw := range app.Wakelock {
-			if pw.GetPartialTimeMsec() >= 0.01 {
-				pwl = append(pwl, &checkinparse.WakelockInfo{
-					Name:     fmt.Sprintf("%s : %s", app.GetName(), pw.GetName()),
-					UID:      app.GetUid(),
-					Duration: time.Duration(pw.GetPartialTimeMsec()) * time.Millisecond,
-					Count:    pw.GetPartialCount(),
-				})
-			}
-		}
-	}
-
-	// Top Partial Wakelocks by time
-	checkinparse.SortByTime(pwl)
-	for _, pw := range pwl {
-		out.UserspaceWakelocks = append(out.UserspaceWakelocks, WakelockData{
-			Name:     pw.Name,
-			UID:      pw.UID,
-			Count:    pw.Count,
-			Duration: pw.Duration,
-		})
-	}
-
-	// Top 5 Kernel Wakelocks
-	var kwl []*checkinparse.WakelockInfo
-	for _, kw := range c.System.KernelWakelock {
-		if kw.GetName() != "PowerManagerService.WakeLocks" && kw.GetTimeMsec() >= 0.01 {
-			kwl = append(kwl, &checkinparse.WakelockInfo{
-				Name:     kw.GetName(),
-				Duration: time.Duration(kw.GetTimeMsec()) * time.Millisecond,
-				Count:    kw.GetCount(),
-			})
-		}
-	}
-	// Top Kernel Wakelocks by time
-	checkinparse.SortByTime(kwl)
-	for _, kw := range kwl {
-		out.KernelWakelocks = append(out.KernelWakelocks, WakelockData{
-			Name:     kw.Name,
-			Count:    kw.Count,
-			Duration: kw.Duration,
-		})
-	}
-
-	// Top SyncTasks by time and count
-	var stl []*checkinparse.WakelockInfo
-	for _, app := range c.App {
-		for _, st := range app.Sync {
-			if st.GetTotalTimeMsec() >= 0.01 {
-				stl = append(stl, &checkinparse.WakelockInfo{
-					Name:     fmt.Sprintf("%s : %s", app.GetName(), st.GetName()),
-					UID:      app.GetUid(),
-					Duration: time.Duration(st.GetTotalTimeMsec()) * time.Millisecond,
-					Count:    st.GetCount(),
-				})
-			}
-		}
-	}
-
-	// Top SyncTasks by time
-	checkinparse.SortByTime(stl)
-	for _, st := range stl {
-		out.SyncTasks = append(out.SyncTasks, WakelockData{
-			Name:     st.Name,
-			UID:      st.UID,
-			Count:    st.Count,
-			Duration: st.Duration,
-		})
-	}
-
-	// Top power consumers and network users
-	var e []*PowerUseData
-	var m []*MobileActiveData
-	var n []*NetworkTrafficData
-	for _, app := range c.App {
-		if mah := app.PowerUseItem.GetComputedPowerMah(); mah >= 0.01 {
-			e = append(e, &PowerUseData{
-				Name:    app.GetName(),
-				UID:     app.GetUid(),
-				Percent: 100 * mah / c.GetSystem().GetPowerUseSummary().GetBatteryCapacityMah(),
-			})
-		}
-		if mat := app.Network.GetMobileActiveTimeMsec(); mat >= 0.01 {
-			m = append(m, &MobileActiveData{
-				Name:     app.GetName(),
-				UID:      app.GetUid(),
-				Duration: time.Duration(mat) * time.Millisecond,
-			})
-		}
-		wr := app.Network.GetWifiBytesRx()
-		wt := app.Network.GetWifiBytesTx()
-		mt := app.Network.GetMobileBytesTx()
-		mr := app.Network.GetMobileBytesRx()
-		if wr+wt+mt+mr >= 0.01 {
-			n = append(n, &NetworkTrafficData{
-				Name:            app.GetName(),
-				UID:             app.GetUid(),
-				WifiMegaBytes:   (wr + wt) / (1024 * 1024),
-				MobileMegaBytes: (mr + mt) / (1024 * 1024),
-			})
-		}
-	}
-	for _, pwi := range c.System.PowerUseItem {
-		if pwi.GetName() == bspb.BatteryStats_System_PowerUseItem_APP {
-			// We have the apps split up in the preceding for loop, and the APP entry is just the sum of all of them, so we skip it here.
-			continue
-		}
-		if mah := pwi.GetComputedPowerMah(); mah >= 0.01 {
-			e = append(e, &PowerUseData{
-				Name:    pwi.GetName().String(),
-				Percent: 100 * mah / c.GetSystem().GetPowerUseSummary().GetBatteryCapacityMah(),
-			})
-		}
-	}
-
-	sort.Sort(byPercent(e))
-	for _, ent := range e {
-		out.TopBatteryConsumingEntities = append(out.TopBatteryConsumingEntities, *ent)
-	}
-
-	sort.Sort(byTime(m))
-	for _, mad := range m {
-		out.TopMobileActiveApps = append(out.TopMobileActiveApps, *mad)
-	}
-
-	sort.Sort(byMobileBytes(n))
-	for _, ntd := range n {
-		if ntd.MobileMegaBytes >= 0.01 {
-			out.TopMobileTrafficApps = append(out.TopMobileTrafficApps, *ntd)
-		}
-	}
-
-	sort.Sort(byWifiBytes(n))
-	for _, ntd := range n {
-		if ntd.WifiMegaBytes >= 0.01 {
-			out.TopWifiTrafficApps = append(out.TopWifiTrafficApps, *ntd)
-		}
-	}
-
-	return out
-}
-
 // byName sorts applications by name in ascending order.
-type byName []*bspb.BatteryStats_App
+type byName []AppStat
 
 func (a byName) Len() int           { return len(a) }
 func (a byName) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
-func (a byName) Less(i, j int) bool { return a[i].GetName() < a[j].GetName() }
+func (a byName) Less(i, j int) bool { return a[i].RawStats.GetName() < a[j].RawStats.GetName() }
 
-func parseAppStats(checkin *bspb.BatteryStats) []*bspb.BatteryStats_App {
-	var as []*bspb.BatteryStats_App
-	unknown := 1
+func parseAppStats(checkin *bspb.BatteryStats, sensors map[int32]bugreportutils.SensorInfo) []AppStat {
+	var as []AppStat
+	bCapMah := checkin.GetSystem().GetPowerUseSummary().GetBatteryCapacityMah()
 
-	for _, a := range checkin.GetApp() {
-		if a.GetName() == "" {
-			a.Name = proto.String("UNKNOWN_" + strconv.Itoa(unknown))
-			unknown++
+	for _, app := range checkin.GetApp() {
+		a := AppStat{
+			DevicePowerPrediction: 100 * float32(app.GetPowerUseItem().GetComputedPowerMah()) / bCapMah,
+			RawStats:              app,
+		}
+
+		if app.GetName() == "" {
+			app.Name = proto.String(fmt.Sprintf("UNKNOWN_%d", app.GetUid()))
+		}
+
+		// Only add it to AppStat if the CPU field exists and is therefore populated.
+		if app.Cpu != nil {
+			a.CPUPowerPrediction = 100 * (app.Cpu.GetPowerMaMs() / (1000 * 60 * 60)) / bCapMah
+		}
+
+		for _, u := range app.GetUserActivity() {
+			a.UserActivity = append(a.UserActivity, userActivity{
+				Type:  u.GetName().String(),
+				Count: u.GetCount(),
+			})
+		}
+
+		for _, s := range app.GetSensor() {
+			sensor, ok := sensors[s.GetNumber()]
+			if !ok {
+				sensor = bugreportutils.SensorInfo{
+					Name:   fmt.Sprintf("unknown sensor (#%d)", s.GetNumber()),
+					Number: s.GetNumber(),
+				}
+			}
+			sensor.TotalTimeMs = int64(s.GetTotalTimeMsec())
+			sensor.Count = s.GetCount()
+			a.Sensor = append(a.Sensor, sensor)
 		}
 		as = append(as, a)
 	}
@@ -517,16 +288,505 @@ func parseAppStats(checkin *bspb.BatteryStats) []*bspb.BatteryStats_App {
 	return as
 }
 
+// PowerUseDataDiff holds PowerUseData info for the 2 files being compared.
+type PowerUseDataDiff struct {
+	Name           string
+	Entries        [2]aggregated.PowerUseData
+	PercentageDiff float32
+}
+
+// byPercentageDiff sorts applications by the absolute value of percentage battery used in desc order.
+type byPercentageDiff []PowerUseDataDiff
+
+func (a byPercentageDiff) Len() int      { return len(a) }
+func (a byPercentageDiff) Swap(i, j int) { a[i], a[j] = a[j], a[i] }
+func (a byPercentageDiff) Less(i, j int) bool {
+	x, y := a[i].PercentageDiff, a[j].PercentageDiff
+	return abs(x) >= abs(y)
+}
+
+// cpuDataDiff contains the combined CPU usage for file1 and file2.
+type cpuDataDiff struct {
+	Name         string                // App name.
+	Entries      [2]aggregated.CPUData // Array stores data for file1 and file2.
+	PowerPctDiff float32               // Difference in percentage of device power used.
+}
+
+// byPowerPctDiff sorts applications by absolute value of PowerPctDiff in desc order.
+type byPowerPctDiff []cpuDataDiff
+
+func (a byPowerPctDiff) Len() int      { return len(a) }
+func (a byPowerPctDiff) Swap(i, j int) { a[i], a[j] = a[j], a[i] }
+func (a byPowerPctDiff) Less(i, j int) bool {
+	x, y := a[i].PowerPctDiff, a[j].PowerPctDiff
+	return abs(x) >= abs(y)
+}
+
+// anrCrashDataDiff contains the combined ANR and crash data for file1 and file2.
+type anrCrashDataDiff struct {
+	Name                         string
+	Entries                      [2]aggregated.ANRCrashData // Array stores data for file1 and file2.
+	ANRCountDiff, CrashCountDiff int32
+}
+
+// byCrashThenANRDiff sorts anrCrashData by the absolute value of the difference in the number
+// of crashes, then by the abs(difference) in the number of ANR, both in descending order.
+type byCrashThenANRDiff []anrCrashDataDiff
+
+func (d byCrashThenANRDiff) Len() int      { return len(d) }
+func (d byCrashThenANRDiff) Swap(i, j int) { d[i], d[j] = d[j], d[i] }
+func (d byCrashThenANRDiff) Less(i, j int) bool {
+	if d[i].CrashCountDiff == d[j].CrashCountDiff {
+		return absInt32(d[i].ANRCountDiff) > absInt32(d[j].ANRCountDiff)
+	}
+	return absInt32(d[i].CrashCountDiff) > absInt32(d[j].CrashCountDiff)
+}
+
+// RateDataDiff contains the combined app metrics for file1 and file2.
+type RateDataDiff struct {
+	Name           string
+	Entries        [2]aggregated.RateData // Array stores data for file1 and file2.
+	CountPerHrDiff float32                // Difference in CountPerHr for the two files.
+}
+
+// byCountPerHrDiff sorts applications by absolute value of CountPerHrDiff in desc order.
+type byCountPerHrDiff []RateDataDiff
+
+func (a byCountPerHrDiff) Len() int      { return len(a) }
+func (a byCountPerHrDiff) Swap(i, j int) { a[i], a[j] = a[j], a[i] }
+func (a byCountPerHrDiff) Less(i, j int) bool {
+	x, y := a[i].CountPerHrDiff, a[j].CountPerHrDiff
+	return abs(x) >= abs(y)
+}
+
+// ActivityDataDiff stores the combined activity data for the 2 files being compared.
+type ActivityDataDiff struct {
+	Name             string
+	Entries          [2]aggregated.ActivityData // Array stores data for file1 and file2.
+	CountPerHourDiff float32                    // Difference in CountPerHr for the two files.
+	SecondsPerHrDiff float32                    // Difference in durPerHr for the two files.
+}
+
+// bySecondsPerHrDiff sorts applications by absolute value of SecondsPerHrDiff in desc order.
+type bySecondsPerHrDiff []ActivityDataDiff
+
+func (a bySecondsPerHrDiff) Len() int      { return len(a) }
+func (a bySecondsPerHrDiff) Swap(i, j int) { a[i], a[j] = a[j], a[i] }
+func (a bySecondsPerHrDiff) Less(i, j int) bool {
+	x, y := a[i].SecondsPerHrDiff, a[j].SecondsPerHrDiff
+	return abs(x) >= abs(y)
+}
+
+// NetworkTrafficDataDiff stores combined network traffic data for the 2 files being compared.
+type NetworkTrafficDataDiff struct {
+	Name                       string
+	Entries                    [2]aggregated.NetworkTrafficData // Array stores data for file1 and file2.
+	WifiMegaBytesPerHourDiff   float32
+	MobileMegaBytesPerHourDiff float32
+}
+
+// byWifiMegaBytesPerHourDiff sorts applications by the absolute value of WifiMegaBytesPerHour
+// difference between data from the two files.
+type byWifiMegaBytesPerHourDiff []NetworkTrafficDataDiff
+
+func (a byWifiMegaBytesPerHourDiff) Len() int      { return len(a) }
+func (a byWifiMegaBytesPerHourDiff) Swap(i, j int) { a[i], a[j] = a[j], a[i] }
+func (a byWifiMegaBytesPerHourDiff) Less(i, j int) bool {
+	x, y := a[i].WifiMegaBytesPerHourDiff, a[j].WifiMegaBytesPerHourDiff
+	return abs(x) >= abs(y)
+}
+
+// byMobileMegaBytesPerHourDiff sorts applications by absolute value of MobileMegaBytesPerHour
+// difference between data from the two files in decending order.
+type byMobileMegaBytesPerHourDiff []NetworkTrafficDataDiff
+
+func (a byMobileMegaBytesPerHourDiff) Len() int      { return len(a) }
+func (a byMobileMegaBytesPerHourDiff) Swap(i, j int) { a[i], a[j] = a[j], a[i] }
+func (a byMobileMegaBytesPerHourDiff) Less(i, j int) bool {
+	x, y := a[i].MobileMegaBytesPerHourDiff, a[j].MobileMegaBytesPerHourDiff
+	return abs(x) >= abs(y)
+}
+
+// combineCheckinData combines the Checkin data for the two files being compared in to one common struct.
+func combineCheckinData(data []HTMLData) CombinedCheckinSummary {
+	// Maps to merge the two individual data by application name.
+	topBat := make(map[string]PowerUseDataDiff)
+	uWl := make(map[string]ActivityDataDiff)
+	kerWl := make(map[string]ActivityDataDiff)
+	sync := make(map[string]ActivityDataDiff)
+	wake := make(map[string]ActivityDataDiff)
+	active := make(map[string]ActivityDataDiff)
+	full := make(map[string]ActivityDataDiff)
+	gps := make(map[string]ActivityDataDiff)
+	cam := make(map[string]ActivityDataDiff)
+	flash := make(map[string]ActivityDataDiff)
+	mob := make(map[string]NetworkTrafficDataDiff)
+	wifi := make(map[string]NetworkTrafficDataDiff)
+	appW := make(map[string]RateDataDiff)
+	ac := make(map[string]anrCrashDataDiff)
+	cpu := make(map[string]cpuDataDiff)
+
+	// Loop over data for the two files.
+	for index, dataValue := range data {
+		for _, value := range dataValue.CheckinSummary.DevicePowerEstimates {
+			p := topBat[value.Name]
+			p.Entries[index] = value
+			p.Name = value.Name
+			topBat[value.Name] = p
+			// Calculating the diff between the two individual file metrics.
+			p.PercentageDiff = topBat[value.Name].Entries[0].Percent -
+				topBat[value.Name].Entries[1].Percent
+			topBat[value.Name] = p
+		}
+
+		for _, value := range dataValue.CheckinSummary.UserspaceWakelocks {
+			u := uWl[value.Name]
+			u.Entries[index] = value
+			u.Name = value.Name
+			uWl[value.Name] = u
+			// Calculating the diff between the two individual file metrics.
+			u.CountPerHourDiff = uWl[value.Name].Entries[0].CountPerHour -
+				uWl[value.Name].Entries[1].CountPerHour
+			u.SecondsPerHrDiff = uWl[value.Name].Entries[0].SecondsPerHr -
+				uWl[value.Name].Entries[1].SecondsPerHr
+			uWl[value.Name] = u
+		}
+
+		for _, value := range dataValue.CheckinSummary.KernelWakelocks {
+			k := kerWl[value.Name]
+			k.Entries[index] = value
+			k.Name = value.Name
+			kerWl[value.Name] = k
+			// Calculating the diff between the two individual file metrics.
+			k.CountPerHourDiff = kerWl[value.Name].Entries[0].CountPerHour -
+				kerWl[value.Name].Entries[1].CountPerHour
+			k.SecondsPerHrDiff = kerWl[value.Name].Entries[0].SecondsPerHr -
+				kerWl[value.Name].Entries[1].SecondsPerHr
+			kerWl[value.Name] = k
+		}
+
+		for _, value := range dataValue.CheckinSummary.SyncTasks {
+			s := sync[value.Name]
+			s.Entries[index] = value
+			s.Name = value.Name
+			sync[value.Name] = s
+			// Calculating the diff between the two individual file metrics.
+			s.CountPerHourDiff = sync[value.Name].Entries[0].CountPerHour -
+				sync[value.Name].Entries[1].CountPerHour
+			s.SecondsPerHrDiff = sync[value.Name].Entries[0].SecondsPerHr -
+				sync[value.Name].Entries[1].SecondsPerHr
+			sync[value.Name] = s
+		}
+
+		for _, value := range dataValue.CheckinSummary.WakeupReasons {
+			w := wake[value.Name]
+			w.Entries[index] = value
+			w.Name = value.Name
+			wake[value.Name] = w
+			// Calculating the diff between the two individual file metrics.
+			w.CountPerHourDiff = wake[value.Name].Entries[0].CountPerHour -
+				wake[value.Name].Entries[1].CountPerHour
+			w.SecondsPerHrDiff = wake[value.Name].Entries[0].SecondsPerHr -
+				wake[value.Name].Entries[1].SecondsPerHr
+			wake[value.Name] = w
+		}
+
+		for _, value := range dataValue.CheckinSummary.TopMobileTrafficApps {
+			t := mob[value.Name]
+			t.Entries[index] = value
+			t.Name = value.Name
+			mob[value.Name] = t
+			// Calculating the diff between the two individual file metrics.
+			t.WifiMegaBytesPerHourDiff = mob[value.Name].Entries[0].WifiMegaBytesPerHour -
+				mob[value.Name].Entries[1].WifiMegaBytesPerHour
+			t.MobileMegaBytesPerHourDiff = mob[value.Name].Entries[0].MobileMegaBytesPerHour -
+				mob[value.Name].Entries[1].MobileMegaBytesPerHour
+			mob[value.Name] = t
+		}
+
+		for _, value := range dataValue.CheckinSummary.TopWifiTrafficApps {
+			w := wifi[value.Name]
+			w.Entries[index] = value
+			w.Name = value.Name
+			wifi[value.Name] = w
+			// Calculating the diff between the two individual file metrics.
+			w.WifiMegaBytesPerHourDiff = wifi[value.Name].Entries[0].WifiMegaBytesPerHour -
+				wifi[value.Name].Entries[1].WifiMegaBytesPerHour
+			w.MobileMegaBytesPerHourDiff = wifi[value.Name].Entries[0].MobileMegaBytesPerHour -
+				wifi[value.Name].Entries[1].MobileMegaBytesPerHour
+			wifi[value.Name] = w
+		}
+
+		for _, value := range dataValue.CheckinSummary.TopMobileActiveApps {
+			m := active[value.Name]
+			m.Entries[index] = value
+			m.Name = value.Name
+			active[value.Name] = m
+			// Calculating the diff between the two individual file metrics.
+			m.CountPerHourDiff = active[value.Name].Entries[0].CountPerHour -
+				active[value.Name].Entries[1].CountPerHour
+			m.SecondsPerHrDiff = active[value.Name].Entries[0].SecondsPerHr -
+				active[value.Name].Entries[1].SecondsPerHr
+			active[value.Name] = m
+		}
+
+		for _, value := range dataValue.CheckinSummary.WifiFullLockActivity {
+			k := full[value.Name]
+			k.Entries[index] = value
+			k.Name = value.Name
+			full[value.Name] = k
+			// Calculating the diff between the two individual file metrics.
+			k.SecondsPerHrDiff = full[value.Name].Entries[0].SecondsPerHr -
+				full[value.Name].Entries[1].SecondsPerHr
+			full[value.Name] = k
+		}
+
+		for _, value := range dataValue.CheckinSummary.GPSUse {
+			k := gps[value.Name]
+			k.Entries[index] = value
+			k.Name = value.Name
+			gps[value.Name] = k
+			// Calculating the diff between the two individual file metrics.
+			k.CountPerHourDiff = gps[value.Name].Entries[0].CountPerHour -
+				gps[value.Name].Entries[1].CountPerHour
+			k.SecondsPerHrDiff = gps[value.Name].Entries[0].SecondsPerHr -
+				gps[value.Name].Entries[1].SecondsPerHr
+			gps[value.Name] = k
+		}
+
+		for _, value := range dataValue.CheckinSummary.CameraUse {
+			k := cam[value.Name]
+			k.Entries[index] = value
+			k.Name = value.Name
+			cam[value.Name] = k
+			// Calculating the diff between the two individual file metrics.
+			k.CountPerHourDiff = cam[value.Name].Entries[0].CountPerHour -
+				cam[value.Name].Entries[1].CountPerHour
+			k.SecondsPerHrDiff = cam[value.Name].Entries[0].SecondsPerHr -
+				cam[value.Name].Entries[1].SecondsPerHr
+			cam[value.Name] = k
+		}
+
+		for _, value := range dataValue.CheckinSummary.FlashlightUse {
+			k := flash[value.Name]
+			k.Entries[index] = value
+			k.Name = value.Name
+			flash[value.Name] = k
+			// Calculating the diff between the two individual file metrics.
+			k.CountPerHourDiff = flash[value.Name].Entries[0].CountPerHour -
+				flash[value.Name].Entries[1].CountPerHour
+			k.SecondsPerHrDiff = flash[value.Name].Entries[0].SecondsPerHr -
+				flash[value.Name].Entries[1].SecondsPerHr
+			flash[value.Name] = k
+		}
+
+		for _, value := range dataValue.CheckinSummary.AppWakeups {
+			m := appW[value.Name]
+			m.Entries[index] = value
+			m.Name = value.Name
+			appW[value.Name] = m
+			// Calculating the diff between the two individual file metrics.
+			m.CountPerHrDiff = appW[value.Name].Entries[0].CountPerHr -
+				appW[value.Name].Entries[1].CountPerHr
+			appW[value.Name] = m
+		}
+
+		for _, value := range dataValue.CheckinSummary.ANRAndCrash {
+			m := ac[value.Name]
+			m.Entries[index] = value
+			m.Name = value.Name
+			ac[value.Name] = m
+			// Calculating the diff between the two individual file metrics.
+			m.ANRCountDiff = ac[value.Name].Entries[0].ANRCount -
+				ac[value.Name].Entries[1].ANRCount
+			m.CrashCountDiff = ac[value.Name].Entries[0].CrashCount -
+				ac[value.Name].Entries[1].CrashCount
+			ac[value.Name] = m
+		}
+
+		for _, value := range dataValue.CheckinSummary.CPUUsage {
+			m := cpu[value.Name]
+			m.Entries[index] = value
+			m.Name = value.Name
+			cpu[value.Name] = m
+			// Calculating the diff between the two individual file metrics.
+			m.PowerPctDiff = cpu[value.Name].Entries[0].PowerPct -
+				cpu[value.Name].Entries[1].PowerPct
+			cpu[value.Name] = m
+		}
+	}
+	/* Convert all the maps into arrays in order to sort them.
+	 * We sort the arrays by the absolute values of their diff values
+	 * since, we want to display the data sorted by descending order of
+	 * differences.
+	 */
+
+	// Arrays to store the final sorted list. These arrays are sorted by the
+	// absolute value of diffs between data from the 2 files.
+	var result CombinedCheckinSummary
+	{
+		var t []PowerUseDataDiff
+		for _, value := range topBat {
+			t = append(t, value)
+		}
+		sort.Sort(byPercentageDiff(t))
+		result.DevicePowerEstimatesCombined = t
+	}
+	{
+		var u []ActivityDataDiff
+		for _, value := range uWl {
+			u = append(u, value)
+		}
+		sort.Sort(bySecondsPerHrDiff(u))
+		result.UserspaceWakelocksCombined = u
+	}
+	{
+		var k []ActivityDataDiff
+		for _, value := range kerWl {
+			k = append(k, value)
+		}
+		sort.Sort(bySecondsPerHrDiff(k))
+		result.KernelWakelocksCombined = k
+	}
+	{
+		var s []ActivityDataDiff
+		for _, value := range sync {
+			s = append(s, value)
+		}
+		sort.Sort(bySecondsPerHrDiff(s))
+		result.SyncTasksCombined = s
+	}
+	{
+		var r []ActivityDataDiff
+		for _, value := range wake {
+			r = append(r, value)
+		}
+		sort.Sort(bySecondsPerHrDiff(r))
+		result.WakeupReasonsCombined = r
+	}
+	{
+		var m []NetworkTrafficDataDiff
+		for _, value := range mob {
+			m = append(m, value)
+		}
+		sort.Sort(byMobileMegaBytesPerHourDiff(m))
+		result.TopMobileTrafficAppsCombined = m
+	}
+	{
+		var w []NetworkTrafficDataDiff
+		for _, value := range wifi {
+			w = append(w, value)
+		}
+		sort.Sort(byWifiMegaBytesPerHourDiff(w))
+		result.TopWifiTrafficAppsCombined = w
+	}
+	{
+		var a []ActivityDataDiff
+		for _, value := range active {
+			a = append(a, value)
+		}
+		sort.Sort(bySecondsPerHrDiff(a))
+		result.TopMobileActiveAppsCombined = a
+	}
+	{
+		var r []RateDataDiff
+		for _, value := range appW {
+			r = append(r, value)
+		}
+		sort.Sort(byCountPerHrDiff(r))
+		result.AppWakeupsCombined = r
+	}
+	{
+		var a []ActivityDataDiff
+		for _, value := range full {
+			a = append(a, value)
+		}
+		sort.Sort(bySecondsPerHrDiff(a))
+		result.WifiFullLockActivityCombined = a
+	}
+	{
+		var a []ActivityDataDiff
+		for _, value := range gps {
+			a = append(a, value)
+		}
+		sort.Sort(bySecondsPerHrDiff(a))
+		result.GPSUseCombined = a
+	}
+	{
+		var a []ActivityDataDiff
+		for _, value := range cam {
+			a = append(a, value)
+		}
+		sort.Sort(bySecondsPerHrDiff(a))
+		result.CameraUseCombined = a
+	}
+	{
+		var a []ActivityDataDiff
+		for _, value := range flash {
+			a = append(a, value)
+		}
+		sort.Sort(bySecondsPerHrDiff(a))
+		result.FlashlightUseCombined = a
+	}
+	{
+		var a []anrCrashDataDiff
+		for _, value := range ac {
+			a = append(a, value)
+		}
+		sort.Sort(byCrashThenANRDiff(a))
+		result.ANRAndCrashCombined = a
+	}
+	{
+		var a []cpuDataDiff
+		for _, value := range cpu {
+			a = append(a, value)
+		}
+		sort.Sort(byPowerPctDiff(a))
+		result.CPUUsageCombined = a
+	}
+	return result
+}
+
+// MultiFileData returns a single structure (MultiFileHTMLData) containing
+// aggregated battery stats for both the compare files in html format.
+func MultiFileData(data []HTMLData) MultiFileHTMLData {
+	var m MultiFileHTMLData
+	m.MinSDKVersion = math.MaxInt32
+	m.CombinedCheckinData = combineCheckinData(data)
+
+	for _, value := range data {
+		m.SDKVersion = append(m.SDKVersion, value.SDKVersion)
+		m.DeviceID = append(m.DeviceID, value.DeviceID)
+		m.DeviceModel = append(m.DeviceModel, value.DeviceModel)
+		m.Historian = append(m.Historian, value.Historian)
+		m.Filename = append(m.Filename, value.Filename)
+		m.CheckinSummary = append(m.CheckinSummary, value.CheckinSummary)
+		m.UnplugSummaries = append(m.UnplugSummaries, value.UnplugSummaries)
+		m.Count = append(m.Count, value.Count)
+		if value.Warning != "" {
+			m.Warning = fmt.Sprintf("%s\n%s:\n  %s", m.Warning, value.Filename, value.Warning)
+		}
+		if value.Error != "" {
+			m.Error = fmt.Sprintf("%s\n%s:\n  %s", m.Error, value.Filename, value.Error)
+		}
+		m.Overflow = m.Overflow || value.Overflow
+
+		if value.SDKVersion < m.MinSDKVersion {
+			m.MinSDKVersion = value.SDKVersion
+		}
+	}
+	return m
+}
+
 // Data returns a single structure (HTMLData) containing aggregated battery stats in html format.
-func Data(sdkVersion int, model, csv, fname string, summaries []parseutils.ActivitySummary, checkinOutput *bspb.BatteryStats, historianOutput string, warnings []string, errs []error) HTMLData {
+func Data(meta *bugreportutils.MetaInfo, fname string, summaries []parseutils.ActivitySummary, checkinOutput *bspb.BatteryStats, historianOutput string, warnings []string, errs []error, overflow bool) HTMLData {
 	var output []UnplugSummary
-	ch := parseCheckinData(checkinOutput)
-	dev := ch.Device
+	ch := aggregated.ParseCheckinData(checkinOutput)
 
 	for _, s := range summaries {
 		duration := time.Duration(s.EndTimeMs-s.StartTimeMs) * time.Millisecond
 		if duration == 0 {
-			errs = append(errs, fmt.Errorf("error! Invalid duration equals 0"))
+			errs = append(errs, fmt.Errorf("history duration is 0"))
 			continue
 		}
 
@@ -539,66 +799,63 @@ func Data(sdkVersion int, model, csv, fname string, summaries []parseutils.Activ
 			LevelDrop:        int32(s.InitialBatteryLevel - s.FinalBatteryLevel),
 			LevelDropPerHour: float64(s.InitialBatteryLevel-s.FinalBatteryLevel) / duration.Hours(),
 			SystemStats: []DurationStats{
-				internalDist{s.ScreenOnSummary}.print(dev, hScreenOn, duration),
-				internalDist{s.CPURunningSummary}.print(dev, hCPURunning, duration),
-				internalDist{s.TotalSyncSummary}.print(dev, hTotalSync, duration),
-				internalDist{s.MobileRadioOnSummary}.print(dev, hRadioOn, duration),
-				internalDist{s.PhoneCallSummary}.print(dev, hPhoneCall, duration),
-				internalDist{s.GpsOnSummary}.print(dev, hGpsOn, duration),
-				internalDist{s.WifiFullLockSummary}.print(dev, hWifiFullLock, duration),
-				internalDist{s.WifiScanSummary}.print(dev, hWifiScan, duration),
-				internalDist{s.WifiMulticastOnSummary}.print(dev, hWifiMulticastOn, duration),
-				internalDist{s.WifiOnSummary}.print(dev, hWifiOn, duration),
-				internalDist{s.PhoneScanSummary}.print(dev, hPhoneScan, duration),
-				internalDist{s.SensorOnSummary}.print(dev, hSensorOn, duration),
-				internalDist{s.PluggedInSummary}.print(dev, hPluggedIn, duration),
-				internalDist{s.IdleModeOnSummary}.print(dev, hIdleModeOn, duration),
-				// Disabled as they were not found to be very useful.
-				/*
-					internalDist{s.WifiRunningSummary}.print("WifiRunning", duration),
-				*/
+				internalDist{s.ScreenOnSummary}.print(hScreenOn, duration),
+				internalDist{s.CPURunningSummary}.print(hCPURunning, duration),
+				internalDist{s.TotalSyncSummary}.print(hTotalSync, duration),
+				internalDist{s.MobileRadioOnSummary}.print(hRadioOn, duration),
+				internalDist{s.PhoneCallSummary}.print(hPhoneCall, duration),
+				internalDist{s.GpsOnSummary}.print(hGpsOn, duration),
+				internalDist{s.WifiFullLockSummary}.print(hWifiFullLock, duration),
+				internalDist{s.WifiScanSummary}.print(hWifiScan, duration),
+				internalDist{s.WifiMulticastOnSummary}.print(hWifiMulticastOn, duration),
+				internalDist{s.WifiOnSummary}.print(hWifiOn, duration),
+				internalDist{s.WifiRunningSummary}.print(hWifiRunning, duration),
+				internalDist{s.WifiRadioSummary}.print(hWifiRadio, duration),
+				internalDist{s.PhoneScanSummary}.print(hPhoneScan, duration),
+				internalDist{s.SensorOnSummary}.print(hSensorOn, duration),
+				internalDist{s.PluggedInSummary}.print(hPluggedIn, duration),
+				internalDist{s.FlashlightOnSummary}.print(hFlashlightOn, duration),
+				internalDist{s.LowPowerModeOnSummary}.print(hLowPowerModeOn, duration),
+				internalDist{s.AudioOnSummary}.print(hAudioOn, duration),
+				internalDist{s.VideoOnSummary}.print(hVideoOn, duration),
 			},
 			BreakdownStats: []MultiDurationStats{
-				mapPrint(dev, hDataConnectionSummary, s.DataConnectionSummary, duration),
-				mapPrint(dev, hConnectivitySummary, s.ConnectivitySummary, duration),
-				mapPrint(dev, hPerAppSyncSummary, s.PerAppSyncSummary, duration),
-				mapPrint(dev, hWakeupReasonSummary, s.WakeupReasonSummary, duration),
-				mapPrint(dev, hFirstWakelockAfterSuspend, s.WakeLockSummary, duration),
-				mapPrint(dev, hForegroundProcessSummary, s.ForegroundProcessSummary, duration),
-				mapPrint(dev, hPhoneStateSummary, s.PhoneStateSummary, duration),
-				mapPrint(dev, hScheduledJobSummary, s.ScheduledJobSummary, duration),
+				mapPrint(hDataConnectionSummary, s.DataConnectionSummary, duration),
+				mapPrint(hConnectivitySummary, s.ConnectivitySummary, duration),
+				mapPrint(hPerAppSyncSummary, s.PerAppSyncSummary, duration),
+				mapPrint(hWakeupReasonSummary, s.WakeupReasonSummary, duration),
+				mapPrint(hFirstWakelockAfterSuspend, s.WakeLockSummary, duration),
+				mapPrint(hDetailedWakelockSummary, s.WakeLockDetailedSummary, duration),
+				mapPrint(hForegroundProcessSummary, s.ForegroundProcessSummary, duration),
+				mapPrint(hPhoneStateSummary, s.PhoneStateSummary, duration),
+				mapPrint(hScheduledJobSummary, s.ScheduledJobSummary, duration),
+				mapPrint(hWifiSupplSummary, s.WifiSupplSummary, duration),
+				mapPrint(hPhoneSignalStrengthSummary, s.PhoneSignalStrengthSummary, duration),
+				mapPrint(hWifiSignalStrengthSummary, s.WifiSignalStrengthSummary, duration),
+				mapPrint(hTopApplicationSummary, s.TopApplicationSummary, duration),
+				mapPrint(hIdleModeSummary, s.IdleModeSummary, duration),
 				// Disabled as they were not found to be very useful.
 				/*
-					mapPrint("HealthSummary", s.HealthSummary, duration),
-					mapPrint("PlugTypeSummary", s.PlugTypeSummary, duration),
-					mapPrint("ChargingStatusSummary", s.ChargingStatusSummary, duration),
-					mapPrint("TopApplicationSummary", s.TopApplicationSummary, duration),
+				   mapPrint("HealthSummary", s.HealthSummary, duration),
+				   mapPrint("PlugTypeSummary", s.PlugTypeSummary, duration),
+				   mapPrint("ChargingStatusSummary", s.ChargingStatusSummary, duration),
 				*/
 			},
 		}
 		output = append(output, t)
 	}
-
-	// We want each error and warning to be seen on separate lines for clarity
-	var errorB, warnB bytes.Buffer
-	for _, e := range errs {
-		fmt.Fprintln(&errorB, e.Error())
-	}
-	for _, w := range warnings {
-		fmt.Fprintln(&warnB, w)
-	}
-
 	return HTMLData{
-		SDKVersion:      sdkVersion,
-		DeviceModel:     model,
-		HistorianCsv:    csv,
+		DeviceID:        meta.DeviceID,
+		SDKVersion:      meta.SdkVersion,
+		DeviceModel:     meta.ModelName,
 		Historian:       template.HTML(historianOutput),
 		Filename:        fname,
 		Count:           len(output),
 		UnplugSummaries: output,
 		CheckinSummary:  ch,
-		Error:           errorB.String(),
-		Warning:         warnB.String(),
-		AppStats:        parseAppStats(checkinOutput),
+		Error:           historianutils.ErrorsToString(errs),
+		Warning:         strings.Join(warnings, "\n"),
+		AppStats:        parseAppStats(checkinOutput, meta.Sensors),
+		Overflow:        overflow,
 	}
 }

@@ -1,6 +1,5 @@
 /**
- *
- * Copyright 2015 Google Inc. All Rights Reserved.
+ * Copyright 2016 Google Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -34,9 +33,25 @@ historian.time.SECS_IN_MIN = 60;
 historian.time.MINS_IN_HOUR = 60;
 
 
+/** @const {number} */
+historian.time.MSECS_IN_MIN =
+    historian.time.MSECS_IN_SEC *
+    historian.time.SECS_IN_MIN;
+
+
+/** @const {number} */
+historian.time.MSECS_IN_HOUR =
+    historian.time.MSECS_IN_MIN *
+    historian.time.MINS_IN_HOUR;
+
+
+/** @const {number} */
+historian.time.NSECS_IN_MSEC = 1000000;
+
+
 /**
  * Returns the date formatted in "Month Day Year".
- * @param {number} t The Unix timestamp to format.
+ * @param {number} t The unix timestamp to format.
  * @return {string} The formatted date "Month Day Year".
  */
 historian.time.getDate = function(t) {
@@ -48,38 +63,23 @@ historian.time.getDate = function(t) {
 
 
 /**
- * Returns the time formatted in 'hh:mm:ss'.
- * @export
- * @param {number} t The Unix timestamp to format.
+ * Returns the time formatted in 'HH:mm:ss' (24 hour time).
+ * @param {number} t The unix timestamp to format.
+ * @param {string} loc The IANA time zone location.
  * @return {string} The formatted time 'hh:mm:ss'.
  */
-historian.time.getTime = function(t) {
-  var d = new Date(t);
-  return (
-      historian.time.padTime_(d.getHours()) + ':' +
-      historian.time.padTime_(d.getMinutes()) + ':' +
-      historian.time.padTime_(d.getSeconds()));
-};
-
-
-/**
- * Pads the unit to two digits by prepending a 0 if the length is 1.
- * @param {number} u The number to format.
- * @return {string} The formatted number as two digits in a string.
- * @private
- */
-historian.time.padTime_ = function(u) {
-  if ((u + '').length === 1) {
-    return '0' + u;
+historian.time.getTime = function(t, loc) {
+  var m = moment.unix(t / 1000);
+  if (loc) {
+    m = m.tz(loc);
   }
-  return '' + u;
+  return m.format('HH:mm:ss');
 };
 
 
 /**
  * Returns the ms duration formatted as a human readable string.
  * Format is "1h 3m 4s 30ms".
- * @export
  * @param {number} duration The time duration in ms.
  * @return {string} The formatted duration.
  */
@@ -113,4 +113,33 @@ historian.time.formatDuration = function(duration) {
     formatted += ms + 'ms';
   }
   return formatted.trim();
+};
+
+
+/**
+ * Returns the number of seconds in the ms duration.
+ * @param {number} ms The ms to convert.
+ * @return {number} The number of seconds.
+ */
+historian.time.secsFromMs = function(ms) {
+  return Math.floor(ms / historian.time.MSECS_IN_SEC);
+};
+
+
+/**
+ * Parses a time.Duration format string into its numeric value.
+ * @param   {string} s time.Duration format string.
+ * @return  {number} The corresponding numeric value of the input time.
+ */
+historian.time.parseTimeString = function(s) {
+  // Format data for normalization.
+  // The string which will be parsed can be in the format of
+  // '2h2m48.373s' or '53m26.89s' or '58.267s' or '765ms' or '0'
+  // the function formats all the data into one unified unit milliseconds.
+  var m = s.trim()
+      .match(/^(?:(\d+)h)?\s*(?:(\d+)m)?\s*(?:(\d+(?:\.\d+)?)s)?\s*(?:(\d+)ms)?$/);
+  return m ? ((m[1] || 0) * historian.time.MSECS_IN_HOUR +
+              (m[2] || 0) * historian.time.MSECS_IN_MIN +
+              (m[3] || 0) * historian.time.MSECS_IN_SEC +
+              (m[4] || 0) * 1) : 0;
 };

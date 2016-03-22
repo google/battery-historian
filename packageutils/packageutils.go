@@ -1,4 +1,4 @@
-// Copyright 2015 Google Inc. All Rights Reserved.
+// Copyright 2016 Google Inc. All Rights Reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -22,7 +22,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/google/battery-historian/parseutils"
+	"github.com/google/battery-historian/historianutils"
 
 	usagepb "github.com/google/battery-historian/pb/usagestats_proto"
 )
@@ -38,6 +38,15 @@ const (
 	// First uid used for fully isolated sandboxed processes (with no permissions of their own).
 	// Defined in frameworks/base/core/java/android/os/Process.java.
 	firstIsolatedUID = 99000
+	// Last uid used for fully isolated sandboxed processes (with no permissions of their own).
+	// Defined in frameworks/base/core/java/android/os/Process.java.
+	lastIsolatedUID = 99999
+	// First gid for applications to share resources. Used when forward-locking is enabled but all UserHandles need to be able to read the resources.
+	// Defined in frameworks/base/core/java/android/os/Process.java.
+	firstSharedApplicationGID = 50000
+	// Last gid for applications to share resources. Used when forward-locking is enabled but all UserHandles need to be able to read the resources.
+	// Defined in frameworks/base/core/java/android/os/Process.java.
+	lastSharedApplicationGID = 59999
 )
 
 // abrUIDRE is a regular expression to match an abbreviated uid (ie u0a2). Based on the format printed in frameworks/base/core/java/android/os/UserHandle.java
@@ -46,7 +55,7 @@ var abrUIDRE = regexp.MustCompile("u(?P<userId>\\d+)(?P<aidType>[ias])(?P<appId>
 // This list is not comprehensive but it will cover the most common cases. The list was curated
 // from the output of running both 'adb shell dumpsys activity providers' and
 // 'adb shell dumpsys content' on several devices. There are cases where a
-// reported name could map to different applications (see go/sync-adapters for some examples).
+// reported name could map to different applications.
 var syncAdapterToPackageName = map[string]string{
 	// com.android.calendar and com.android.contacts can be used by many applications and are thus only differentiable by the process uid.
 	// If it gets to this point, the default packages listed here appear to be installed on all devices.
@@ -153,13 +162,18 @@ func GuessPackage(identifier string, uid string, p []*usagepb.PackageInfo) (l *u
 	return guessPackageJustFromIdentifier(identifier, candidatePackages), err
 }
 
-// AppID returns the app id (or base uid) for a given uid, stripping out the user id from it.
+// AppID returns the appID (or base uid) for a given uid, stripping out the user id from it.
 // Based on frameworks/base/core/java/android/os/UserHandle.java.
 func AppID(uid int32) int32 {
-	return uid % perUserRange
+	u := uid % perUserRange
+	// Application GID to appID parsing defined in frameworks/base/core/java/android/os/UserHandle.java
+	if firstSharedApplicationGID <= u && u <= lastSharedApplicationGID {
+		return u + firstApplicationUID - firstSharedApplicationGID
+	}
+	return u
 }
 
-// AppIDFromString returns the app id (or base uid) for a given uid, stripping out the user id from it.
+// AppIDFromString returns the appID (or base uid) for a given uid, stripping out the user id from it.
 // (ie. "10001" -> 10001,nil; "u0a25" -> 10025,nil; "text" -> 0,error
 func AppIDFromString(uid string) (int32, error) {
 	// The empty string is a valid/expected value to pass through here.
@@ -167,11 +181,10 @@ func AppIDFromString(uid string) (int32, error) {
 		return 0, nil
 	}
 
-	if m, result := parseutils.SubexpNames(abrUIDRE, uid); m {
+	if m, result := historianutils.SubexpNames(abrUIDRE, uid); m {
 		i, err := strconv.Atoi(result["appId"])
 		if err != nil {
-			fmt.Printf("Error getting app id from string: %v\n", err)
-			return 0, err
+			return 0, fmt.Errorf("error getting appID from string: %v", err)
 		}
 		// These are types defined and formatted in frameworks/base/core/java/android/os/UserHandle.java
 		switch result["aidType"] {
@@ -179,7 +192,7 @@ func AppIDFromString(uid string) (int32, error) {
 			return int32(i) + firstIsolatedUID, nil
 		case "a": // appId >= firstApplicationUID
 			return int32(i) + firstApplicationUID, nil
-		case "s": // Unmodified app ID
+		case "s": // Unmodified appID
 			return int32(i), nil
 		default:
 			return int32(i), fmt.Errorf("unknown appIdType: %s", result["aidType"])
@@ -188,8 +201,12 @@ func AppIDFromString(uid string) (int32, error) {
 
 	i, err := strconv.Atoi(uid)
 	if err != nil {
-		fmt.Printf("Error getting app id from string: %v\n", err)
-		return 0, err
+		return 0, fmt.Errorf("error getting appID from string: %v", err)
 	}
 	return AppID(int32(i)), nil
+}
+
+// IsSandboxedProcess returns true if the given UID is the UID of a fully isolated sandboxed process.
+func IsSandboxedProcess(uid int32) bool {
+	return firstIsolatedUID <= uid && uid <= lastIsolatedUID
 }

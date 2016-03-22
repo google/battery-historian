@@ -44,5 +44,4 @@ message Build {
 
   // Tags, e.g. "dev-keys"
   repeated string tags = 9;
-
 }

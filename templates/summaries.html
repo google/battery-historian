@@ -1,5 +1,5 @@
 <!--
-Copyright 2015 Google Inc. All rights reserved.
+Copyright 2016 Google Inc. All rights reserved.
 Licensed under the Apache License, Version 2.0 (the "License"); you may not use
 this file except in compliance with the License. You may obtain a copy of the
 License at
@@ -10,455 +10,80 @@ CONDITIONS OF ANY KIND, either express or implied. See the License for the
 specific language governing permissions and limitations under the License.
 -->
 
-{{ define "content" }}
-
-  <script type="text/javascript" src="/static/summaries.js"></script>
-  <script type="text/javascript" src="/static/app_stats.js"></script>
-  <pre id="csv-data" style="display:none">{{.HistorianCsv}}</pre>
-  <!-- Closure and Historian js scripts were loaded in header,
-       need to call render as automatic loading on page load was disabled.-->
-  <script>
-    $(document).ready(function() {
-      $(document).tooltip({
-        track: true
-      });
-      historian.render();
-    });
-  </script>
-
-  {{if ge .SDKVersion 21}}
-  <b>File:</b> {{.Filename}} <br>
-  <b>Device:</b> {{.DeviceModel}} <br>
-  <b>Build:</b> {{.CheckinSummary.BuildFingerprint}}<br><br>
-  {{else}}
-  <b>Device:</b> {{.DeviceModel}} <br>
-  {{end}}
-
-  <a href = "/">Analyze a new bugreport.</a>
-
-    {{if .Error}}
-      <br />
-      <p style="display:inline" title="Display errors from bugreport">Parsing Errors:</p><p style="display:inline" class="show-hide">Show</p>
-      <div class="sliding" style="color: red">
-        <pre>{{.Error}}</pre>
-      </div>
-    {{end}}
-    {{if .Warning}}
-      <br />
-      <p style="display:inline" title="Display warnings from bugreport">Warnings:</p><p style="display:inline" class="show-hide">Show</p>
-      <div class="sliding" style="color: red">
-        <pre>{{.Warning}}</pre>
-      </div>
-    {{end}}
-
-  {{if ge .SDKVersion 21}}
-  <div id="tabs" class="hidden">
-    <ul>
-      <li><a href="#checkin" title="Show system stats since the device was last fully charged.">System Stats</a></li>
-      <li><a href="#historian-v2" title="Data visualization for history stats, version 2">Historian 2.0</a></li>
-      <li><a href="#historian" title="Data visualization for history stats, version 1">Historian (legacy)</a></li>
-      <li><a href="#appstats" title="Show detailed stats for each active application">App Stats</a></li>
-      <li>
-        <select id="appSelector" name="Pkg Name" style="margin:auto;display:block" onchange="historian.displaySelectedApp()" title="Choosing an application here will display app-specific details in the 'App Stats' tab, and also app-specific syncs/wakelocks in 'Historian 2.0'.">
-          <option selected disabled value="none_chosen">Choose an application</option>
-          {{range $app := .AppStats}}
-          <option value="{{$app.Uid}}">{{$app.Name}} (Uid: {{$app.Uid}})</option>
+{{define "content"}}
+<div class="row">
+  <div class="col-xs-12">
+    <div id="panel-fileinfo" class="panel panel-default collapse in" data-toggle="collapse">
+      <span class="sdk-version-21"><button id="toggle-fileinfo" class="glyphicon glyphicon-remove btn btn-default btn-right btn-xxs" type="button" data-toggle="collapse" data-target="#panel-fileinfo"></button></span>
+      <div class="panel-body">
+        <table id="fileinfo" class="fileinfo-table">
+          <tr class="sdk-version-21">
+            <td><b>File:</b> {{.Filename}}</td>
+            <td><b>Build:</b> {{.CheckinSummary.BuildFingerprint}}</td>
+          </tr>
+          <tr>
+            <td><b>Device:</b> {{.DeviceModel}} {{.CheckinSummary.Build}}</td>
+            <td><b>Android ID:</b> {{.DeviceID}}</td>
+          </tr>
+        </table>
+        <div id="btns-dialog">
+          {{if .Error}}
+          <a id="btn-errors" class="btn btn-default btn-toggle" data-toggle="modal" data-target="#dialog" href="#errors">Errors</a>
+          <pre id="errors" style="display: none;">{{.Error}}</pre>
           {{end}}
-        </select>
-        <button id="clearApp" onclick='$("#appSelector").prop("selectedIndex", 0);historian.showNoSelection();'>Clear app selection</button>
-      </li>
-    </ul>
-    <div id="historian-v2">
-      <div id="historian-graph"></div>
-    </div>
-  {{end}}
-    <div id="historian">
-      <div class="loading">Please wait, drawing chart...</div>
-      <div id="historian-chart" class="hidden">
-      {{ .Historian }}
-      </div>
-    </div>
-
-  {{if lt .SDKVersion 21}}
-    <script>
-      historian.loadHistorianV1();
-    </script>
-  {{else}}
-    <div id="checkin">
-      <h2 id="top">{{.DeviceModel}} {{.CheckinSummary.Build}}</h2>
-
-      <div class="summary-title">Aggregated Stats:</div>
-      <div style="display: table-cell; margin-left: 40%;"></div>
-      <div>
-        <table id="checkin" style="width:80%; font-size:15px;" class="tablesorter">
-          <thead>
-            <tr>
-              <th>Metric</th>
-              <th>Value</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr>
-              <td><b>Device</b></td><td>{{printf "%s"  .DeviceModel}}</td>
-            </tr>
-
-            <tr>
-              <td><b>Build</b></td><td>{{printf "%s"  .CheckinSummary.Build}}</td>
-            </tr>
-
-            <tr>
-              <td><b>Duration / Realtime</b></td><td>{{printf "%s"  .CheckinSummary.Realtime}}</td>
-            </tr>
-
-            <tr>
-              <td><b>Screen Off Discharge Rate (%/hr) </b></td>
-              <td>{{printf "%.2f  (Discharged: %.f%%)" .CheckinSummary.ScreenOffDichargeRatePerHr.V .CheckinSummary.ScreenOffDischargePoints}}</td>
-            </tr>
-
-            <tr>
-              <td><b>Screen On Discharge Rate (%/hr) </b></td>
-              <td>{{printf "%.2f  (Discharged: %.f%%)" .CheckinSummary.ScreenOnDichargeRatePerHr.V .CheckinSummary.ScreenOnDischargePoints}}</td>
-            </tr>
-
-            <tr>
-              <td><b>Screen On Time</b></td><td>{{printf "%s" .CheckinSummary.ScreenOnTime.V }}</td>
-            </tr>
-
-            <tr>
-              <td><b>Screen Off Uptime</b></td><td>{{printf "%s" .CheckinSummary.ScreenOffUptime.V }}</td>
-            </tr>
-
-            <tr onclick="document.location='#userspace-wakelock';" class="row-clickable">
-              <td><b>Userspace Wakelock Time</b></td><td>{{printf "%s" .CheckinSummary.PartialWakelockTime.V }}</td>
-            </tr>
-
-            <tr onclick="document.location='#kernel';" class="row-clickable">
-              <td><b>Kernel Overhead Time</b></td><td>{{printf "%s" .CheckinSummary.KernelOverheadTime.V }}</td>
-            </tr>
-
-            <tr onclick="document.location='#mobile-traffic';" class="row-clickable">
-              <td><b>Mobile KBs/hr</b></td><td>{{printf "%.2f" .CheckinSummary.MobileKiloBytesPerHr.V }}</td>
-            </tr>
-
-            <tr onclick="document.location='#wifi-traffic';" class="row-clickable">
-              <td><b>WiFi KBs/hr</b></td><td>{{printf "%.2f" .CheckinSummary.WifiKiloBytesPerHr.V }}</td>
-            </tr>
-
-            <tr onclick="document.location='#mobile-active';" class="row-clickable">
-              <td><b>Mobile Active Time</b></td><td>{{printf "%s" .CheckinSummary.MobileActiveTime.V }}</td>
-            </tr>
-
-            <tr>
-              <td><b>Signal Scanning Time</b></td><td>{{printf "%s" .CheckinSummary.SignalScanningTime.V }}</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-
-      <br>
-      <div class="summary-title">Top power consuming entities:</div>
-      <div style="display: table-cell; margin-left: 40%;"></div>
-      <div style="width:80%; font-size:15px;">
-        <table class="tablesorter4">
-          <colgroup>
-            <col span="1" style="width: 5%;">
-            <col span="1" style="width: 55%;">
-            <col span="1" style="width: 15%;">
-            <col span="1" style="width: 25%;">
-          </colgroup>
-          <thead>
-            <tr>
-              <th>Ranking</th>
-              <th>Name</th>
-              <th>Uid</th>
-              <th>Battery Percentage Consumed</th>
-            </tr>
-          </thead>
-          <tbody>
-            {{range $i, $ent := .CheckinSummary.TopBatteryConsumingEntities}}
-            <tr>
-              <td>{{$i}}</td>
-              <td>{{$ent.Name}}</td>
-              <td>{{$ent.UID}}</td>
-              <td>{{printf "%.2f%%" $ent.Percent}}</td>
-            </tr>
-            {{end}}
-          </tbody>
-        </table>
-      </div>
-
-      <br>
-      <div class="summary-title" id="userspace-wakelock">Userspace partial wakelocks:</div>
-      <div style="display: table-cell; margin-left: 40%;"></div>
-      <div style="width:80%; font-size:15px;">
-        <table class="tablesorter3">
-          <colgroup>
-            <col span="1" style="width: 5%;">
-            <col span="1" style="width: 55%;">
-            <col span="1" style="width: 15%;">
-            <col span="1" style="width: 12.5%;">
-            <col span="1" style="width: 12.5%;">
-          </colgroup>
-          <thead>
-            <tr>
-              <th>Ranking</th>
-              <th>Name</th>
-              <th>Uid</th>
-              <th>Duration</th>
-              <th>Count</th>
-            </tr>
-          </thead>
-          <tbody>
-            {{range $id, $wl := .CheckinSummary.UserspaceWakelocks}}
-            <tr>
-              <td>{{$id}}</td>
-              <td>{{$wl.Name}}</td>
-              <td>{{$wl.UID}}</td>
-              <td>{{$wl.Duration}}</td>
-              <td>{{$wl.Count}}</td>
-            </tr>
-            {{end}}
-          </tbody>
-        </table>
-      </div>
-
-      <br>
-      <div class="summary-title" id="userspace-wakelock">SyncManager Syncs:</div>
-      <div style="display: table-cell; margin-left: 40%;"></div>
-      <div style="width:80%; font-size:15px;">
-        <table class="tablesorter3">
-          <colgroup>
-            <col span="1" style="width: 5%;">
-            <col span="1" style="width: 55%;">
-            <col span="1" style="width: 15%;">
-            <col span="1" style="width: 12.5%;">
-            <col span="1" style="width: 12.5%;">
-          </colgroup>
-          <thead>
-            <tr>
-              <th>Ranking</th>
-              <th>Name</th>
-              <th>Uid</th>
-              <th>Duration</th>
-              <th>Count</th>
-            </tr>
-          </thead>
-          <tbody>
-            {{range $id, $wl := .CheckinSummary.SyncTasks}}
-            <tr>
-              <td>{{$id}}</td>
-              <td>{{$wl.Name}}</td>
-              <td>{{$wl.UID}}</td>
-              <td>{{$wl.Duration}}</td>
-              <td>{{$wl.Count}}</td>
-            </tr>
-            {{end}}
-          </tbody>
-        </table>
-      </div>
-
-
-      {{if .CheckinSummary.TopMobileActiveApps}}
-      <br>
-      <div class="summary-title" id="mobile-active">Mobile radio (active) time per app:</div>
-      <div style="display: table-cell; margin-left: 40%;"></div>
-      <div style="width:80%; font-size:15px;">
-        <table class="tablesorter3">
-          <colgroup>
-            <col span="1" style="width: 5%;">
-            <col span="1" style="width: 55%;">
-            <col span="1" style="width: 20%;">
-            <col span="1" style="width: 20%;">
-          </colgroup>
-          <thead>
-            <tr>
-              <th>Ranking</th>
-              <th>Name</th>
-              <th>Uid</th>
-              <th>Mobile Active Time</th>
-            </tr>
-          </thead>
-          <tbody>
-            {{range $i, $app := .CheckinSummary.TopMobileActiveApps}}
-            <tr>
-              <td>{{$i}}</td>
-              <td>{{$app.Name}}</td>
-              <td>{{$app.UID}}</td>
-              <td>{{$app.Duration}}</td>
-            </tr>
-            {{end}}
-          </tbody>
-        </table>
-      </div>
-      {{end}}
-
-      {{if .CheckinSummary.TopMobileTrafficApps}}
-      <br>
-      <div class="summary-title" id="mobile-traffic">Mobile traffic per app:</div>
-      <div style="display: table-cell; margin-left: 40%;"></div>
-      <div style="width:80%; font-size:15px;">
-       <table class="tablesorter4">
-          <colgroup>
-            <col span="1" style="width: 5%;">
-            <col span="1" style="width: 55%;">
-            <col span="1" style="width: 20%;">
-            <col span="1" style="width: 20%;">
-          </colgroup>
-          <thead>
-            <tr>
-              <th>Ranking</th>
-              <th>Name</th>
-              <th>Uid</th>
-              <th>MB Transferred Over Mobile</th>
-            </tr>
-          </thead>
-          <tbody>
-            {{range $i, $app := .CheckinSummary.TopMobileTrafficApps}}
-            <tr>
-              <td>{{$i}}</td>
-              <td>{{$app.Name}}</td>
-              <td>{{$app.UID}}</td>
-              <td>{{printf "%.2f" $app.MobileMegaBytes}}</td>
-            </tr>
-            {{end}}
-          </tbody>
-        </table>
-      </div>
-      {{end}}
-
-      {{if .CheckinSummary.TopWifiTrafficApps}}
-      <br>
-      <div class="summary-title" id="wifi-traffic">WiFi traffic per app:</div>
-      <div style="display: table-cell; margin-left: 40%;"></div>
-      <div style="width:80%; font-size:15px;">
-        <table class="tablesorter4">
-          <colgroup>
-            <col span="1" style="width: 5%;">
-            <col span="1" style="width: 55%;">
-            <col span="1" style="width: 20%;">
-            <col span="1" style="width: 20%;">
-          </colgroup>
-          <thead>
-            <tr>
-              <th>Ranking</th>
-              <th>Name</th>
-              <th>Uid</th>
-              <th>MB Transferred Over Wifi</th>
-            </tr>
-          </thead>
-          <tbody>
-            {{range $i, $app := .CheckinSummary.TopWifiTrafficApps}}
-            <tr>
-              <td>{{$i}}</td>
-              <td>{{$app.Name}}</td>
-              <td>{{$app.UID}}</td>
-              <td>{{printf "%.2f" $app.WifiMegaBytes}}</td>
-            </tr>
-            {{end}}
-          </tbody>
-        </table>
-      </div>
-      {{end}}
-
-      <br>
-      <div class="summary-title" id="kernel">Kernel wakesources:</div>
-      <div style="display: table-cell; margin-left: 40%;"></div>
-      <div style="width:80%; font-size:15px;">
-        <table class="tablesorter2">
-          <colgroup>
-            <col span="1" style="width: 5%;">
-            <col span="1" style="width: 55%;">
-            <col span="1" style="width: 20%;">
-            <col span="1" style="width: 20%;">
-          </colgroup>
-          <thead>
-            <tr>
-              <th>Ranking</th>
-              <th>Name</th>
-              <th>Duration</th>
-              <th>Count</th>
-            </tr>
-          </thead>
-          <tbody>
-            {{range $i, $wl := .CheckinSummary.KernelWakelocks}}
-            <tr>
-              <td>{{$i}}</td>
-              <td>{{$wl.Name}}</td>
-              <td>{{$wl.Duration}}</td>
-              <td>{{$wl.Count}}</td>
-            </tr>
-            {{end}}
-          </tbody>
-        </table>
-      </div>
-
-    </div>
-
-    <div id="appstats">
-      <div id="noAppSelected" style="display:none">
-        Please choose an application.
-      </div>
-      <div id="selectedAppStats">
-        <div id="miscSummary"></div>
-        <div id="appChildSection">
-          <div class="summary-title" title="All apps that share this UID">Contained apps:</div><div class="show-hide" style="display: table-cell; margin-left: 40%;">Show</div>
-          <div id="appChild" class="sliding"></div>
-          <br>
+          {{if .Warning}}
+          <a id="btn-warnings" class="btn btn-default btn-toggle" data-toggle="modal" data-target="#dialog" href="#warnings">Warnings</a>
+          <pre id="warnings" style="display: none;">{{.Warning}}</pre>
+          {{end}}
         </div>
-        <div id="appNetworkInfoSection">
-          <div class="summary-title">Network information:</div><div class="show-hide" style="display: table-cell; margin-left: 40%;">Show</div>
-          <div class="sliding"><div id="appNetworkInfo"></div></div>
-          <br>
+        {{if .Overflow}}
+        <div id="dialog-message" data-toggle="tooltip" title="Overflow detected">
+         Battery history log overflow has been detected for the uploaded bugreport.
+         Please note analysis should not be entirely trusted due to overflow.
         </div>
-        <div id="appSyncSection">
-          <div class="summary-title">Syncs:</div><div class="show-hide" style="display: table-cell; margin-left: 40%;">Show</div>
-          <div class="sliding"><div id="appSync"></div></div>
-          <br>
-        </div>
-        <div id="appWakelockSection">
-          <div class="summary-title">Wakelocks:</div><div class="show-hide" style="display: table-cell; margin-left: 40%;">Show</div>
-          <div class="sliding"><div id="appWakelock"></div></div>
-          <br>
-        </div>
-        <div id="appApkSection">
-          <div class="summary-title">Services:</div><div class="show-hide" style="display: table-cell; margin-left: 40%;">Show</div>
-          <div class="sliding">
-            <p>Number of wakeups: <span id="appWakeups"></span></p>
-            <div id="appServices"></div>
-          </div>
-          <br>
-        </div>
-        <div id="appProcessSection">
-          <div class="summary-title">Processes:</div><div class="show-hide" style="display: table-cell; margin-left: 40%;">Show</div>
-          <div class="sliding"><div id="appProcess"></div></div>
-          <br>
-        </div>
-        <div id="appScheduledJobSection">
-          <div class="summary-title" title="Jobs scheduled and started using the JobScheduler">Scheduled Job:</div><div class="show-hide" style="display: table-cell; margin-left: 40%;">Show</div>
-          <div class="sliding"><div id="appScheduledJob"></div></div>
-          <br>
-        </div>
-        <div id="appSensorSection">
-          <div class="summary-title">Sensor use:</div><div class="show-hide" style="display: table-cell; margin-left: 40%;">Show</div>
-          <div class="sliding"><div id="appSensor"></div></div>
-          <br>
-        </div>
-        <div id="appUserActivitySection">
-          <div class="summary-title">User Activity:</div><div class="show-hide" style="display: table-cell; margin-left: 40%;">Show</div>
-          <div class="sliding"><div id="appUserActivity"></div></div>
-          <br>
-        </div>
-      </div>
-      <script>
-        var reportVersion = {{.CheckinSummary.ReportVersion}}
-        var batteryCapacity = {{ .CheckinSummary.BatteryCapacity }}
-        var appStats = {}
-        {{range $app := .AppStats}}
-        appStats[{{$app.Uid}}] = {{$app}};
         {{end}}
-        historian.displaySelectedApp();
-      </script>
+      </div>
     </div>
   </div>
-  {{end}}
+  <div class="col-xs-12">
+    <div id="panel-historian" class="panel panel-default panel-tabs collapse in">
+      <div class="panel-heading">
+        <ul class="nav nav-tabs">
+          <li id="tab-historian-v2" class="active sdk-version-21" data-toggle="tooltip" title="Data visualization for history stats, version 2">
+            <a href="#historian-v2" data-toggle="tab">Historian V2</a>
+          </li>
+          <li id="tab-historian" data-toggle="tooltip" title="Data visualization for history stats, version 1">
+            <a href="#historian" data-toggle="tab">Historian</a>
+          </li>
+          <span class="sdk-version-21"><span id="toggle-historian" class="glyphicon glyphicon-remove btn btn-default btn-right-tabs btn-xxs" data-toggle="collapse" data-target="#panel-historian"></span></span>
+        </ul>
+      </div>
+      <div class="panel-body">
+        <div class="tab-content">
+          <!-- historian v2 -->
+          <div id="historian-v2" class="tab-pane fade in active" >
+            <div class="graph"></div>
+          </div>
+          <!-- historian v1 -->
+          <div id="historian" class="tab-pane fade">
+            <div class="loading">Please wait, drawing chart...</div>
+            <div id="historian-chart" class="hidden">{{ .Historian }}</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="col-xs-12 sdk-version-21">
+    <div class="table-sidebar col-xs-3">
+      {{template "tablesidebar" .}}
+    </div>
+    <div class="col-xs-9">
+      <div class="row">
+        <div id="panel-tables" class="panel panel-default panel-tabs">
+          {{template "tables" .}}
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
 {{end}}

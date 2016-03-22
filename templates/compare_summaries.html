@@ -1,0 +1,107 @@
+<!--
+Copyright 2016 Google Inc. All rights reserved.
+Licensed under the Apache License, Version 2.0 (the "License"); you may not use
+this file except in compliance with the License. You may obtain a copy of the
+License at
+      http://www.apache.org/licenses/LICENSE-2.0
+Unless required by applicable law or agreed to in writing, software distributed
+under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
+CONDITIONS OF ANY KIND, either express or implied. See the License for the
+specific language governing permissions and limitations under the License.
+-->
+
+{{define "content"}}
+<div class="row">
+   <div class="col-xs-12">
+      <div id="panel-fileinfo" class="panel panel-default collapse in" data-toggle="collapse">
+         <button id="toggle-fileinfo" class="glyphicon glyphicon-remove btn btn-default btn-right btn-xxs" type="button" data-toggle="collapse" data-target="#panel-fileinfo"></button>
+         <div class="panel-body">
+            <table>
+               <tr class="sdk-version-21">
+                  <td><b>File #1:</b> {{index .Filename 0}}</td>
+                  {{with index .CheckinSummary 0}}
+                  <td><b>Build #1:</b> {{.BuildFingerprint}}</td>
+                  {{end}}
+                  {{with index .CheckinSummary 0}}
+                  <td><b>Duration / Realtime #1:</b> {{.Realtime}}</td>
+                  {{end}}
+                  <td><b>Device #1:</b> {{index .DeviceModel 0}}</td>
+                  <td><b>Android ID #1:</b> {{index .DeviceID 0}}</td>
+               </tr>
+               <tr>
+                  <td><b>File #2:</b> {{index .Filename 1}}</td>
+                  {{with index .CheckinSummary 1}}
+                  <td><b>Build #2:</b> {{.BuildFingerprint}}</td>
+                  {{end}}
+                  {{with index .CheckinSummary 1}}
+                  <td><b>Duration / Realtime #2:</b> {{.Realtime}}</td>
+                  {{end}}
+                  <td><b>Device #2:</b> {{index .DeviceModel 1}}</td>
+                  <td><b>Android ID #2:</b> {{index .DeviceID 1}}</td>
+               </tr>
+            </table>
+            <div id="btns-dialog">
+               {{if .Error}}
+               <a id="btn-errors" class="btn btn-default btn-toggle" data-toggle="modal" data-target="#dialog" href="#errors">Errors</a>
+               <pre id="errors" style="display: none;">{{.Error}}</pre>
+               {{end}}
+               {{if .Warning}}
+               <a id="btn-warnings" class="btn btn-default btn-toggle" data-toggle="modal" data-target="#dialog" href="#warnings">Warnings</a>
+               <pre id="warnings" style="display: none;">{{.Warning}}</pre>
+               {{end}}
+            </div>
+            {{if .Overflow}}
+            <div id="dialog-message" data-toggle="tooltip" title="Overflow detected">
+               Battery history log overflow has been detected for the uploaded bugreport.
+               Please note analysis should not be entirely trusted due to overflow.
+            </div>
+            {{end}}
+         </div>
+      </div>
+   </div>
+   <div class="col-xs-12">
+      <div class="table-sidebar col-xs-3">
+         {{template "tablesidebar" .}}
+      </div>
+      <div class="col-xs-9">
+         <div class="row">
+            <div id="panel-tables" class="panel panel-default panel-tabs sdk-version-21">
+               {{template "tables" .}}
+            </div>
+         </div>
+      </div>
+   </div>
+   <div class="col-xs-12">
+      <div id="panel-historian" class="panel panel-default panel-tabs collapse in">
+         <div class="panel-heading">
+            <span>Historian File: {{index .Filename 0}}</span>
+            <span id="toggle-historian" class="glyphicon glyphicon-remove btn btn-default btn-right-tabs btn-xxs" data-toggle="collapse" data-target="#panel-historian"></span>
+         </div>
+         <div class="panel-body">
+            <div class="tab-content">
+               <!-- historian v2 -->
+               <div id="historian-v2" class="tab-pane fade in active" >
+                  <div class="graph"></div>
+               </div>
+            </div>
+         </div>
+      </div>
+   </div>
+   <div class="col-xs-12">
+      <div id="panel-historian2" class="panel panel-default sdk-version-21 collapse in">
+         <div class="panel-heading">
+            <span>Historian File: {{index .Filename 1}}</span>
+            <span id="toggle-historian2" class="glyphicon glyphicon-remove btn btn-default btn-right-tabs btn-xxs" data-toggle="collapse" data-target="#panel-historian2"></span>
+         </div>
+         <div class="panel-body">
+            <div class="tab-content">
+               <!-- historian v2 -->
+               <div id="historian-v2-2" class="tab-pane fade in active" >
+                  <div class="graph"></div>
+               </div>
+            </div>
+         </div>
+      </div>
+   </div>
+</div>
+{{end}}

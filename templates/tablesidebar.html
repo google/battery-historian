@@ -1,0 +1,62 @@
+<!--
+Copyright 2016 Google Inc. All rights reserved.
+Licensed under the Apache License, Version 2.0 (the "License"); you may not use
+this file except in compliance with the License. You may obtain a copy of the
+License at
+      http://www.apache.org/licenses/LICENSE-2.0
+Unless required by applicable law or agreed to in writing, software distributed
+under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
+CONDITIONS OF ANY KIND, either express or implied. See the License for the
+specific language governing permissions and limitations under the License.
+-->
+
+{{define "tablesidebar"}}
+<div class="row">
+  {{if .AppStats}}
+  <div class="sdk-version-21 non-comparison" id="app-selector">
+    <label>App Selection</label>
+    <select id="appSelector" data-toggle="tooltip" name="Pkg Name" title="Choosing an application here will display app-specific details in the 'App Stats' tab, and also app-specific syncs & wakelocks in 'Historian v2'.">
+      <option></option>
+      {{range $app := .AppStats}}
+      <option value="{{$app.RawStats.Uid}}">{{$app.RawStats.Name}} (Uid: {{$app.RawStats.Uid}})</option>
+      {{end}}
+    </select>
+  </div>
+  {{end}}
+</div>
+<div class="row">
+  <label>Tables</label>
+  <div class="panel-group table-indices" id="accordion">
+    <div class="panel panel-default sdk-version-21">
+      <div id="collapse-header-system" class="panel-heading accordion-heading" data-toggle="collapse" data-parent="#accordion" href="#collapse-system">
+        <span class="glyphicon glyphicon-triangle-bottom expand-hint"></span>
+        <span class="panel-title">System Stats</span>
+      </div>
+      <div id="collapse-system" class="panel-collapse collapse in"></div>
+    </div>
+    <div class="panel panel-default sdk-version-21 non-comparison">
+      <div id="collapse-header-history" class="panel-heading accordion-heading" data-toggle="collapse" data-parent="#accordion" href="#collapse-history">
+        <span class="glyphicon glyphicon-triangle-right expand-hint"></span>
+        <span class="panel-title">History Stats</span>
+      </div>
+      <div id="collapse-history" class="panel-collapse collapse">
+        <div style="padding: 5px">
+          <select class="btn btn-default" data-toggle="tooltip" title="Choose a summary" style="width: 100%;"></select>
+        </div>
+      </div>
+    </div>
+    <div class="panel panel-default sdk-version-21 non-comparison">
+      <div id="collapse-header-app" class="panel-heading accordion-heading" data-toggle="collapse" data-parent="#accordion" href="#collapse-app">
+        <span class="glyphicon glyphicon-triangle-right expand-hint"></span>
+        <span class="panel-title">App Stats</span>
+      </div>
+      <div id="collapse-app" class="panel-collapse collapse">
+        <div class="noAppSelected" style="padding: 10px">
+          <span>Please choose an application.</span>
+          <span data-toggle="tooltip" title="Choose an application in the sidebar" class="quick-hint glyphicon glyphicon-question-sign choose-app"></span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{{end}}

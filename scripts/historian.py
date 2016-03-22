@@ -1,6 +1,7 @@
 #!/usr/bin/python
+"""Legacy Historian script for analyzing Android bug reports."""
 
-# Copyright 2014 Google Inc. All rights reserved.
+# Copyright 2016 Google Inc. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -17,10 +18,11 @@
 # TO USE: (see also usage() below)
 # adb shell dumpsys batterystats --enable full-wake-history  (post-KitKat only)
 # adb shell dumpsys batterystats --reset
-# optionally start monsoon/power monitor logging:
-#   if device/host clocks are not synced, run historian.py -v
-#   cts/tools/utils/monsoon.py --serialno 2294 --hz 1 --samples 100000 \
-#   -timestamp | tee monsoon.out
+# Optionally start powermonitor logging:
+#   For example, if using a Monsoon:
+#     if device/host clocks are not synced, run historian.py -v
+#     cts/tools/utils/monsoon.py --serialno 2294 --hz 1 --samples 100000 \
+#     -timestamp | tee monsoon.out
 # ...let device run a while...
 # stop monsoon.py
 # adb bugreport > bugreport.txt
@@ -42,7 +44,7 @@ ROWS_TO_SUMMARIZE = ["wake_lock", "running"]  # -s: summarize these rows
 
 getopt_debug = 0
 getopt_bill_extra_secs = 0
-getopt_power_quanta = 15        # slice monsoon data this many seconds,
+getopt_power_quanta = 15        # slice powermonitor data this many seconds,
                                 # to avoid crashing visualizer
 getopt_power_data_file = False
 getopt_proc_name = ""
@@ -85,6 +87,18 @@ def usage():
 
 
 def parse_time(s, fmt):
+  """Parses a human readable duration string into milliseconds.
+
+  Takes a human readable duration string like '1d2h3m4s5ms' and returns
+  the equivalent in milliseconds.
+
+  Args:
+    s: Duration string
+    fmt: A re object to parse the string
+
+  Returns:
+    A number indicating the duration in milliseconds.
+  """
   if s == "0": return 0.0
 
   p = re.compile(fmt)
@@ -313,6 +327,7 @@ def swap(swap_list, first, second):
 
 
 def add_emit_event(emit_dict, cat, name, start, end):
+  """Saves a new event into the dictionary that will be visualized."""
   newevent = (name, int(start), int(end))
   if end < start:
     print "BUG: end time before start time: %s %s %s<br>" % (name,
@@ -714,7 +729,7 @@ class BHEmitter(object):
         pass
     if getopt_debug:
       print "retrieve_event: no match for event %s/%s<br>" % (cat, subcat)
-    return (False, False)
+    return (False, (None, None, None))
 
   def store_proc(self, e, highlight_dict):
     proc_pair = get_after_equal(e)
@@ -748,6 +763,7 @@ class BHEmitter(object):
       return ""
 
   def annotate_event_name(self, name):
+    """Modifies the event name to make it more understandable."""
     if "*alarm*" in name:
       try:
         proc_pair = get_after_equal(name)
@@ -809,6 +825,7 @@ class BHEmitter(object):
   def emit_event(self, cat, event_name, start_time, start_timestr,
                  end_event_name, end_time, end_timestr,
                  emit_dict, time_dict, highlight_dict):
+    """Saves an event to be later visualized."""
     (start_pid, start_pname) = get_proc_pair(event_name)
     (end_pid, end_pname) = get_proc_pair(end_event_name)
 
@@ -1163,15 +1180,20 @@ def get_app_id(uid):
   return uid
 
 
+usr_time = "usrTime"
+sys_time = "sysTime"
+# A map of app uid to their total CPU usage in terms of user
+# and system time (in ms).
 app_cpu_usage = {}
 
 
-def save_app_cpu_usage(uid, cpu_time):
+def save_app_cpu_usage(uid, usr_cpu_time, sys_cpu_time):
   uid = get_app_id(uid)
   if uid in app_cpu_usage:
-    app_cpu_usage[uid] += cpu_time
+    app_cpu_usage[uid][usr_time] += usr_cpu_time
+    app_cpu_usage[uid][sys_time] += sys_cpu_time
   else:
-    app_cpu_usage[uid] = cpu_time
+    app_cpu_usage[uid] = {usr_time: usr_cpu_time, sys_time: sys_cpu_time}
 
 # Constants defined in android.net.ConnectivityManager
 conn_constants = {
@@ -1219,6 +1241,7 @@ def main():
   argv_remainder = parse_argv()
   input_file = argv_remainder[0]
   legacy_mode = is_file_legacy_mode(input_file)
+  # A map of /proc/stat names to total times (in ms).
   proc_stat_summary = {
       "usr": 0,
       "sys": 0,
@@ -1274,7 +1297,7 @@ def main():
             try:
               a = app_match.groupdict()
               save_app_cpu_usage(a["uid"],
-                                 int(a["userTime"]) + int(a["sysTime"]))
+                                 int(a["userTime"]), int(a["sysTime"]))
             except IndexError:
               sys.stderr.write("App CPU usage line didn't match properly")
       except IndexError:
@@ -1532,11 +1555,20 @@ width:100px;
   power_emitter.report()
 
   if app_cpu_usage:
-    print "<b>App CPU usage:</b>"
+    print "<b>App CPU usage:</b><br />"
+    print "In user time:<br />"
     print "<table border=\"1\"><tr><td>UID</td><td>Duration</td></tr>"
-    for (uid, use) in sorted(app_cpu_usage.items(), key=lambda x: -x[1]):
+    for (uid, use) in sorted(app_cpu_usage.items(),
+                             key=lambda x: -x[1][usr_time]):
       print "<tr><td>%s</td>" % uid
-      print "<td>%s</td></tr>" % format_duration(use)
+      print "<td>%s</td></tr>" % format_duration(use[usr_time])
+    print "</table>"
+    print "<br />In system time:<br />"
+    print "<table border=\"1\"><tr><td>UID</td><td>Duration</td></tr>"
+    for (uid, use) in sorted(app_cpu_usage.items(),
+                             key=lambda x: -x[1][sys_time]):
+      print "<tr><td>%s</td>" % uid
+      print "<td>%s</td></tr>" % format_duration(use[sys_time])
     print "</table>"
 
   print "<br /><b>Proc/stat summary</b><ul>"

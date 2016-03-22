@@ -1,0 +1,115 @@
+/**
+ * Copyright 2016 Google Inc. All Rights Reserved.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+.ABtable {
+  padding-bottom: 50px;
+}
+
+#chart-tooltip {
+  background-color: #FFF;
+  border: 2px solid;
+  border-radius: 5px;
+  -moz-border-radius: 5px;
+  -webkit-border-radius: 5px;
+  -khtml-border-radius: 5px;
+  display: none;
+  font-size: 12px;
+  font-family: Verdana, Arial, sans-serif;
+  height: 100px;
+  opacity: 1;
+  position: absolute;
+  padding: 2px;
+  white-space: pre-line;
+}
+
+.dataTables_empty {
+  display:none; /* Overriding the empty table error message display property */
+}
+
+.histogram-chart {
+  width: 1000px;
+  height: 300px;
+  position: relative;
+  margin: 0 auto;
+  margin-top: 50px;
+  margin-bottom: 50px;
+}
+
+.id-text {
+  font-weight: bold;
+}
+
+.label-left {
+  position: relative;
+  left: 50%;
+  margin-left: -770px;
+  padding-top: 210px; /* Height of pie chart container + 10 */
+}
+
+.label-right {
+  position: relative;
+  left: 120%;
+  margin-left: -200px;
+  padding-top: 200px; /* Height of pie chart container */
+}
+
+.left {
+  float: left;
+  width: 150px;
+  margin: 0 5px 5px 0;
+}
+
+.notification {
+  width: 300px;
+  height: 50px;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  padding: 2px;
+}
+
+.pie-chart {
+  width: 250px;
+  height: 200px;
+  text-align: left;
+}
+
+.pie-container {
+  width: 800px;
+  height: 200px;
+  position: relative;
+  left: 50%;
+  margin-left: -400px; /* Half of width */
+  margin-top: 10px;
+  margin-bottom: 40px;
+}
+
+.right {
+  float: right;
+  width: 150px;
+}
+
+.rotate div.xAxis div.tickLabel {
+  transform: rotate(-90deg);
+  -ms-transform:rotate(-90deg); /* IE 9 */
+  -moz-transform:rotate(-90deg); /* Firefox */
+  -webkit-transform:rotate(-90deg); /* Safari and Chrome */
+  -o-transform:rotate(-90deg); /* Opera */
+}
+
+.shift-left div.xAxis div.tickLabel {
+   margin-left: -80px; /* Shift the labels to the left once rotated */
+}

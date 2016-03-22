@@ -1,4 +1,4 @@
-// Copyright 2015 Google Inc. All Rights Reserved.
+// Copyright 2016 Google Inc. All Rights Reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -27,23 +27,38 @@ import (
 var (
 	optimized = flag.Bool("optimized", true, "Whether to output optimized js files. Disable for local debugging.")
 	port      = flag.Int("port", 9999, "service port")
+
+	scriptsDir  = flag.String("scripts_dir", "./scripts", "Directory containing Historian and kernel trace Python scripts.")
+	templateDir = flag.String("template_dir", "./templates", "Directory containing HTML templates.")
+
+	// resVersion should be incremented whenever the JS or CSS files are modified.
+	resVersion = flag.Int("res_version", 0, "The current version of JS and CSS files. Used to force JS and CSS reloading to avoid cache issues when rolling out new versions.")
 )
 
 type analysisServer struct{}
 
-func (*analysisServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	log.Printf("Starting processing for: %s", r.Method)
+func (s *analysisServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	log.Printf("Trace starting analysisServer processing for: %s", r.Method)
+	defer log.Printf("Trace finished analysisServer processing for: %s", r.Method)
 
-	analyzer.UploadHandler(w, r)
+	switch r.Method {
+	case "GET":
+		analyzer.UploadHandler(w, r)
+	case "POST":
+		r.ParseForm()
+		analyzer.HTTPAnalyzeHandler(w, r)
+	default:
+		http.Error(w, fmt.Sprintf("Method %s not allowed", r.Method), http.StatusMethodNotAllowed)
+	}
 }
 
 func initFrontend() {
-	http.HandleFunc("/", analyzer.UploadHandler)
+	http.Handle("/", &analysisServer{})
 	http.Handle("/static/", http.FileServer(http.Dir(".")))
 	http.Handle("/compiled/", http.FileServer(http.Dir(".")))
+	http.Handle("/third_party/", http.FileServer(http.Dir(".")))
 
 	if *optimized == false {
-		http.Handle("/third_party/", http.FileServer(http.Dir(".")))
 		http.Handle("/js/", http.FileServer(http.Dir(".")))
 	}
 }
@@ -52,7 +67,9 @@ func main() {
 	flag.Parse()
 
 	initFrontend()
-	analyzer.InitTemplates()
+	analyzer.InitTemplates(*templateDir)
+	analyzer.SetScriptsDir(*scriptsDir)
+	analyzer.SetResVersion(*resVersion)
 	analyzer.SetIsOptimized(*optimized)
 	log.Println("Listening on port: ", *port)
 	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%d", *port), nil))

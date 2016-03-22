@@ -10,17 +10,22 @@ It is generated from these files:
 
 It has these top-level messages:
 	BatteryStats
-	BatteryStatsFilterSpec
 */
 package batterystats
 
 import proto "github.com/golang/protobuf/proto"
+import fmt "fmt"
 import math "math"
 import build "github.com/google/battery-historian/pb/build_proto"
 
 // Reference imports to suppress errors if they are not otherwise used.
 var _ = proto.Marshal
+var _ = fmt.Errorf
 var _ = math.Inf
+
+// This is a compile-time assertion to ensure that this generated file
+// is compatible with the proto package it is being compiled against.
+const _ = proto.ProtoPackageIsVersion1
 
 type BatteryStats_AggregationType int32
 
@@ -64,6 +69,9 @@ func (x *BatteryStats_AggregationType) UnmarshalJSON(data []byte) error {
 	*x = BatteryStats_AggregationType(value)
 	return nil
 }
+func (BatteryStats_AggregationType) EnumDescriptor() ([]byte, []int) {
+	return fileDescriptor0, []int{0, 0}
+}
 
 type BatteryStats_App_UserActivity_Name int32
 
@@ -99,6 +107,9 @@ func (x *BatteryStats_App_UserActivity_Name) UnmarshalJSON(data []byte) error {
 	}
 	*x = BatteryStats_App_UserActivity_Name(value)
 	return nil
+}
+func (BatteryStats_App_UserActivity_Name) EnumDescriptor() ([]byte, []int) {
+	return fileDescriptor0, []int{0, 0, 14, 0}
 }
 
 type BatteryStats_System_BluetoothState_Name int32
@@ -138,6 +149,9 @@ func (x *BatteryStats_System_BluetoothState_Name) UnmarshalJSON(data []byte) err
 	}
 	*x = BatteryStats_System_BluetoothState_Name(value)
 	return nil
+}
+func (BatteryStats_System_BluetoothState_Name) EnumDescriptor() ([]byte, []int) {
+	return fileDescriptor0, []int{0, 2, 3, 0}
 }
 
 type BatteryStats_System_DataConnection_Name int32
@@ -217,6 +231,9 @@ func (x *BatteryStats_System_DataConnection_Name) UnmarshalJSON(data []byte) err
 	*x = BatteryStats_System_DataConnection_Name(value)
 	return nil
 }
+func (BatteryStats_System_DataConnection_Name) EnumDescriptor() ([]byte, []int) {
+	return fileDescriptor0, []int{0, 2, 5, 0}
+}
 
 type BatteryStats_System_DisplayState_State int32
 
@@ -259,6 +276,9 @@ func (x *BatteryStats_System_DisplayState_State) UnmarshalJSON(data []byte) erro
 	*x = BatteryStats_System_DisplayState_State(value)
 	return nil
 }
+func (BatteryStats_System_DisplayState_State) EnumDescriptor() ([]byte, []int) {
+	return fileDescriptor0, []int{0, 2, 7, 0}
+}
 
 type BatteryStats_System_IdleMode_Mode int32
 
@@ -300,6 +320,9 @@ func (x *BatteryStats_System_IdleMode_Mode) UnmarshalJSON(data []byte) error {
 	*x = BatteryStats_System_IdleMode_Mode(value)
 	return nil
 }
+func (BatteryStats_System_IdleMode_Mode) EnumDescriptor() ([]byte, []int) {
+	return fileDescriptor0, []int{0, 2, 11, 0}
+}
 
 type BatteryStats_System_PowerSaveMode_Mode int32
 
@@ -335,6 +358,9 @@ func (x *BatteryStats_System_PowerSaveMode_Mode) UnmarshalJSON(data []byte) erro
 	}
 	*x = BatteryStats_System_PowerSaveMode_Mode(value)
 	return nil
+}
+func (BatteryStats_System_PowerSaveMode_Mode) EnumDescriptor() ([]byte, []int) {
+	return fileDescriptor0, []int{0, 2, 14, 0}
 }
 
 type BatteryStats_System_PowerUseItem_Name int32
@@ -399,6 +425,9 @@ func (x *BatteryStats_System_PowerUseItem_Name) UnmarshalJSON(data []byte) error
 	*x = BatteryStats_System_PowerUseItem_Name(value)
 	return nil
 }
+func (BatteryStats_System_PowerUseItem_Name) EnumDescriptor() ([]byte, []int) {
+	return fileDescriptor0, []int{0, 2, 15, 0}
+}
 
 type BatteryStats_System_ScreenBrightness_Name int32
 
@@ -440,6 +469,9 @@ func (x *BatteryStats_System_ScreenBrightness_Name) UnmarshalJSON(data []byte) e
 	}
 	*x = BatteryStats_System_ScreenBrightness_Name(value)
 	return nil
+}
+func (BatteryStats_System_ScreenBrightness_Name) EnumDescriptor() ([]byte, []int) {
+	return fileDescriptor0, []int{0, 2, 17, 0}
 }
 
 type BatteryStats_System_SignalStrength_Name int32
@@ -483,6 +515,9 @@ func (x *BatteryStats_System_SignalStrength_Name) UnmarshalJSON(data []byte) err
 	*x = BatteryStats_System_SignalStrength_Name(value)
 	return nil
 }
+func (BatteryStats_System_SignalStrength_Name) EnumDescriptor() ([]byte, []int) {
+	return fileDescriptor0, []int{0, 2, 19, 0}
+}
 
 type BatteryStats_System_WifiSignalStrength_Name int32
 
@@ -524,6 +559,9 @@ func (x *BatteryStats_System_WifiSignalStrength_Name) UnmarshalJSON(data []byte)
 	}
 	*x = BatteryStats_System_WifiSignalStrength_Name(value)
 	return nil
+}
+func (BatteryStats_System_WifiSignalStrength_Name) EnumDescriptor() ([]byte, []int) {
+	return fileDescriptor0, []int{0, 2, 21, 0}
 }
 
 type BatteryStats_System_WifiSupplicantState_Name int32
@@ -591,6 +629,9 @@ func (x *BatteryStats_System_WifiSupplicantState_Name) UnmarshalJSON(data []byte
 	*x = BatteryStats_System_WifiSupplicantState_Name(value)
 	return nil
 }
+func (BatteryStats_System_WifiSupplicantState_Name) EnumDescriptor() ([]byte, []int) {
+	return fileDescriptor0, []int{0, 2, 22, 0}
+}
 
 type BatteryStats_System_WifiState_Name int32
 
@@ -641,6 +682,9 @@ func (x *BatteryStats_System_WifiState_Name) UnmarshalJSON(data []byte) error {
 	}
 	*x = BatteryStats_System_WifiState_Name(value)
 	return nil
+}
+func (BatteryStats_System_WifiState_Name) EnumDescriptor() ([]byte, []int) {
+	return fileDescriptor0, []int{0, 2, 23, 0}
 }
 
 type BatteryStats struct {
@@ -693,16 +737,23 @@ type BatteryStats struct {
 	// True for the report generated from diff between originals or if such
 	// operation does not make sense. Note is_original and is_diff are not
 	// mutually exclusive.
-	IsDiff           *bool                         `protobuf:"varint,24,opt,name=is_diff" json:"is_diff,omitempty"`
+	IsDiff *bool `protobuf:"varint,24,opt,name=is_diff" json:"is_diff,omitempty"`
+	// True if the android wear device is paired to an ALT mode companion on iPhone.
+	IsAltMode *bool `protobuf:"varint,28,opt,name=is_alt_mode" json:"is_alt_mode,omitempty"`
+	// Warnings generated when parsing the report.
+	Warning []string `protobuf:"bytes,29,rep,name=warning" json:"warning,omitempty"`
+	// Errors generated when parsing the report.
+	Error            []string                      `protobuf:"bytes,30,rep,name=error" json:"error,omitempty"`
 	AggregationType  *BatteryStats_AggregationType `protobuf:"varint,25,opt,name=aggregation_type,enum=batterystats.BatteryStats_AggregationType" json:"aggregation_type,omitempty"`
 	App              []*BatteryStats_App           `protobuf:"bytes,26,rep,name=app" json:"app,omitempty"`
 	System           *BatteryStats_System          `protobuf:"bytes,27,opt,name=system" json:"system,omitempty"`
 	XXX_unrecognized []byte                        `json:"-"`
 }
 
-func (m *BatteryStats) Reset()         { *m = BatteryStats{} }
-func (m *BatteryStats) String() string { return proto.CompactTextString(m) }
-func (*BatteryStats) ProtoMessage()    {}
+func (m *BatteryStats) Reset()                    { *m = BatteryStats{} }
+func (m *BatteryStats) String() string            { return proto.CompactTextString(m) }
+func (*BatteryStats) ProtoMessage()               {}
+func (*BatteryStats) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{0} }
 
 func (m *BatteryStats) GetRecordId() string {
 	if m != nil && m.RecordId != nil {
@@ -872,6 +923,27 @@ func (m *BatteryStats) GetIsDiff() bool {
 	return false
 }
 
+func (m *BatteryStats) GetIsAltMode() bool {
+	if m != nil && m.IsAltMode != nil {
+		return *m.IsAltMode
+	}
+	return false
+}
+
+func (m *BatteryStats) GetWarning() []string {
+	if m != nil {
+		return m.Warning
+	}
+	return nil
+}
+
+func (m *BatteryStats) GetError() []string {
+	if m != nil {
+		return m.Error
+	}
+	return nil
+}
+
 func (m *BatteryStats) GetAggregationType() BatteryStats_AggregationType {
 	if m != nil && m.AggregationType != nil {
 		return *m.AggregationType
@@ -893,36 +965,48 @@ func (m *BatteryStats) GetSystem() *BatteryStats_System {
 	return nil
 }
 
+// Data collected about a single UID.
 type BatteryStats_App struct {
 	// e.g., com.google.android.gms.
 	Name *string `protobuf:"bytes,1,opt,name=name" json:"name,omitempty"`
 	// e.g., 4224038.
 	VersionCode *int32 `protobuf:"varint,2,opt,name=version_code" json:"version_code,omitempty"`
 	// e.g., 1000.
-	Uid   *int32                    `protobuf:"varint,3,opt,name=uid" json:"uid,omitempty"`
-	Child []*BatteryStats_App_Child `protobuf:"bytes,13,rep,name=child" json:"child,omitempty"`
+	Uid *int32 `protobuf:"varint,3,opt,name=uid" json:"uid,omitempty"`
+	// e.g. 1.3
+	VersionName *string                   `protobuf:"bytes,24,opt,name=version_name" json:"version_name,omitempty"`
+	Child       []*BatteryStats_App_Child `protobuf:"bytes,13,rep,name=child" json:"child,omitempty"`
 	// For the most important child (to make it easy to query by dremel).
 	// e.g., gms for Google Services.
-	HeadChild        *BatteryStats_App_Child          `protobuf:"bytes,18,opt,name=head_child" json:"head_child,omitempty"`
-	Apk              *BatteryStats_App_Apk            `protobuf:"bytes,4,opt,name=apk" json:"apk,omitempty"`
-	Foreground       *BatteryStats_App_Foreground     `protobuf:"bytes,5,opt,name=foreground" json:"foreground,omitempty"`
-	Network          *BatteryStats_App_Network        `protobuf:"bytes,6,opt,name=network" json:"network,omitempty"`
-	PowerUseItem     *BatteryStats_App_PowerUseItem   `protobuf:"bytes,7,opt,name=power_use_item" json:"power_use_item,omitempty"`
-	Process          []*BatteryStats_App_Process      `protobuf:"bytes,8,rep,name=process" json:"process,omitempty"`
-	ScheduledJob     []*BatteryStats_App_ScheduledJob `protobuf:"bytes,14,rep,name=scheduled_job" json:"scheduled_job,omitempty"`
-	Sensor           []*BatteryStats_App_Sensor       `protobuf:"bytes,9,rep,name=sensor" json:"sensor,omitempty"`
-	StateTime        *BatteryStats_App_StateTime      `protobuf:"bytes,15,opt,name=state_time" json:"state_time,omitempty"`
-	Sync             []*BatteryStats_App_Sync         `protobuf:"bytes,16,rep,name=sync" json:"sync,omitempty"`
-	UserActivity     []*BatteryStats_App_UserActivity `protobuf:"bytes,17,rep,name=user_activity" json:"user_activity,omitempty"`
-	Vibrator         *BatteryStats_App_Vibrator       `protobuf:"bytes,10,opt,name=vibrator" json:"vibrator,omitempty"`
-	Wakelock         []*BatteryStats_App_Wakelock     `protobuf:"bytes,11,rep,name=wakelock" json:"wakelock,omitempty"`
-	Wifi             *BatteryStats_App_Wifi           `protobuf:"bytes,12,opt,name=wifi" json:"wifi,omitempty"`
-	XXX_unrecognized []byte                           `json:"-"`
+	HeadChild           *BatteryStats_App_Child          `protobuf:"bytes,18,opt,name=head_child" json:"head_child,omitempty"`
+	Apk                 *BatteryStats_App_Apk            `protobuf:"bytes,4,opt,name=apk" json:"apk,omitempty"`
+	Audio               *BatteryStats_App_Audio          `protobuf:"bytes,19,opt,name=audio" json:"audio,omitempty"`
+	BluetoothController *BatteryStats_ControllerActivity `protobuf:"bytes,25,opt,name=bluetooth_controller" json:"bluetooth_controller,omitempty"`
+	Camera              *BatteryStats_App_Camera         `protobuf:"bytes,20,opt,name=camera" json:"camera,omitempty"`
+	Cpu                 *BatteryStats_App_Cpu            `protobuf:"bytes,23,opt,name=cpu" json:"cpu,omitempty"`
+	Flashlight          *BatteryStats_App_Flashlight     `protobuf:"bytes,21,opt,name=flashlight" json:"flashlight,omitempty"`
+	Foreground          *BatteryStats_App_Foreground     `protobuf:"bytes,5,opt,name=foreground" json:"foreground,omitempty"`
+	ModemController     *BatteryStats_ControllerActivity `protobuf:"bytes,26,opt,name=modem_controller" json:"modem_controller,omitempty"`
+	Network             *BatteryStats_App_Network        `protobuf:"bytes,6,opt,name=network" json:"network,omitempty"`
+	PowerUseItem        *BatteryStats_App_PowerUseItem   `protobuf:"bytes,7,opt,name=power_use_item" json:"power_use_item,omitempty"`
+	Process             []*BatteryStats_App_Process      `protobuf:"bytes,8,rep,name=process" json:"process,omitempty"`
+	ScheduledJob        []*BatteryStats_App_ScheduledJob `protobuf:"bytes,14,rep,name=scheduled_job" json:"scheduled_job,omitempty"`
+	Sensor              []*BatteryStats_App_Sensor       `protobuf:"bytes,9,rep,name=sensor" json:"sensor,omitempty"`
+	StateTime           *BatteryStats_App_StateTime      `protobuf:"bytes,15,opt,name=state_time" json:"state_time,omitempty"`
+	Sync                []*BatteryStats_App_Sync         `protobuf:"bytes,16,rep,name=sync" json:"sync,omitempty"`
+	UserActivity        []*BatteryStats_App_UserActivity `protobuf:"bytes,17,rep,name=user_activity" json:"user_activity,omitempty"`
+	Vibrator            *BatteryStats_App_Vibrator       `protobuf:"bytes,10,opt,name=vibrator" json:"vibrator,omitempty"`
+	Video               *BatteryStats_App_Video          `protobuf:"bytes,22,opt,name=video" json:"video,omitempty"`
+	Wakelock            []*BatteryStats_App_Wakelock     `protobuf:"bytes,11,rep,name=wakelock" json:"wakelock,omitempty"`
+	Wifi                *BatteryStats_App_Wifi           `protobuf:"bytes,12,opt,name=wifi" json:"wifi,omitempty"`
+	WifiController      *BatteryStats_ControllerActivity `protobuf:"bytes,27,opt,name=wifi_controller" json:"wifi_controller,omitempty"`
+	XXX_unrecognized    []byte                           `json:"-"`
 }
 
-func (m *BatteryStats_App) Reset()         { *m = BatteryStats_App{} }
-func (m *BatteryStats_App) String() string { return proto.CompactTextString(m) }
-func (*BatteryStats_App) ProtoMessage()    {}
+func (m *BatteryStats_App) Reset()                    { *m = BatteryStats_App{} }
+func (m *BatteryStats_App) String() string            { return proto.CompactTextString(m) }
+func (*BatteryStats_App) ProtoMessage()               {}
+func (*BatteryStats_App) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{0, 0} }
 
 func (m *BatteryStats_App) GetName() string {
 	if m != nil && m.Name != nil {
@@ -943,6 +1027,13 @@ func (m *BatteryStats_App) GetUid() int32 {
 		return *m.Uid
 	}
 	return 0
+}
+
+func (m *BatteryStats_App) GetVersionName() string {
+	if m != nil && m.VersionName != nil {
+		return *m.VersionName
+	}
+	return ""
 }
 
 func (m *BatteryStats_App) GetChild() []*BatteryStats_App_Child {
@@ -966,9 +1057,51 @@ func (m *BatteryStats_App) GetApk() *BatteryStats_App_Apk {
 	return nil
 }
 
+func (m *BatteryStats_App) GetAudio() *BatteryStats_App_Audio {
+	if m != nil {
+		return m.Audio
+	}
+	return nil
+}
+
+func (m *BatteryStats_App) GetBluetoothController() *BatteryStats_ControllerActivity {
+	if m != nil {
+		return m.BluetoothController
+	}
+	return nil
+}
+
+func (m *BatteryStats_App) GetCamera() *BatteryStats_App_Camera {
+	if m != nil {
+		return m.Camera
+	}
+	return nil
+}
+
+func (m *BatteryStats_App) GetCpu() *BatteryStats_App_Cpu {
+	if m != nil {
+		return m.Cpu
+	}
+	return nil
+}
+
+func (m *BatteryStats_App) GetFlashlight() *BatteryStats_App_Flashlight {
+	if m != nil {
+		return m.Flashlight
+	}
+	return nil
+}
+
 func (m *BatteryStats_App) GetForeground() *BatteryStats_App_Foreground {
 	if m != nil {
 		return m.Foreground
+	}
+	return nil
+}
+
+func (m *BatteryStats_App) GetModemController() *BatteryStats_ControllerActivity {
+	if m != nil {
+		return m.ModemController
 	}
 	return nil
 }
@@ -1036,6 +1169,13 @@ func (m *BatteryStats_App) GetVibrator() *BatteryStats_App_Vibrator {
 	return nil
 }
 
+func (m *BatteryStats_App) GetVideo() *BatteryStats_App_Video {
+	if m != nil {
+		return m.Video
+	}
+	return nil
+}
+
 func (m *BatteryStats_App) GetWakelock() []*BatteryStats_App_Wakelock {
 	if m != nil {
 		return m.Wakelock
@@ -1050,17 +1190,26 @@ func (m *BatteryStats_App) GetWifi() *BatteryStats_App_Wifi {
 	return nil
 }
 
-// List of apps sharing the UID. (e.g., gms, gsf for Google Services)
-type BatteryStats_App_Child struct {
-	Name             *string `protobuf:"bytes,1,opt,name=name" json:"name,omitempty"`
-	VersionCode      *int32  `protobuf:"varint,2,opt,name=version_code" json:"version_code,omitempty"`
-	VersionName      *string `protobuf:"bytes,3,opt,name=version_name" json:"version_name,omitempty"`
-	XXX_unrecognized []byte  `json:"-"`
+func (m *BatteryStats_App) GetWifiController() *BatteryStats_ControllerActivity {
+	if m != nil {
+		return m.WifiController
+	}
+	return nil
 }
 
-func (m *BatteryStats_App_Child) Reset()         { *m = BatteryStats_App_Child{} }
-func (m *BatteryStats_App_Child) String() string { return proto.CompactTextString(m) }
-func (*BatteryStats_App_Child) ProtoMessage()    {}
+// List of packages sharing the UID. (e.g., gms, gsf for Google Services)
+type BatteryStats_App_Child struct {
+	Name             *string               `protobuf:"bytes,1,opt,name=name" json:"name,omitempty"`
+	VersionCode      *int32                `protobuf:"varint,2,opt,name=version_code" json:"version_code,omitempty"`
+	VersionName      *string               `protobuf:"bytes,3,opt,name=version_name" json:"version_name,omitempty"`
+	Apk              *BatteryStats_App_Apk `protobuf:"bytes,4,opt,name=apk" json:"apk,omitempty"`
+	XXX_unrecognized []byte                `json:"-"`
+}
+
+func (m *BatteryStats_App_Child) Reset()                    { *m = BatteryStats_App_Child{} }
+func (m *BatteryStats_App_Child) String() string            { return proto.CompactTextString(m) }
+func (*BatteryStats_App_Child) ProtoMessage()               {}
+func (*BatteryStats_App_Child) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{0, 0, 0} }
 
 func (m *BatteryStats_App_Child) GetName() string {
 	if m != nil && m.Name != nil {
@@ -1083,16 +1232,24 @@ func (m *BatteryStats_App_Child) GetVersionName() string {
 	return ""
 }
 
+func (m *BatteryStats_App_Child) GetApk() *BatteryStats_App_Apk {
+	if m != nil {
+		return m.Apk
+	}
+	return nil
+}
+
 type BatteryStats_App_Apk struct {
-	// #wakeup alarms that executed. Not int because some apps share the UID.
+	// #wakeup alarms that executed. Not int because some packages share the UID.
 	Wakeups          *float32                        `protobuf:"fixed32,1,opt,name=wakeups" json:"wakeups,omitempty"`
 	Service          []*BatteryStats_App_Apk_Service `protobuf:"bytes,2,rep,name=service" json:"service,omitempty"`
 	XXX_unrecognized []byte                          `json:"-"`
 }
 
-func (m *BatteryStats_App_Apk) Reset()         { *m = BatteryStats_App_Apk{} }
-func (m *BatteryStats_App_Apk) String() string { return proto.CompactTextString(m) }
-func (*BatteryStats_App_Apk) ProtoMessage()    {}
+func (m *BatteryStats_App_Apk) Reset()                    { *m = BatteryStats_App_Apk{} }
+func (m *BatteryStats_App_Apk) String() string            { return proto.CompactTextString(m) }
+func (*BatteryStats_App_Apk) ProtoMessage()               {}
+func (*BatteryStats_App_Apk) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{0, 0, 1} }
 
 func (m *BatteryStats_App_Apk) GetWakeups() float32 {
 	if m != nil && m.Wakeups != nil {
@@ -1123,6 +1280,9 @@ type BatteryStats_App_Apk_Service struct {
 func (m *BatteryStats_App_Apk_Service) Reset()         { *m = BatteryStats_App_Apk_Service{} }
 func (m *BatteryStats_App_Apk_Service) String() string { return proto.CompactTextString(m) }
 func (*BatteryStats_App_Apk_Service) ProtoMessage()    {}
+func (*BatteryStats_App_Apk_Service) Descriptor() ([]byte, []int) {
+	return fileDescriptor0, []int{0, 0, 1, 0}
+}
 
 func (m *BatteryStats_App_Apk_Service) GetName() string {
 	if m != nil && m.Name != nil {
@@ -1152,6 +1312,125 @@ func (m *BatteryStats_App_Apk_Service) GetLaunches() float32 {
 	return 0
 }
 
+type BatteryStats_App_Audio struct {
+	// Duration spent running audio.
+	TotalTimeMsec *float32 `protobuf:"fixed32,1,opt,name=total_time_msec" json:"total_time_msec,omitempty"`
+	// #times.
+	Count            *float32 `protobuf:"fixed32,2,opt,name=count" json:"count,omitempty"`
+	XXX_unrecognized []byte   `json:"-"`
+}
+
+func (m *BatteryStats_App_Audio) Reset()                    { *m = BatteryStats_App_Audio{} }
+func (m *BatteryStats_App_Audio) String() string            { return proto.CompactTextString(m) }
+func (*BatteryStats_App_Audio) ProtoMessage()               {}
+func (*BatteryStats_App_Audio) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{0, 0, 2} }
+
+func (m *BatteryStats_App_Audio) GetTotalTimeMsec() float32 {
+	if m != nil && m.TotalTimeMsec != nil {
+		return *m.TotalTimeMsec
+	}
+	return 0
+}
+
+func (m *BatteryStats_App_Audio) GetCount() float32 {
+	if m != nil && m.Count != nil {
+		return *m.Count
+	}
+	return 0
+}
+
+type BatteryStats_App_Camera struct {
+	// Duration spent running camera.
+	TotalTimeMsec *float32 `protobuf:"fixed32,1,opt,name=total_time_msec" json:"total_time_msec,omitempty"`
+	// #times.
+	Count            *float32 `protobuf:"fixed32,2,opt,name=count" json:"count,omitempty"`
+	XXX_unrecognized []byte   `json:"-"`
+}
+
+func (m *BatteryStats_App_Camera) Reset()                    { *m = BatteryStats_App_Camera{} }
+func (m *BatteryStats_App_Camera) String() string            { return proto.CompactTextString(m) }
+func (*BatteryStats_App_Camera) ProtoMessage()               {}
+func (*BatteryStats_App_Camera) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{0, 0, 3} }
+
+func (m *BatteryStats_App_Camera) GetTotalTimeMsec() float32 {
+	if m != nil && m.TotalTimeMsec != nil {
+		return *m.TotalTimeMsec
+	}
+	return 0
+}
+
+func (m *BatteryStats_App_Camera) GetCount() float32 {
+	if m != nil && m.Count != nil {
+		return *m.Count
+	}
+	return 0
+}
+
+type BatteryStats_App_Cpu struct {
+	// Total CPU time with processes executing in userspace.
+	UserTimeMs *float32 `protobuf:"fixed32,1,opt,name=user_time_ms" json:"user_time_ms,omitempty"`
+	// Total CPU time with processes executing kernel syscalls.
+	SystemTimeMs *float32 `protobuf:"fixed32,2,opt,name=system_time_ms" json:"system_time_ms,omitempty"`
+	// Total CPU power consumed in milli-ampere-milliseconds.
+	PowerMaMs        *float32 `protobuf:"fixed32,3,opt,name=power_ma_ms" json:"power_ma_ms,omitempty"`
+	XXX_unrecognized []byte   `json:"-"`
+}
+
+func (m *BatteryStats_App_Cpu) Reset()                    { *m = BatteryStats_App_Cpu{} }
+func (m *BatteryStats_App_Cpu) String() string            { return proto.CompactTextString(m) }
+func (*BatteryStats_App_Cpu) ProtoMessage()               {}
+func (*BatteryStats_App_Cpu) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{0, 0, 4} }
+
+func (m *BatteryStats_App_Cpu) GetUserTimeMs() float32 {
+	if m != nil && m.UserTimeMs != nil {
+		return *m.UserTimeMs
+	}
+	return 0
+}
+
+func (m *BatteryStats_App_Cpu) GetSystemTimeMs() float32 {
+	if m != nil && m.SystemTimeMs != nil {
+		return *m.SystemTimeMs
+	}
+	return 0
+}
+
+func (m *BatteryStats_App_Cpu) GetPowerMaMs() float32 {
+	if m != nil && m.PowerMaMs != nil {
+		return *m.PowerMaMs
+	}
+	return 0
+}
+
+type BatteryStats_App_Flashlight struct {
+	// Duration spent running flashlight.
+	TotalTimeMsec *float32 `protobuf:"fixed32,1,opt,name=total_time_msec" json:"total_time_msec,omitempty"`
+	// #times.
+	Count            *float32 `protobuf:"fixed32,2,opt,name=count" json:"count,omitempty"`
+	XXX_unrecognized []byte   `json:"-"`
+}
+
+func (m *BatteryStats_App_Flashlight) Reset()         { *m = BatteryStats_App_Flashlight{} }
+func (m *BatteryStats_App_Flashlight) String() string { return proto.CompactTextString(m) }
+func (*BatteryStats_App_Flashlight) ProtoMessage()    {}
+func (*BatteryStats_App_Flashlight) Descriptor() ([]byte, []int) {
+	return fileDescriptor0, []int{0, 0, 5}
+}
+
+func (m *BatteryStats_App_Flashlight) GetTotalTimeMsec() float32 {
+	if m != nil && m.TotalTimeMsec != nil {
+		return *m.TotalTimeMsec
+	}
+	return 0
+}
+
+func (m *BatteryStats_App_Flashlight) GetCount() float32 {
+	if m != nil && m.Count != nil {
+		return *m.Count
+	}
+	return 0
+}
+
 type BatteryStats_App_Foreground struct {
 	// Duration spent running as foreground activity.
 	TotalTimeMsec *float32 `protobuf:"fixed32,1,opt,name=total_time_msec" json:"total_time_msec,omitempty"`
@@ -1163,6 +1442,9 @@ type BatteryStats_App_Foreground struct {
 func (m *BatteryStats_App_Foreground) Reset()         { *m = BatteryStats_App_Foreground{} }
 func (m *BatteryStats_App_Foreground) String() string { return proto.CompactTextString(m) }
 func (*BatteryStats_App_Foreground) ProtoMessage()    {}
+func (*BatteryStats_App_Foreground) Descriptor() ([]byte, []int) {
+	return fileDescriptor0, []int{0, 0, 6}
+}
 
 func (m *BatteryStats_App_Foreground) GetTotalTimeMsec() float32 {
 	if m != nil && m.TotalTimeMsec != nil {
@@ -1193,12 +1475,15 @@ type BatteryStats_App_Network struct {
 	// Radio active duration.
 	MobileActiveTimeMsec *float32 `protobuf:"fixed32,9,opt,name=mobile_active_time_msec" json:"mobile_active_time_msec,omitempty"`
 	MobileActiveCount    *float32 `protobuf:"fixed32,10,opt,name=mobile_active_count" json:"mobile_active_count,omitempty"`
+	BtBytesRx            *int64   `protobuf:"varint,11,opt,name=bt_bytes_rx" json:"bt_bytes_rx,omitempty"`
+	BtBytesTx            *int64   `protobuf:"varint,12,opt,name=bt_bytes_tx" json:"bt_bytes_tx,omitempty"`
 	XXX_unrecognized     []byte   `json:"-"`
 }
 
-func (m *BatteryStats_App_Network) Reset()         { *m = BatteryStats_App_Network{} }
-func (m *BatteryStats_App_Network) String() string { return proto.CompactTextString(m) }
-func (*BatteryStats_App_Network) ProtoMessage()    {}
+func (m *BatteryStats_App_Network) Reset()                    { *m = BatteryStats_App_Network{} }
+func (m *BatteryStats_App_Network) String() string            { return proto.CompactTextString(m) }
+func (*BatteryStats_App_Network) ProtoMessage()               {}
+func (*BatteryStats_App_Network) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{0, 0, 7} }
 
 func (m *BatteryStats_App_Network) GetMobileBytesRx() float32 {
 	if m != nil && m.MobileBytesRx != nil {
@@ -1270,6 +1555,20 @@ func (m *BatteryStats_App_Network) GetMobileActiveCount() float32 {
 	return 0
 }
 
+func (m *BatteryStats_App_Network) GetBtBytesRx() int64 {
+	if m != nil && m.BtBytesRx != nil {
+		return *m.BtBytesRx
+	}
+	return 0
+}
+
+func (m *BatteryStats_App_Network) GetBtBytesTx() int64 {
+	if m != nil && m.BtBytesTx != nil {
+		return *m.BtBytesTx
+	}
+	return 0
+}
+
 // APP only. See System.PowerUseItem for others.
 type BatteryStats_App_PowerUseItem struct {
 	// Estimated power use in mAh.
@@ -1280,6 +1579,9 @@ type BatteryStats_App_PowerUseItem struct {
 func (m *BatteryStats_App_PowerUseItem) Reset()         { *m = BatteryStats_App_PowerUseItem{} }
 func (m *BatteryStats_App_PowerUseItem) String() string { return proto.CompactTextString(m) }
 func (*BatteryStats_App_PowerUseItem) ProtoMessage()    {}
+func (*BatteryStats_App_PowerUseItem) Descriptor() ([]byte, []int) {
+	return fileDescriptor0, []int{0, 0, 8}
+}
 
 func (m *BatteryStats_App_PowerUseItem) GetComputedPowerMah() float32 {
 	if m != nil && m.ComputedPowerMah != nil {
@@ -1306,9 +1608,10 @@ type BatteryStats_App_Process struct {
 	XXX_unrecognized []byte   `json:"-"`
 }
 
-func (m *BatteryStats_App_Process) Reset()         { *m = BatteryStats_App_Process{} }
-func (m *BatteryStats_App_Process) String() string { return proto.CompactTextString(m) }
-func (*BatteryStats_App_Process) ProtoMessage()    {}
+func (m *BatteryStats_App_Process) Reset()                    { *m = BatteryStats_App_Process{} }
+func (m *BatteryStats_App_Process) String() string            { return proto.CompactTextString(m) }
+func (*BatteryStats_App_Process) ProtoMessage()               {}
+func (*BatteryStats_App_Process) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{0, 0, 9} }
 
 func (m *BatteryStats_App_Process) GetName() string {
 	if m != nil && m.Name != nil {
@@ -1371,6 +1674,9 @@ type BatteryStats_App_ScheduledJob struct {
 func (m *BatteryStats_App_ScheduledJob) Reset()         { *m = BatteryStats_App_ScheduledJob{} }
 func (m *BatteryStats_App_ScheduledJob) String() string { return proto.CompactTextString(m) }
 func (*BatteryStats_App_ScheduledJob) ProtoMessage()    {}
+func (*BatteryStats_App_ScheduledJob) Descriptor() ([]byte, []int) {
+	return fileDescriptor0, []int{0, 0, 10}
+}
 
 func (m *BatteryStats_App_ScheduledJob) GetName() string {
 	if m != nil && m.Name != nil {
@@ -1403,9 +1709,10 @@ type BatteryStats_App_Sensor struct {
 	XXX_unrecognized []byte   `json:"-"`
 }
 
-func (m *BatteryStats_App_Sensor) Reset()         { *m = BatteryStats_App_Sensor{} }
-func (m *BatteryStats_App_Sensor) String() string { return proto.CompactTextString(m) }
-func (*BatteryStats_App_Sensor) ProtoMessage()    {}
+func (m *BatteryStats_App_Sensor) Reset()                    { *m = BatteryStats_App_Sensor{} }
+func (m *BatteryStats_App_Sensor) String() string            { return proto.CompactTextString(m) }
+func (*BatteryStats_App_Sensor) ProtoMessage()               {}
+func (*BatteryStats_App_Sensor) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{0, 0, 11} }
 
 func (m *BatteryStats_App_Sensor) GetNumber() int32 {
 	if m != nil && m.Number != nil {
@@ -1429,18 +1736,33 @@ func (m *BatteryStats_App_Sensor) GetCount() float32 {
 }
 
 type BatteryStats_App_StateTime struct {
-	// Time the app has any processes in foreground state.
+	// Time the uid had any processes in foreground state.
 	ForegroundTimeMsec *float32 `protobuf:"fixed32,1,opt,name=foreground_time_msec" json:"foreground_time_msec,omitempty"`
-	// Time the app has any process in active state (not cached).
+	// Time the uid had any process in active state (not cached).
+	// Deprecated as of report version 17.
 	ActiveTimeMsec *float32 `protobuf:"fixed32,2,opt,name=active_time_msec" json:"active_time_msec,omitempty"`
-	// Time the app has any processes running at all.
-	RunningTimeMsec  *float32 `protobuf:"fixed32,3,opt,name=running_time_msec" json:"running_time_msec,omitempty"`
-	XXX_unrecognized []byte   `json:"-"`
+	// Time the uid had any processes running at all.
+	CachedTimeMsec *float32 `protobuf:"fixed32,3,opt,name=cached_time_msec" json:"cached_time_msec,omitempty"`
+	// Time the uid had any processes in the top state.
+	TopTimeMsec *int64 `protobuf:"varint,4,opt,name=top_time_msec" json:"top_time_msec,omitempty"`
+	// Time the uid had any process with a started out bound foreground
+	// service.
+	ForegroundServiceTimeMsec *int64 `protobuf:"varint,5,opt,name=foreground_service_time_msec" json:"foreground_service_time_msec,omitempty"`
+	// Time the uid had any process that is top while the device was sleeping.
+	// Sleeping is mostly screen off, but also includes the the time when the
+	// screen is on but the device has not yet been unlocked.
+	TopSleepingTimeMsec *int64 `protobuf:"varint,6,opt,name=top_sleeping_time_msec" json:"top_sleeping_time_msec,omitempty"`
+	// Time the uid had any process in an active background state.
+	BackgroundTimeMsec *int64 `protobuf:"varint,7,opt,name=background_time_msec" json:"background_time_msec,omitempty"`
+	XXX_unrecognized   []byte `json:"-"`
 }
 
 func (m *BatteryStats_App_StateTime) Reset()         { *m = BatteryStats_App_StateTime{} }
 func (m *BatteryStats_App_StateTime) String() string { return proto.CompactTextString(m) }
 func (*BatteryStats_App_StateTime) ProtoMessage()    {}
+func (*BatteryStats_App_StateTime) Descriptor() ([]byte, []int) {
+	return fileDescriptor0, []int{0, 0, 12}
+}
 
 func (m *BatteryStats_App_StateTime) GetForegroundTimeMsec() float32 {
 	if m != nil && m.ForegroundTimeMsec != nil {
@@ -1456,9 +1778,37 @@ func (m *BatteryStats_App_StateTime) GetActiveTimeMsec() float32 {
 	return 0
 }
 
-func (m *BatteryStats_App_StateTime) GetRunningTimeMsec() float32 {
-	if m != nil && m.RunningTimeMsec != nil {
-		return *m.RunningTimeMsec
+func (m *BatteryStats_App_StateTime) GetCachedTimeMsec() float32 {
+	if m != nil && m.CachedTimeMsec != nil {
+		return *m.CachedTimeMsec
+	}
+	return 0
+}
+
+func (m *BatteryStats_App_StateTime) GetTopTimeMsec() int64 {
+	if m != nil && m.TopTimeMsec != nil {
+		return *m.TopTimeMsec
+	}
+	return 0
+}
+
+func (m *BatteryStats_App_StateTime) GetForegroundServiceTimeMsec() int64 {
+	if m != nil && m.ForegroundServiceTimeMsec != nil {
+		return *m.ForegroundServiceTimeMsec
+	}
+	return 0
+}
+
+func (m *BatteryStats_App_StateTime) GetTopSleepingTimeMsec() int64 {
+	if m != nil && m.TopSleepingTimeMsec != nil {
+		return *m.TopSleepingTimeMsec
+	}
+	return 0
+}
+
+func (m *BatteryStats_App_StateTime) GetBackgroundTimeMsec() int64 {
+	if m != nil && m.BackgroundTimeMsec != nil {
+		return *m.BackgroundTimeMsec
 	}
 	return 0
 }
@@ -1472,9 +1822,10 @@ type BatteryStats_App_Sync struct {
 	XXX_unrecognized []byte   `json:"-"`
 }
 
-func (m *BatteryStats_App_Sync) Reset()         { *m = BatteryStats_App_Sync{} }
-func (m *BatteryStats_App_Sync) String() string { return proto.CompactTextString(m) }
-func (*BatteryStats_App_Sync) ProtoMessage()    {}
+func (m *BatteryStats_App_Sync) Reset()                    { *m = BatteryStats_App_Sync{} }
+func (m *BatteryStats_App_Sync) String() string            { return proto.CompactTextString(m) }
+func (*BatteryStats_App_Sync) ProtoMessage()               {}
+func (*BatteryStats_App_Sync) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{0, 0, 13} }
 
 func (m *BatteryStats_App_Sync) GetName() string {
 	if m != nil && m.Name != nil {
@@ -1506,6 +1857,9 @@ type BatteryStats_App_UserActivity struct {
 func (m *BatteryStats_App_UserActivity) Reset()         { *m = BatteryStats_App_UserActivity{} }
 func (m *BatteryStats_App_UserActivity) String() string { return proto.CompactTextString(m) }
 func (*BatteryStats_App_UserActivity) ProtoMessage()    {}
+func (*BatteryStats_App_UserActivity) Descriptor() ([]byte, []int) {
+	return fileDescriptor0, []int{0, 0, 14}
+}
 
 func (m *BatteryStats_App_UserActivity) GetName() BatteryStats_App_UserActivity_Name {
 	if m != nil && m.Name != nil {
@@ -1532,6 +1886,9 @@ type BatteryStats_App_Vibrator struct {
 func (m *BatteryStats_App_Vibrator) Reset()         { *m = BatteryStats_App_Vibrator{} }
 func (m *BatteryStats_App_Vibrator) String() string { return proto.CompactTextString(m) }
 func (*BatteryStats_App_Vibrator) ProtoMessage()    {}
+func (*BatteryStats_App_Vibrator) Descriptor() ([]byte, []int) {
+	return fileDescriptor0, []int{0, 0, 15}
+}
 
 func (m *BatteryStats_App_Vibrator) GetTotalTimeMsec() float32 {
 	if m != nil && m.TotalTimeMsec != nil {
@@ -1541,6 +1898,33 @@ func (m *BatteryStats_App_Vibrator) GetTotalTimeMsec() float32 {
 }
 
 func (m *BatteryStats_App_Vibrator) GetCount() float32 {
+	if m != nil && m.Count != nil {
+		return *m.Count
+	}
+	return 0
+}
+
+type BatteryStats_App_Video struct {
+	// Duration spent with video on.
+	TotalTimeMsec *float32 `protobuf:"fixed32,1,opt,name=total_time_msec" json:"total_time_msec,omitempty"`
+	// #times.
+	Count            *float32 `protobuf:"fixed32,2,opt,name=count" json:"count,omitempty"`
+	XXX_unrecognized []byte   `json:"-"`
+}
+
+func (m *BatteryStats_App_Video) Reset()                    { *m = BatteryStats_App_Video{} }
+func (m *BatteryStats_App_Video) String() string            { return proto.CompactTextString(m) }
+func (*BatteryStats_App_Video) ProtoMessage()               {}
+func (*BatteryStats_App_Video) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{0, 0, 16} }
+
+func (m *BatteryStats_App_Video) GetTotalTimeMsec() float32 {
+	if m != nil && m.TotalTimeMsec != nil {
+		return *m.TotalTimeMsec
+	}
+	return 0
+}
+
+func (m *BatteryStats_App_Video) GetCount() float32 {
 	if m != nil && m.Count != nil {
 		return *m.Count
 	}
@@ -1568,6 +1952,9 @@ type BatteryStats_App_Wakelock struct {
 func (m *BatteryStats_App_Wakelock) Reset()         { *m = BatteryStats_App_Wakelock{} }
 func (m *BatteryStats_App_Wakelock) String() string { return proto.CompactTextString(m) }
 func (*BatteryStats_App_Wakelock) ProtoMessage()    {}
+func (*BatteryStats_App_Wakelock) Descriptor() ([]byte, []int) {
+	return fileDescriptor0, []int{0, 0, 17}
+}
 
 func (m *BatteryStats_App_Wakelock) GetName() string {
 	if m != nil && m.Name != nil {
@@ -1632,9 +2019,10 @@ type BatteryStats_App_Wifi struct {
 	XXX_unrecognized []byte   `json:"-"`
 }
 
-func (m *BatteryStats_App_Wifi) Reset()         { *m = BatteryStats_App_Wifi{} }
-func (m *BatteryStats_App_Wifi) String() string { return proto.CompactTextString(m) }
-func (*BatteryStats_App_Wifi) ProtoMessage()    {}
+func (m *BatteryStats_App_Wifi) Reset()                    { *m = BatteryStats_App_Wifi{} }
+func (m *BatteryStats_App_Wifi) String() string            { return proto.CompactTextString(m) }
+func (*BatteryStats_App_Wifi) ProtoMessage()               {}
+func (*BatteryStats_App_Wifi) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{0, 0, 18} }
 
 func (m *BatteryStats_App_Wifi) GetFullWifiLockTimeMsec() float32 {
 	if m != nil && m.FullWifiLockTimeMsec != nil {
@@ -1685,34 +2073,121 @@ func (m *BatteryStats_App_Wifi) GetTxTimeMsec() float32 {
 	return 0
 }
 
-type BatteryStats_System struct {
-	Battery             *BatteryStats_System_Battery               `protobuf:"bytes,1,opt,name=battery" json:"battery,omitempty"`
-	BatteryDischarge    *BatteryStats_System_BatteryDischarge      `protobuf:"bytes,2,opt,name=battery_discharge" json:"battery_discharge,omitempty"`
-	BatteryLevel        *BatteryStats_System_BatteryLevel          `protobuf:"bytes,3,opt,name=battery_level" json:"battery_level,omitempty"`
-	BluetoothState      []*BatteryStats_System_BluetoothState      `protobuf:"bytes,4,rep,name=bluetooth_state" json:"bluetooth_state,omitempty"`
-	ChargeStep          []*BatteryStats_System_ChargeStep          `protobuf:"bytes,18,rep,name=charge_step" json:"charge_step,omitempty"`
-	DataConnection      []*BatteryStats_System_DataConnection      `protobuf:"bytes,5,rep,name=data_connection" json:"data_connection,omitempty"`
-	DischargeStep       []*BatteryStats_System_DischargeStep       `protobuf:"bytes,19,rep,name=discharge_step" json:"discharge_step,omitempty"`
-	GlobalBluetooth     *BatteryStats_System_GlobalBluetooth       `protobuf:"bytes,20,opt,name=global_bluetooth" json:"global_bluetooth,omitempty"`
-	GlobalNetwork       *BatteryStats_System_GlobalNetwork         `protobuf:"bytes,6,opt,name=global_network" json:"global_network,omitempty"`
-	GlobalWifi          *BatteryStats_System_GlobalWifi            `protobuf:"bytes,21,opt,name=global_wifi" json:"global_wifi,omitempty"`
-	KernelWakelock      []*BatteryStats_System_KernelWakelock      `protobuf:"bytes,7,rep,name=kernel_wakelock" json:"kernel_wakelock,omitempty"`
-	Misc                *BatteryStats_System_Misc                  `protobuf:"bytes,8,opt,name=misc" json:"misc,omitempty"`
-	PowerUseItem        []*BatteryStats_System_PowerUseItem        `protobuf:"bytes,9,rep,name=power_use_item" json:"power_use_item,omitempty"`
-	PowerUseSummary     *BatteryStats_System_PowerUseSummary       `protobuf:"bytes,10,opt,name=power_use_summary" json:"power_use_summary,omitempty"`
-	ScreenBrightness    []*BatteryStats_System_ScreenBrightness    `protobuf:"bytes,11,rep,name=screen_brightness" json:"screen_brightness,omitempty"`
-	SignalScanningTime  *BatteryStats_System_SignalScanningTime    `protobuf:"bytes,12,opt,name=signal_scanning_time" json:"signal_scanning_time,omitempty"`
-	SignalStrength      []*BatteryStats_System_SignalStrength      `protobuf:"bytes,13,rep,name=signal_strength" json:"signal_strength,omitempty"`
-	WakeupReason        []*BatteryStats_System_WakeupReason        `protobuf:"bytes,14,rep,name=wakeup_reason" json:"wakeup_reason,omitempty"`
-	WifiSignalStrength  []*BatteryStats_System_WifiSignalStrength  `protobuf:"bytes,16,rep,name=wifi_signal_strength" json:"wifi_signal_strength,omitempty"`
-	WifiSupplicantState []*BatteryStats_System_WifiSupplicantState `protobuf:"bytes,17,rep,name=wifi_supplicant_state" json:"wifi_supplicant_state,omitempty"`
-	WifiState           []*BatteryStats_System_WifiState           `protobuf:"bytes,15,rep,name=wifi_state" json:"wifi_state,omitempty"`
-	XXX_unrecognized    []byte                                     `json:"-"`
+type BatteryStats_ControllerActivity struct {
+	// Time (milliseconds) spent in the idle state.
+	IdleTimeMsec *int64 `protobuf:"varint,1,opt,name=idle_time_msec" json:"idle_time_msec,omitempty"`
+	// Time (milliseconds) spent in the receive state.
+	RxTimeMsec *int64 `protobuf:"varint,2,opt,name=rx_time_msec" json:"rx_time_msec,omitempty"`
+	// Total power (mAh) consumed by the controller in all states. The value may
+	// always be 0 if the device doesn't support power calculations.
+	PowerMah         *int64                                     `protobuf:"varint,3,opt,name=power_mah" json:"power_mah,omitempty"`
+	Tx               []*BatteryStats_ControllerActivity_TxLevel `protobuf:"bytes,4,rep,name=tx" json:"tx,omitempty"`
+	XXX_unrecognized []byte                                     `json:"-"`
 }
 
-func (m *BatteryStats_System) Reset()         { *m = BatteryStats_System{} }
-func (m *BatteryStats_System) String() string { return proto.CompactTextString(m) }
-func (*BatteryStats_System) ProtoMessage()    {}
+func (m *BatteryStats_ControllerActivity) Reset()         { *m = BatteryStats_ControllerActivity{} }
+func (m *BatteryStats_ControllerActivity) String() string { return proto.CompactTextString(m) }
+func (*BatteryStats_ControllerActivity) ProtoMessage()    {}
+func (*BatteryStats_ControllerActivity) Descriptor() ([]byte, []int) {
+	return fileDescriptor0, []int{0, 1}
+}
+
+func (m *BatteryStats_ControllerActivity) GetIdleTimeMsec() int64 {
+	if m != nil && m.IdleTimeMsec != nil {
+		return *m.IdleTimeMsec
+	}
+	return 0
+}
+
+func (m *BatteryStats_ControllerActivity) GetRxTimeMsec() int64 {
+	if m != nil && m.RxTimeMsec != nil {
+		return *m.RxTimeMsec
+	}
+	return 0
+}
+
+func (m *BatteryStats_ControllerActivity) GetPowerMah() int64 {
+	if m != nil && m.PowerMah != nil {
+		return *m.PowerMah
+	}
+	return 0
+}
+
+func (m *BatteryStats_ControllerActivity) GetTx() []*BatteryStats_ControllerActivity_TxLevel {
+	if m != nil {
+		return m.Tx
+	}
+	return nil
+}
+
+// Represents a transmit level, where each level may draw a different amount
+// of power. The levels themselves are controller-specific (and may possibly
+// be device specific...yet to be confirmed).
+type BatteryStats_ControllerActivity_TxLevel struct {
+	// Transmit level. Higher levels draw more power.
+	Level *int32 `protobuf:"varint,1,opt,name=level" json:"level,omitempty"`
+	// Time spent in this specific transmit level state.
+	TimeMsec         *int64 `protobuf:"varint,2,opt,name=time_msec" json:"time_msec,omitempty"`
+	XXX_unrecognized []byte `json:"-"`
+}
+
+func (m *BatteryStats_ControllerActivity_TxLevel) Reset() {
+	*m = BatteryStats_ControllerActivity_TxLevel{}
+}
+func (m *BatteryStats_ControllerActivity_TxLevel) String() string { return proto.CompactTextString(m) }
+func (*BatteryStats_ControllerActivity_TxLevel) ProtoMessage()    {}
+func (*BatteryStats_ControllerActivity_TxLevel) Descriptor() ([]byte, []int) {
+	return fileDescriptor0, []int{0, 1, 0}
+}
+
+func (m *BatteryStats_ControllerActivity_TxLevel) GetLevel() int32 {
+	if m != nil && m.Level != nil {
+		return *m.Level
+	}
+	return 0
+}
+
+func (m *BatteryStats_ControllerActivity_TxLevel) GetTimeMsec() int64 {
+	if m != nil && m.TimeMsec != nil {
+		return *m.TimeMsec
+	}
+	return 0
+}
+
+type BatteryStats_System struct {
+	Battery          *BatteryStats_System_Battery          `protobuf:"bytes,1,opt,name=battery" json:"battery,omitempty"`
+	BatteryDischarge *BatteryStats_System_BatteryDischarge `protobuf:"bytes,2,opt,name=battery_discharge" json:"battery_discharge,omitempty"`
+	BatteryLevel     *BatteryStats_System_BatteryLevel     `protobuf:"bytes,3,opt,name=battery_level" json:"battery_level,omitempty"`
+	BluetoothState   []*BatteryStats_System_BluetoothState `protobuf:"bytes,4,rep,name=bluetooth_state" json:"bluetooth_state,omitempty"`
+	ChargeStep       []*BatteryStats_System_ChargeStep     `protobuf:"bytes,18,rep,name=charge_step" json:"charge_step,omitempty"`
+	DataConnection   []*BatteryStats_System_DataConnection `protobuf:"bytes,5,rep,name=data_connection" json:"data_connection,omitempty"`
+	DischargeStep    []*BatteryStats_System_DischargeStep  `protobuf:"bytes,19,rep,name=discharge_step" json:"discharge_step,omitempty"`
+	GlobalBluetooth  *BatteryStats_System_GlobalBluetooth  `protobuf:"bytes,20,opt,name=global_bluetooth" json:"global_bluetooth,omitempty"`
+	// tx_time and power were swapped during report version 17, so they cannot
+	// be trusted in version 17.
+	GlobalBluetoothController *BatteryStats_ControllerActivity           `protobuf:"bytes,22,opt,name=global_bluetooth_controller" json:"global_bluetooth_controller,omitempty"`
+	GlobalModemController     *BatteryStats_ControllerActivity           `protobuf:"bytes,23,opt,name=global_modem_controller" json:"global_modem_controller,omitempty"`
+	GlobalNetwork             *BatteryStats_System_GlobalNetwork         `protobuf:"bytes,6,opt,name=global_network" json:"global_network,omitempty"`
+	GlobalWifi                *BatteryStats_System_GlobalWifi            `protobuf:"bytes,21,opt,name=global_wifi" json:"global_wifi,omitempty"`
+	GlobalWifiController      *BatteryStats_ControllerActivity           `protobuf:"bytes,24,opt,name=global_wifi_controller" json:"global_wifi_controller,omitempty"`
+	KernelWakelock            []*BatteryStats_System_KernelWakelock      `protobuf:"bytes,7,rep,name=kernel_wakelock" json:"kernel_wakelock,omitempty"`
+	Misc                      *BatteryStats_System_Misc                  `protobuf:"bytes,8,opt,name=misc" json:"misc,omitempty"`
+	PowerUseItem              []*BatteryStats_System_PowerUseItem        `protobuf:"bytes,9,rep,name=power_use_item" json:"power_use_item,omitempty"`
+	PowerUseSummary           *BatteryStats_System_PowerUseSummary       `protobuf:"bytes,10,opt,name=power_use_summary" json:"power_use_summary,omitempty"`
+	ScreenBrightness          []*BatteryStats_System_ScreenBrightness    `protobuf:"bytes,11,rep,name=screen_brightness" json:"screen_brightness,omitempty"`
+	SignalScanningTime        *BatteryStats_System_SignalScanningTime    `protobuf:"bytes,12,opt,name=signal_scanning_time" json:"signal_scanning_time,omitempty"`
+	SignalStrength            []*BatteryStats_System_SignalStrength      `protobuf:"bytes,13,rep,name=signal_strength" json:"signal_strength,omitempty"`
+	WakeupReason              []*BatteryStats_System_WakeupReason        `protobuf:"bytes,14,rep,name=wakeup_reason" json:"wakeup_reason,omitempty"`
+	WifiSignalStrength        []*BatteryStats_System_WifiSignalStrength  `protobuf:"bytes,16,rep,name=wifi_signal_strength" json:"wifi_signal_strength,omitempty"`
+	WifiSupplicantState       []*BatteryStats_System_WifiSupplicantState `protobuf:"bytes,17,rep,name=wifi_supplicant_state" json:"wifi_supplicant_state,omitempty"`
+	WifiState                 []*BatteryStats_System_WifiState           `protobuf:"bytes,15,rep,name=wifi_state" json:"wifi_state,omitempty"`
+	XXX_unrecognized          []byte                                     `json:"-"`
+}
+
+func (m *BatteryStats_System) Reset()                    { *m = BatteryStats_System{} }
+func (m *BatteryStats_System) String() string            { return proto.CompactTextString(m) }
+func (*BatteryStats_System) ProtoMessage()               {}
+func (*BatteryStats_System) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{0, 2} }
 
 func (m *BatteryStats_System) GetBattery() *BatteryStats_System_Battery {
 	if m != nil {
@@ -1770,6 +2245,20 @@ func (m *BatteryStats_System) GetGlobalBluetooth() *BatteryStats_System_GlobalBl
 	return nil
 }
 
+func (m *BatteryStats_System) GetGlobalBluetoothController() *BatteryStats_ControllerActivity {
+	if m != nil {
+		return m.GlobalBluetoothController
+	}
+	return nil
+}
+
+func (m *BatteryStats_System) GetGlobalModemController() *BatteryStats_ControllerActivity {
+	if m != nil {
+		return m.GlobalModemController
+	}
+	return nil
+}
+
 func (m *BatteryStats_System) GetGlobalNetwork() *BatteryStats_System_GlobalNetwork {
 	if m != nil {
 		return m.GlobalNetwork
@@ -1780,6 +2269,13 @@ func (m *BatteryStats_System) GetGlobalNetwork() *BatteryStats_System_GlobalNetw
 func (m *BatteryStats_System) GetGlobalWifi() *BatteryStats_System_GlobalWifi {
 	if m != nil {
 		return m.GlobalWifi
+	}
+	return nil
+}
+
+func (m *BatteryStats_System) GetGlobalWifiController() *BatteryStats_ControllerActivity {
+	if m != nil {
+		return m.GlobalWifiController
 	}
 	return nil
 }
@@ -1881,6 +2377,9 @@ type BatteryStats_System_Battery struct {
 func (m *BatteryStats_System_Battery) Reset()         { *m = BatteryStats_System_Battery{} }
 func (m *BatteryStats_System_Battery) String() string { return proto.CompactTextString(m) }
 func (*BatteryStats_System_Battery) ProtoMessage()    {}
+func (*BatteryStats_System_Battery) Descriptor() ([]byte, []int) {
+	return fileDescriptor0, []int{0, 2, 0}
+}
 
 func (m *BatteryStats_System_Battery) GetStartCount() float32 {
 	if m != nil && m.StartCount != nil {
@@ -1953,6 +2452,9 @@ type BatteryStats_System_BatteryDischarge struct {
 func (m *BatteryStats_System_BatteryDischarge) Reset()         { *m = BatteryStats_System_BatteryDischarge{} }
 func (m *BatteryStats_System_BatteryDischarge) String() string { return proto.CompactTextString(m) }
 func (*BatteryStats_System_BatteryDischarge) ProtoMessage()    {}
+func (*BatteryStats_System_BatteryDischarge) Descriptor() ([]byte, []int) {
+	return fileDescriptor0, []int{0, 2, 1}
+}
 
 func (m *BatteryStats_System_BatteryDischarge) GetLowerBound() float32 {
 	if m != nil && m.LowerBound != nil {
@@ -1993,6 +2495,9 @@ type BatteryStats_System_BatteryLevel struct {
 func (m *BatteryStats_System_BatteryLevel) Reset()         { *m = BatteryStats_System_BatteryLevel{} }
 func (m *BatteryStats_System_BatteryLevel) String() string { return proto.CompactTextString(m) }
 func (*BatteryStats_System_BatteryLevel) ProtoMessage()    {}
+func (*BatteryStats_System_BatteryLevel) Descriptor() ([]byte, []int) {
+	return fileDescriptor0, []int{0, 2, 2}
+}
 
 func (m *BatteryStats_System_BatteryLevel) GetStartLevel() float32 {
 	if m != nil && m.StartLevel != nil {
@@ -2020,6 +2525,9 @@ type BatteryStats_System_BluetoothState struct {
 func (m *BatteryStats_System_BluetoothState) Reset()         { *m = BatteryStats_System_BluetoothState{} }
 func (m *BatteryStats_System_BluetoothState) String() string { return proto.CompactTextString(m) }
 func (*BatteryStats_System_BluetoothState) ProtoMessage()    {}
+func (*BatteryStats_System_BluetoothState) Descriptor() ([]byte, []int) {
+	return fileDescriptor0, []int{0, 2, 3}
+}
 
 func (m *BatteryStats_System_BluetoothState) GetName() BatteryStats_System_BluetoothState_Name {
 	if m != nil && m.Name != nil {
@@ -2061,6 +2569,9 @@ type BatteryStats_System_ChargeStep struct {
 func (m *BatteryStats_System_ChargeStep) Reset()         { *m = BatteryStats_System_ChargeStep{} }
 func (m *BatteryStats_System_ChargeStep) String() string { return proto.CompactTextString(m) }
 func (*BatteryStats_System_ChargeStep) ProtoMessage()    {}
+func (*BatteryStats_System_ChargeStep) Descriptor() ([]byte, []int) {
+	return fileDescriptor0, []int{0, 2, 4}
+}
 
 func (m *BatteryStats_System_ChargeStep) GetTimeMsec() float32 {
 	if m != nil && m.TimeMsec != nil {
@@ -2109,6 +2620,9 @@ type BatteryStats_System_DataConnection struct {
 func (m *BatteryStats_System_DataConnection) Reset()         { *m = BatteryStats_System_DataConnection{} }
 func (m *BatteryStats_System_DataConnection) String() string { return proto.CompactTextString(m) }
 func (*BatteryStats_System_DataConnection) ProtoMessage()    {}
+func (*BatteryStats_System_DataConnection) Descriptor() ([]byte, []int) {
+	return fileDescriptor0, []int{0, 2, 5}
+}
 
 func (m *BatteryStats_System_DataConnection) GetName() BatteryStats_System_DataConnection_Name {
 	if m != nil && m.Name != nil {
@@ -2150,6 +2664,9 @@ type BatteryStats_System_DischargeStep struct {
 func (m *BatteryStats_System_DischargeStep) Reset()         { *m = BatteryStats_System_DischargeStep{} }
 func (m *BatteryStats_System_DischargeStep) String() string { return proto.CompactTextString(m) }
 func (*BatteryStats_System_DischargeStep) ProtoMessage()    {}
+func (*BatteryStats_System_DischargeStep) Descriptor() ([]byte, []int) {
+	return fileDescriptor0, []int{0, 2, 6}
+}
 
 func (m *BatteryStats_System_DischargeStep) GetTimeMsec() float32 {
 	if m != nil && m.TimeMsec != nil {
@@ -2193,6 +2710,9 @@ type BatteryStats_System_DisplayState struct {
 func (m *BatteryStats_System_DisplayState) Reset()         { *m = BatteryStats_System_DisplayState{} }
 func (m *BatteryStats_System_DisplayState) String() string { return proto.CompactTextString(m) }
 func (*BatteryStats_System_DisplayState) ProtoMessage()    {}
+func (*BatteryStats_System_DisplayState) Descriptor() ([]byte, []int) {
+	return fileDescriptor0, []int{0, 2, 7}
+}
 
 // Total bluetooth data
 type BatteryStats_System_GlobalBluetooth struct {
@@ -2206,6 +2726,9 @@ type BatteryStats_System_GlobalBluetooth struct {
 func (m *BatteryStats_System_GlobalBluetooth) Reset()         { *m = BatteryStats_System_GlobalBluetooth{} }
 func (m *BatteryStats_System_GlobalBluetooth) String() string { return proto.CompactTextString(m) }
 func (*BatteryStats_System_GlobalBluetooth) ProtoMessage()    {}
+func (*BatteryStats_System_GlobalBluetooth) Descriptor() ([]byte, []int) {
+	return fileDescriptor0, []int{0, 2, 8}
+}
 
 func (m *BatteryStats_System_GlobalBluetooth) GetBluetoothIdleTimeMsec() float32 {
 	if m != nil && m.BluetoothIdleTimeMsec != nil {
@@ -2245,12 +2768,17 @@ type BatteryStats_System_GlobalNetwork struct {
 	MobilePacketsTx  *float32 `protobuf:"fixed32,6,opt,name=mobile_packets_tx" json:"mobile_packets_tx,omitempty"`
 	WifiPacketsRx    *float32 `protobuf:"fixed32,7,opt,name=wifi_packets_rx" json:"wifi_packets_rx,omitempty"`
 	WifiPacketsTx    *float32 `protobuf:"fixed32,8,opt,name=wifi_packets_tx" json:"wifi_packets_tx,omitempty"`
+	BtBytesRx        *int64   `protobuf:"varint,9,opt,name=bt_bytes_rx" json:"bt_bytes_rx,omitempty"`
+	BtBytesTx        *int64   `protobuf:"varint,10,opt,name=bt_bytes_tx" json:"bt_bytes_tx,omitempty"`
 	XXX_unrecognized []byte   `json:"-"`
 }
 
 func (m *BatteryStats_System_GlobalNetwork) Reset()         { *m = BatteryStats_System_GlobalNetwork{} }
 func (m *BatteryStats_System_GlobalNetwork) String() string { return proto.CompactTextString(m) }
 func (*BatteryStats_System_GlobalNetwork) ProtoMessage()    {}
+func (*BatteryStats_System_GlobalNetwork) Descriptor() ([]byte, []int) {
+	return fileDescriptor0, []int{0, 2, 9}
+}
 
 func (m *BatteryStats_System_GlobalNetwork) GetMobileBytesRx() float32 {
 	if m != nil && m.MobileBytesRx != nil {
@@ -2308,6 +2836,20 @@ func (m *BatteryStats_System_GlobalNetwork) GetWifiPacketsTx() float32 {
 	return 0
 }
 
+func (m *BatteryStats_System_GlobalNetwork) GetBtBytesRx() int64 {
+	if m != nil && m.BtBytesRx != nil {
+		return *m.BtBytesRx
+	}
+	return 0
+}
+
+func (m *BatteryStats_System_GlobalNetwork) GetBtBytesTx() int64 {
+	if m != nil && m.BtBytesTx != nil {
+		return *m.BtBytesTx
+	}
+	return 0
+}
+
 // Total wifi data (includes app wifi usage).
 type BatteryStats_System_GlobalWifi struct {
 	// Wifi on and wifi running are mostly legacy and shouldn't have a
@@ -2327,6 +2869,9 @@ type BatteryStats_System_GlobalWifi struct {
 func (m *BatteryStats_System_GlobalWifi) Reset()         { *m = BatteryStats_System_GlobalWifi{} }
 func (m *BatteryStats_System_GlobalWifi) String() string { return proto.CompactTextString(m) }
 func (*BatteryStats_System_GlobalWifi) ProtoMessage()    {}
+func (*BatteryStats_System_GlobalWifi) Descriptor() ([]byte, []int) {
+	return fileDescriptor0, []int{0, 2, 10}
+}
 
 func (m *BatteryStats_System_GlobalWifi) GetWifiOnTimeMsec() float32 {
 	if m != nil && m.WifiOnTimeMsec != nil {
@@ -2377,6 +2922,9 @@ type BatteryStats_System_IdleMode struct {
 func (m *BatteryStats_System_IdleMode) Reset()         { *m = BatteryStats_System_IdleMode{} }
 func (m *BatteryStats_System_IdleMode) String() string { return proto.CompactTextString(m) }
 func (*BatteryStats_System_IdleMode) ProtoMessage()    {}
+func (*BatteryStats_System_IdleMode) Descriptor() ([]byte, []int) {
+	return fileDescriptor0, []int{0, 2, 11}
+}
 
 // Similar to Wakelock.
 type BatteryStats_System_KernelWakelock struct {
@@ -2389,6 +2937,9 @@ type BatteryStats_System_KernelWakelock struct {
 func (m *BatteryStats_System_KernelWakelock) Reset()         { *m = BatteryStats_System_KernelWakelock{} }
 func (m *BatteryStats_System_KernelWakelock) String() string { return proto.CompactTextString(m) }
 func (*BatteryStats_System_KernelWakelock) ProtoMessage()    {}
+func (*BatteryStats_System_KernelWakelock) Descriptor() ([]byte, []int) {
+	return fileDescriptor0, []int{0, 2, 12}
+}
 
 func (m *BatteryStats_System_KernelWakelock) GetName() string {
 	if m != nil && m.Name != nil {
@@ -2437,20 +2988,34 @@ type BatteryStats_System_Misc struct {
 	// #times that connectivity state changed.
 	ConnectivityChanges *float32 `protobuf:"fixed32,17,opt,name=connectivity_changes" json:"connectivity_changes,omitempty"`
 	// When the device has seen no activity, it goes into
-	// idle mode, which encompasses "idling" time and the
-	// occasional time out of idling that allows apps to operate.
+	// idle (Doze) mode. https://youtu.be/N72ksDKrX6c
 	DeviceIdleModeEnabledTimeMsec *float32 `protobuf:"fixed32,18,opt,name=device_idle_mode_enabled_time_msec" json:"device_idle_mode_enabled_time_msec,omitempty"`
 	DeviceIdleModeEnabledCount    *float32 `protobuf:"fixed32,19,opt,name=device_idle_mode_enabled_count" json:"device_idle_mode_enabled_count,omitempty"`
-	// Idling time is when the device turns off most activity
-	// to prevent apps from running.
+	// Idling time encompasses "idle" time and the idle maintenance windows that allow apps to operate.
 	DeviceIdlingTimeMsec *float32 `protobuf:"fixed32,20,opt,name=device_idling_time_msec" json:"device_idling_time_msec,omitempty"`
 	DeviceIdlingCount    *float32 `protobuf:"fixed32,21,opt,name=device_idling_count" json:"device_idling_count,omitempty"`
-	XXX_unrecognized     []byte   `json:"-"`
+	// # times the mobile radio was active.
+	MobileActiveCount *float32 `protobuf:"fixed32,22,opt,name=mobile_active_count" json:"mobile_active_count,omitempty"`
+	// Amount of time the mobile radio was on but the time couldn't be attributed to any app.
+	MobileActiveUnknownTime *float32 `protobuf:"fixed32,23,opt,name=mobile_active_unknown_time" json:"mobile_active_unknown_time,omitempty"`
+	// Light-weight idle (Doze) mode turns on after the screen has been off for some time,
+	// and then cycles through periods of light-weight idle with maintenance
+	// windows, regardless of whether the device is moving around.
+	DeviceLightIdleModeEnabledTimeMsec *int64 `protobuf:"varint,24,opt,name=device_light_idle_mode_enabled_time_msec" json:"device_light_idle_mode_enabled_time_msec,omitempty"`
+	DeviceLightIdleModeEnabledCount    *int32 `protobuf:"varint,25,opt,name=device_light_idle_mode_enabled_count" json:"device_light_idle_mode_enabled_count,omitempty"`
+	// Light idling time encompasses "light idle" time and the maintenance
+	// windows that allow apps to operate.
+	DeviceLightIdlingTimeMsec             *int64 `protobuf:"varint,26,opt,name=device_light_idling_time_msec" json:"device_light_idling_time_msec,omitempty"`
+	DeviceLightIdlingCount                *int32 `protobuf:"varint,27,opt,name=device_light_idling_count" json:"device_light_idling_count,omitempty"`
+	MaxDeviceLightIdleModeEnabledTimeMsec *int64 `protobuf:"varint,28,opt,name=max_device_light_idle_mode_enabled_time_msec" json:"max_device_light_idle_mode_enabled_time_msec,omitempty"`
+	MaxDeviceIdleModeEnabledTimeMsec      *int64 `protobuf:"varint,29,opt,name=max_device_idle_mode_enabled_time_msec" json:"max_device_idle_mode_enabled_time_msec,omitempty"`
+	XXX_unrecognized                      []byte `json:"-"`
 }
 
-func (m *BatteryStats_System_Misc) Reset()         { *m = BatteryStats_System_Misc{} }
-func (m *BatteryStats_System_Misc) String() string { return proto.CompactTextString(m) }
-func (*BatteryStats_System_Misc) ProtoMessage()    {}
+func (m *BatteryStats_System_Misc) Reset()                    { *m = BatteryStats_System_Misc{} }
+func (m *BatteryStats_System_Misc) String() string            { return proto.CompactTextString(m) }
+func (*BatteryStats_System_Misc) ProtoMessage()               {}
+func (*BatteryStats_System_Misc) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{0, 2, 13} }
 
 func (m *BatteryStats_System_Misc) GetScreenOnTimeMsec() float32 {
 	if m != nil && m.ScreenOnTimeMsec != nil {
@@ -2599,6 +3164,62 @@ func (m *BatteryStats_System_Misc) GetDeviceIdlingCount() float32 {
 	return 0
 }
 
+func (m *BatteryStats_System_Misc) GetMobileActiveCount() float32 {
+	if m != nil && m.MobileActiveCount != nil {
+		return *m.MobileActiveCount
+	}
+	return 0
+}
+
+func (m *BatteryStats_System_Misc) GetMobileActiveUnknownTime() float32 {
+	if m != nil && m.MobileActiveUnknownTime != nil {
+		return *m.MobileActiveUnknownTime
+	}
+	return 0
+}
+
+func (m *BatteryStats_System_Misc) GetDeviceLightIdleModeEnabledTimeMsec() int64 {
+	if m != nil && m.DeviceLightIdleModeEnabledTimeMsec != nil {
+		return *m.DeviceLightIdleModeEnabledTimeMsec
+	}
+	return 0
+}
+
+func (m *BatteryStats_System_Misc) GetDeviceLightIdleModeEnabledCount() int32 {
+	if m != nil && m.DeviceLightIdleModeEnabledCount != nil {
+		return *m.DeviceLightIdleModeEnabledCount
+	}
+	return 0
+}
+
+func (m *BatteryStats_System_Misc) GetDeviceLightIdlingTimeMsec() int64 {
+	if m != nil && m.DeviceLightIdlingTimeMsec != nil {
+		return *m.DeviceLightIdlingTimeMsec
+	}
+	return 0
+}
+
+func (m *BatteryStats_System_Misc) GetDeviceLightIdlingCount() int32 {
+	if m != nil && m.DeviceLightIdlingCount != nil {
+		return *m.DeviceLightIdlingCount
+	}
+	return 0
+}
+
+func (m *BatteryStats_System_Misc) GetMaxDeviceLightIdleModeEnabledTimeMsec() int64 {
+	if m != nil && m.MaxDeviceLightIdleModeEnabledTimeMsec != nil {
+		return *m.MaxDeviceLightIdleModeEnabledTimeMsec
+	}
+	return 0
+}
+
+func (m *BatteryStats_System_Misc) GetMaxDeviceIdleModeEnabledTimeMsec() int64 {
+	if m != nil && m.MaxDeviceIdleModeEnabledTimeMsec != nil {
+		return *m.MaxDeviceIdleModeEnabledTimeMsec
+	}
+	return 0
+}
+
 type BatteryStats_System_PowerSaveMode struct {
 	XXX_unrecognized []byte `json:"-"`
 }
@@ -2606,6 +3227,9 @@ type BatteryStats_System_PowerSaveMode struct {
 func (m *BatteryStats_System_PowerSaveMode) Reset()         { *m = BatteryStats_System_PowerSaveMode{} }
 func (m *BatteryStats_System_PowerSaveMode) String() string { return proto.CompactTextString(m) }
 func (*BatteryStats_System_PowerSaveMode) ProtoMessage()    {}
+func (*BatteryStats_System_PowerSaveMode) Descriptor() ([]byte, []int) {
+	return fileDescriptor0, []int{0, 2, 14}
+}
 
 type BatteryStats_System_PowerUseItem struct {
 	Name             *BatteryStats_System_PowerUseItem_Name `protobuf:"varint,1,opt,name=name,enum=batterystats.BatteryStats_System_PowerUseItem_Name" json:"name,omitempty"`
@@ -2616,6 +3240,9 @@ type BatteryStats_System_PowerUseItem struct {
 func (m *BatteryStats_System_PowerUseItem) Reset()         { *m = BatteryStats_System_PowerUseItem{} }
 func (m *BatteryStats_System_PowerUseItem) String() string { return proto.CompactTextString(m) }
 func (*BatteryStats_System_PowerUseItem) ProtoMessage()    {}
+func (*BatteryStats_System_PowerUseItem) Descriptor() ([]byte, []int) {
+	return fileDescriptor0, []int{0, 2, 15}
+}
 
 func (m *BatteryStats_System_PowerUseItem) GetName() BatteryStats_System_PowerUseItem_Name {
 	if m != nil && m.Name != nil {
@@ -2643,6 +3270,9 @@ type BatteryStats_System_PowerUseSummary struct {
 func (m *BatteryStats_System_PowerUseSummary) Reset()         { *m = BatteryStats_System_PowerUseSummary{} }
 func (m *BatteryStats_System_PowerUseSummary) String() string { return proto.CompactTextString(m) }
 func (*BatteryStats_System_PowerUseSummary) ProtoMessage()    {}
+func (*BatteryStats_System_PowerUseSummary) Descriptor() ([]byte, []int) {
+	return fileDescriptor0, []int{0, 2, 16}
+}
 
 func (m *BatteryStats_System_PowerUseSummary) GetBatteryCapacityMah() float32 {
 	if m != nil && m.BatteryCapacityMah != nil {
@@ -2682,6 +3312,9 @@ type BatteryStats_System_ScreenBrightness struct {
 func (m *BatteryStats_System_ScreenBrightness) Reset()         { *m = BatteryStats_System_ScreenBrightness{} }
 func (m *BatteryStats_System_ScreenBrightness) String() string { return proto.CompactTextString(m) }
 func (*BatteryStats_System_ScreenBrightness) ProtoMessage()    {}
+func (*BatteryStats_System_ScreenBrightness) Descriptor() ([]byte, []int) {
+	return fileDescriptor0, []int{0, 2, 17}
+}
 
 func (m *BatteryStats_System_ScreenBrightness) GetName() BatteryStats_System_ScreenBrightness_Name {
 	if m != nil && m.Name != nil {
@@ -2708,6 +3341,9 @@ func (m *BatteryStats_System_SignalScanningTime) Reset() {
 }
 func (m *BatteryStats_System_SignalScanningTime) String() string { return proto.CompactTextString(m) }
 func (*BatteryStats_System_SignalScanningTime) ProtoMessage()    {}
+func (*BatteryStats_System_SignalScanningTime) Descriptor() ([]byte, []int) {
+	return fileDescriptor0, []int{0, 2, 18}
+}
 
 func (m *BatteryStats_System_SignalScanningTime) GetTimeMsec() float32 {
 	if m != nil && m.TimeMsec != nil {
@@ -2728,6 +3364,9 @@ type BatteryStats_System_SignalStrength struct {
 func (m *BatteryStats_System_SignalStrength) Reset()         { *m = BatteryStats_System_SignalStrength{} }
 func (m *BatteryStats_System_SignalStrength) String() string { return proto.CompactTextString(m) }
 func (*BatteryStats_System_SignalStrength) ProtoMessage()    {}
+func (*BatteryStats_System_SignalStrength) Descriptor() ([]byte, []int) {
+	return fileDescriptor0, []int{0, 2, 19}
+}
 
 func (m *BatteryStats_System_SignalStrength) GetName() BatteryStats_System_SignalStrength_Name {
 	if m != nil && m.Name != nil {
@@ -2761,6 +3400,9 @@ type BatteryStats_System_WakeupReason struct {
 func (m *BatteryStats_System_WakeupReason) Reset()         { *m = BatteryStats_System_WakeupReason{} }
 func (m *BatteryStats_System_WakeupReason) String() string { return proto.CompactTextString(m) }
 func (*BatteryStats_System_WakeupReason) ProtoMessage()    {}
+func (*BatteryStats_System_WakeupReason) Descriptor() ([]byte, []int) {
+	return fileDescriptor0, []int{0, 2, 20}
+}
 
 func (m *BatteryStats_System_WakeupReason) GetName() string {
 	if m != nil && m.Name != nil {
@@ -2796,6 +3438,9 @@ func (m *BatteryStats_System_WifiSignalStrength) Reset() {
 }
 func (m *BatteryStats_System_WifiSignalStrength) String() string { return proto.CompactTextString(m) }
 func (*BatteryStats_System_WifiSignalStrength) ProtoMessage()    {}
+func (*BatteryStats_System_WifiSignalStrength) Descriptor() ([]byte, []int) {
+	return fileDescriptor0, []int{0, 2, 21}
+}
 
 func (m *BatteryStats_System_WifiSignalStrength) GetName() BatteryStats_System_WifiSignalStrength_Name {
 	if m != nil && m.Name != nil {
@@ -2830,6 +3475,9 @@ func (m *BatteryStats_System_WifiSupplicantState) Reset() {
 }
 func (m *BatteryStats_System_WifiSupplicantState) String() string { return proto.CompactTextString(m) }
 func (*BatteryStats_System_WifiSupplicantState) ProtoMessage()    {}
+func (*BatteryStats_System_WifiSupplicantState) Descriptor() ([]byte, []int) {
+	return fileDescriptor0, []int{0, 2, 22}
+}
 
 func (m *BatteryStats_System_WifiSupplicantState) GetName() BatteryStats_System_WifiSupplicantState_Name {
 	if m != nil && m.Name != nil {
@@ -2863,6 +3511,9 @@ type BatteryStats_System_WifiState struct {
 func (m *BatteryStats_System_WifiState) Reset()         { *m = BatteryStats_System_WifiState{} }
 func (m *BatteryStats_System_WifiState) String() string { return proto.CompactTextString(m) }
 func (*BatteryStats_System_WifiState) ProtoMessage()    {}
+func (*BatteryStats_System_WifiState) Descriptor() ([]byte, []int) {
+	return fileDescriptor0, []int{0, 2, 23}
+}
 
 func (m *BatteryStats_System_WifiState) GetName() BatteryStats_System_WifiState_Name {
 	if m != nil && m.Name != nil {
@@ -2885,72 +3536,56 @@ func (m *BatteryStats_System_WifiState) GetCount() float32 {
 	return 0
 }
 
-// Regexp filters for PII.
-type BatteryStatsFilterSpec struct {
-	Section          []*BatteryStatsFilterSpec_Section `protobuf:"bytes,1,rep,name=section" json:"section,omitempty"`
-	XXX_unrecognized []byte                            `json:"-"`
-}
-
-func (m *BatteryStatsFilterSpec) Reset()         { *m = BatteryStatsFilterSpec{} }
-func (m *BatteryStatsFilterSpec) String() string { return proto.CompactTextString(m) }
-func (*BatteryStatsFilterSpec) ProtoMessage()    {}
-
-func (m *BatteryStatsFilterSpec) GetSection() []*BatteryStatsFilterSpec_Section {
-	if m != nil {
-		return m.Section
-	}
-	return nil
-}
-
-type BatteryStatsFilterSpec_Filter struct {
-	Pattern          *string `protobuf:"bytes,1,opt,name=pattern" json:"pattern,omitempty"`
-	Replacement      *string `protobuf:"bytes,2,opt,name=replacement" json:"replacement,omitempty"`
-	XXX_unrecognized []byte  `json:"-"`
-}
-
-func (m *BatteryStatsFilterSpec_Filter) Reset()         { *m = BatteryStatsFilterSpec_Filter{} }
-func (m *BatteryStatsFilterSpec_Filter) String() string { return proto.CompactTextString(m) }
-func (*BatteryStatsFilterSpec_Filter) ProtoMessage()    {}
-
-func (m *BatteryStatsFilterSpec_Filter) GetPattern() string {
-	if m != nil && m.Pattern != nil {
-		return *m.Pattern
-	}
-	return ""
-}
-
-func (m *BatteryStatsFilterSpec_Filter) GetReplacement() string {
-	if m != nil && m.Replacement != nil {
-		return *m.Replacement
-	}
-	return ""
-}
-
-type BatteryStatsFilterSpec_Section struct {
-	Name             *string                          `protobuf:"bytes,1,opt,name=name" json:"name,omitempty"`
-	Filter           []*BatteryStatsFilterSpec_Filter `protobuf:"bytes,2,rep,name=filter" json:"filter,omitempty"`
-	XXX_unrecognized []byte                           `json:"-"`
-}
-
-func (m *BatteryStatsFilterSpec_Section) Reset()         { *m = BatteryStatsFilterSpec_Section{} }
-func (m *BatteryStatsFilterSpec_Section) String() string { return proto.CompactTextString(m) }
-func (*BatteryStatsFilterSpec_Section) ProtoMessage()    {}
-
-func (m *BatteryStatsFilterSpec_Section) GetName() string {
-	if m != nil && m.Name != nil {
-		return *m.Name
-	}
-	return ""
-}
-
-func (m *BatteryStatsFilterSpec_Section) GetFilter() []*BatteryStatsFilterSpec_Filter {
-	if m != nil {
-		return m.Filter
-	}
-	return nil
-}
-
 func init() {
+	proto.RegisterType((*BatteryStats)(nil), "batterystats.BatteryStats")
+	proto.RegisterType((*BatteryStats_App)(nil), "batterystats.BatteryStats.App")
+	proto.RegisterType((*BatteryStats_App_Child)(nil), "batterystats.BatteryStats.App.Child")
+	proto.RegisterType((*BatteryStats_App_Apk)(nil), "batterystats.BatteryStats.App.Apk")
+	proto.RegisterType((*BatteryStats_App_Apk_Service)(nil), "batterystats.BatteryStats.App.Apk.Service")
+	proto.RegisterType((*BatteryStats_App_Audio)(nil), "batterystats.BatteryStats.App.Audio")
+	proto.RegisterType((*BatteryStats_App_Camera)(nil), "batterystats.BatteryStats.App.Camera")
+	proto.RegisterType((*BatteryStats_App_Cpu)(nil), "batterystats.BatteryStats.App.Cpu")
+	proto.RegisterType((*BatteryStats_App_Flashlight)(nil), "batterystats.BatteryStats.App.Flashlight")
+	proto.RegisterType((*BatteryStats_App_Foreground)(nil), "batterystats.BatteryStats.App.Foreground")
+	proto.RegisterType((*BatteryStats_App_Network)(nil), "batterystats.BatteryStats.App.Network")
+	proto.RegisterType((*BatteryStats_App_PowerUseItem)(nil), "batterystats.BatteryStats.App.PowerUseItem")
+	proto.RegisterType((*BatteryStats_App_Process)(nil), "batterystats.BatteryStats.App.Process")
+	proto.RegisterType((*BatteryStats_App_ScheduledJob)(nil), "batterystats.BatteryStats.App.ScheduledJob")
+	proto.RegisterType((*BatteryStats_App_Sensor)(nil), "batterystats.BatteryStats.App.Sensor")
+	proto.RegisterType((*BatteryStats_App_StateTime)(nil), "batterystats.BatteryStats.App.StateTime")
+	proto.RegisterType((*BatteryStats_App_Sync)(nil), "batterystats.BatteryStats.App.Sync")
+	proto.RegisterType((*BatteryStats_App_UserActivity)(nil), "batterystats.BatteryStats.App.UserActivity")
+	proto.RegisterType((*BatteryStats_App_Vibrator)(nil), "batterystats.BatteryStats.App.Vibrator")
+	proto.RegisterType((*BatteryStats_App_Video)(nil), "batterystats.BatteryStats.App.Video")
+	proto.RegisterType((*BatteryStats_App_Wakelock)(nil), "batterystats.BatteryStats.App.Wakelock")
+	proto.RegisterType((*BatteryStats_App_Wifi)(nil), "batterystats.BatteryStats.App.Wifi")
+	proto.RegisterType((*BatteryStats_ControllerActivity)(nil), "batterystats.BatteryStats.ControllerActivity")
+	proto.RegisterType((*BatteryStats_ControllerActivity_TxLevel)(nil), "batterystats.BatteryStats.ControllerActivity.TxLevel")
+	proto.RegisterType((*BatteryStats_System)(nil), "batterystats.BatteryStats.System")
+	proto.RegisterType((*BatteryStats_System_Battery)(nil), "batterystats.BatteryStats.System.Battery")
+	proto.RegisterType((*BatteryStats_System_BatteryDischarge)(nil), "batterystats.BatteryStats.System.BatteryDischarge")
+	proto.RegisterType((*BatteryStats_System_BatteryLevel)(nil), "batterystats.BatteryStats.System.BatteryLevel")
+	proto.RegisterType((*BatteryStats_System_BluetoothState)(nil), "batterystats.BatteryStats.System.BluetoothState")
+	proto.RegisterType((*BatteryStats_System_ChargeStep)(nil), "batterystats.BatteryStats.System.ChargeStep")
+	proto.RegisterType((*BatteryStats_System_DataConnection)(nil), "batterystats.BatteryStats.System.DataConnection")
+	proto.RegisterType((*BatteryStats_System_DischargeStep)(nil), "batterystats.BatteryStats.System.DischargeStep")
+	proto.RegisterType((*BatteryStats_System_DisplayState)(nil), "batterystats.BatteryStats.System.DisplayState")
+	proto.RegisterType((*BatteryStats_System_GlobalBluetooth)(nil), "batterystats.BatteryStats.System.GlobalBluetooth")
+	proto.RegisterType((*BatteryStats_System_GlobalNetwork)(nil), "batterystats.BatteryStats.System.GlobalNetwork")
+	proto.RegisterType((*BatteryStats_System_GlobalWifi)(nil), "batterystats.BatteryStats.System.GlobalWifi")
+	proto.RegisterType((*BatteryStats_System_IdleMode)(nil), "batterystats.BatteryStats.System.IdleMode")
+	proto.RegisterType((*BatteryStats_System_KernelWakelock)(nil), "batterystats.BatteryStats.System.KernelWakelock")
+	proto.RegisterType((*BatteryStats_System_Misc)(nil), "batterystats.BatteryStats.System.Misc")
+	proto.RegisterType((*BatteryStats_System_PowerSaveMode)(nil), "batterystats.BatteryStats.System.PowerSaveMode")
+	proto.RegisterType((*BatteryStats_System_PowerUseItem)(nil), "batterystats.BatteryStats.System.PowerUseItem")
+	proto.RegisterType((*BatteryStats_System_PowerUseSummary)(nil), "batterystats.BatteryStats.System.PowerUseSummary")
+	proto.RegisterType((*BatteryStats_System_ScreenBrightness)(nil), "batterystats.BatteryStats.System.ScreenBrightness")
+	proto.RegisterType((*BatteryStats_System_SignalScanningTime)(nil), "batterystats.BatteryStats.System.SignalScanningTime")
+	proto.RegisterType((*BatteryStats_System_SignalStrength)(nil), "batterystats.BatteryStats.System.SignalStrength")
+	proto.RegisterType((*BatteryStats_System_WakeupReason)(nil), "batterystats.BatteryStats.System.WakeupReason")
+	proto.RegisterType((*BatteryStats_System_WifiSignalStrength)(nil), "batterystats.BatteryStats.System.WifiSignalStrength")
+	proto.RegisterType((*BatteryStats_System_WifiSupplicantState)(nil), "batterystats.BatteryStats.System.WifiSupplicantState")
+	proto.RegisterType((*BatteryStats_System_WifiState)(nil), "batterystats.BatteryStats.System.WifiState")
 	proto.RegisterEnum("batterystats.BatteryStats_AggregationType", BatteryStats_AggregationType_name, BatteryStats_AggregationType_value)
 	proto.RegisterEnum("batterystats.BatteryStats_App_UserActivity_Name", BatteryStats_App_UserActivity_Name_name, BatteryStats_App_UserActivity_Name_value)
 	proto.RegisterEnum("batterystats.BatteryStats_System_BluetoothState_Name", BatteryStats_System_BluetoothState_Name_name, BatteryStats_System_BluetoothState_Name_value)
@@ -2964,4 +3599,236 @@ func init() {
 	proto.RegisterEnum("batterystats.BatteryStats_System_WifiSignalStrength_Name", BatteryStats_System_WifiSignalStrength_Name_name, BatteryStats_System_WifiSignalStrength_Name_value)
 	proto.RegisterEnum("batterystats.BatteryStats_System_WifiSupplicantState_Name", BatteryStats_System_WifiSupplicantState_Name_name, BatteryStats_System_WifiSupplicantState_Name_value)
 	proto.RegisterEnum("batterystats.BatteryStats_System_WifiState_Name", BatteryStats_System_WifiState_Name_name, BatteryStats_System_WifiState_Name_value)
+}
+
+var fileDescriptor0 = []byte{
+	// 3643 bytes of a gzipped FileDescriptorProto
+	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x09, 0x6e, 0x88, 0x02, 0xff, 0xec, 0x5a, 0xcd, 0x73, 0xdb, 0xd8,
+	0x91, 0x5f, 0x7e, 0x89, 0x52, 0x93, 0xa2, 0x60, 0x48, 0x96, 0x69, 0xc8, 0xf6, 0x78, 0xb4, 0xf3,
+	0xe1, 0xf5, 0x78, 0x24, 0x8f, 0xec, 0xa9, 0xa9, 0xf9, 0x1e, 0x88, 0xa4, 0x24, 0xae, 0x25, 0x92,
+	0xc5, 0x0f, 0x6b, 0x66, 0x6a, 0xab, 0x50, 0x20, 0x09, 0x53, 0x18, 0x91, 0x00, 0x0b, 0x00, 0x2d,
+	0x7b, 0x6f, 0x7b, 0xda, 0xda, 0xaa, 0xdd, 0xa9, 0xdd, 0xcb, 0x9e, 0x76, 0xaf, 0x49, 0x55, 0x2a,
+	0xff, 0x40, 0x2e, 0x49, 0x25, 0x55, 0xf9, 0x0b, 0x72, 0x4c, 0xae, 0xb9, 0xe4, 0x90, 0x4b, 0xfe,
+	0x81, 0xf4, 0xeb, 0x07, 0x80, 0x00, 0x48, 0x8b, 0x90, 0x8e, 0xa9, 0x5c, 0x5c, 0x70, 0xbf, 0xfe,
+	0xf5, 0x7b, 0xdd, 0xaf, 0x5f, 0x7f, 0x51, 0x70, 0x3c, 0xd0, 0x9d, 0xb3, 0x49, 0x77, 0xa7, 0x67,
+	0x8e, 0x76, 0x07, 0xa6, 0x39, 0x18, 0x6a, 0xbb, 0x5d, 0xd5, 0x71, 0x34, 0xeb, 0xf5, 0x87, 0x67,
+	0xba, 0xed, 0x98, 0x96, 0xae, 0x1a, 0xbb, 0xe3, 0xae, 0x47, 0xb4, 0x1d, 0xd5, 0xb1, 0x95, 0xb1,
+	0x65, 0x3a, 0x66, 0x88, 0xb4, 0x43, 0x24, 0x31, 0x1f, 0xa4, 0x49, 0x5f, 0xc5, 0x95, 0x3d, 0xd1,
+	0x87, 0x7d, 0x4f, 0x28, 0xfb, 0xe6, 0xd2, 0xb6, 0x7f, 0xff, 0x1d, 0xe4, 0xf7, 0x39, 0xa0, 0xc5,
+	0x04, 0x8a, 0x37, 0x60, 0xc5, 0xd2, 0x7a, 0xa6, 0xd5, 0x57, 0xf4, 0x7e, 0x31, 0x71, 0x3f, 0xf1,
+	0x60, 0x45, 0x5c, 0x87, 0x9c, 0x6a, 0xf4, 0x2d, 0x53, 0x67, 0xb4, 0x57, 0xc5, 0x24, 0x11, 0x6f,
+	0xc1, 0x1a, 0x9e, 0xc0, 0x72, 0x14, 0x47, 0x1f, 0x69, 0xca, 0xc4, 0xd6, 0x7a, 0xc5, 0x14, 0x2e,
+	0xa4, 0xc4, 0x9b, 0xb0, 0xaa, 0x19, 0xfd, 0x00, 0x39, 0x4d, 0xe4, 0x4d, 0x28, 0x04, 0xf8, 0x6d,
+	0xc7, 0x2a, 0x66, 0x48, 0xce, 0x06, 0xe4, 0x7d, 0x76, 0x46, 0x5d, 0x22, 0xea, 0x1d, 0xd8, 0x18,
+	0x9a, 0x3d, 0x75, 0xa8, 0x44, 0x30, 0x59, 0x5a, 0x95, 0x40, 0xe4, 0xab, 0x21, 0xe4, 0xb2, 0x27,
+	0xaf, 0xaf, 0xbd, 0xd4, 0x7b, 0x9a, 0x32, 0xb0, 0xcc, 0xc9, 0xb8, 0xb8, 0x72, 0x3f, 0xc5, 0xa9,
+	0xbd, 0x33, 0xad, 0x77, 0xae, 0x1b, 0x8a, 0x35, 0x19, 0x6a, 0x45, 0x20, 0xaa, 0x08, 0xa0, 0xdb,
+	0x0a, 0x37, 0x9b, 0x55, 0xcc, 0x21, 0x7e, 0x99, 0xe9, 0x85, 0x34, 0x3c, 0xb8, 0xa5, 0x58, 0xda,
+	0x50, 0x53, 0x6d, 0xad, 0x98, 0xa7, 0x85, 0x2d, 0xc8, 0x90, 0xe1, 0x8a, 0xab, 0xf8, 0xdf, 0xdc,
+	0x5e, 0x7e, 0x87, 0x9b, 0x71, 0x9f, 0xfd, 0xcb, 0x4c, 0x64, 0xf7, 0xcf, 0x95, 0x97, 0x9a, 0x65,
+	0xeb, 0xa6, 0x51, 0x2c, 0x20, 0x4b, 0x86, 0x11, 0x07, 0x23, 0xdb, 0x27, 0xae, 0x11, 0x11, 0xf7,
+	0xec, 0x9a, 0xa6, 0x33, 0x34, 0xd5, 0x3e, 0xee, 0x29, 0xd0, 0x99, 0x57, 0x21, 0x63, 0xa9, 0x7d,
+	0xdd, 0x2c, 0xde, 0xa0, 0xff, 0xae, 0x41, 0xb6, 0xa7, 0x5a, 0x96, 0x8e, 0xeb, 0xa2, 0xa7, 0x53,
+	0xcf, 0x9c, 0x18, 0x8e, 0xf5, 0x5a, 0xe9, 0x99, 0x7d, 0xad, 0xb8, 0x4e, 0x54, 0xbc, 0x29, 0xd2,
+	0xfd, 0x5f, 0x4d, 0x43, 0x2b, 0x6e, 0x10, 0x09, 0x8d, 0x6c, 0x69, 0x63, 0x13, 0x2d, 0xe6, 0x6d,
+	0x7a, 0xd3, 0x3b, 0x09, 0x2a, 0x85, 0xce, 0x30, 0xd0, 0x0d, 0x75, 0x58, 0xdc, 0x24, 0x85, 0x10,
+	0x8f, 0xc4, 0xa1, 0xea, 0x68, 0xb6, 0x53, 0xbc, 0x45, 0x24, 0xdc, 0x19, 0x49, 0x7d, 0xfd, 0xc5,
+	0x8b, 0x62, 0x91, 0x08, 0x1c, 0xa8, 0x0e, 0x1d, 0x65, 0xc4, 0x36, 0xbe, 0xe3, 0x71, 0x5d, 0xa8,
+	0x96, 0xa1, 0x1b, 0x83, 0xe2, 0x5d, 0xb2, 0x23, 0x9e, 0x5f, 0xb3, 0x2c, 0xd3, 0x2a, 0xde, 0xa3,
+	0xff, 0x96, 0x41, 0x50, 0x07, 0x03, 0x4b, 0x1b, 0xa8, 0x0e, 0x1e, 0x41, 0x71, 0x5e, 0x8f, 0xb5,
+	0xe2, 0x6d, 0x44, 0x16, 0xf6, 0x1e, 0xee, 0x84, 0x1c, 0x3a, 0xe8, 0x78, 0x3b, 0xf2, 0x14, 0xd2,
+	0x46, 0x84, 0xf8, 0x01, 0xa4, 0xd4, 0xf1, 0xb8, 0x28, 0xa1, 0xc8, 0xdc, 0xde, 0xbd, 0xcb, 0x80,
+	0xe3, 0xb1, 0xf8, 0x11, 0x2c, 0xd9, 0xb8, 0xa6, 0x8d, 0x8a, 0x5b, 0x74, 0x3b, 0x6f, 0x5f, 0xc2,
+	0xdf, 0x22, 0x46, 0xe9, 0x8f, 0x5b, 0x90, 0x62, 0xd0, 0x3c, 0xa4, 0x0d, 0x75, 0xa4, 0xb9, 0xbe,
+	0x8e, 0xa6, 0x76, 0x4d, 0xc7, 0x4d, 0x9d, 0x24, 0xfb, 0xe5, 0x20, 0x35, 0xc1, 0xe7, 0x90, 0xa2,
+	0xff, 0x04, 0x58, 0x08, 0x58, 0x24, 0xe0, 0x13, 0xc8, 0xf4, 0xce, 0xb8, 0x7b, 0xb0, 0x03, 0xbf,
+	0x73, 0xf9, 0x81, 0x77, 0x4a, 0x8c, 0x57, 0xfc, 0x02, 0xe0, 0x4c, 0x53, 0xfb, 0x0a, 0x47, 0x8a,
+	0x74, 0xf4, 0x58, 0xc8, 0xfd, 0x64, 0x31, 0x21, 0xee, 0x32, 0x0b, 0x9d, 0xd3, 0xfb, 0xca, 0xed,
+	0x6d, 0x2f, 0x80, 0xc9, 0xe3, 0x73, 0x76, 0x46, 0x75, 0xc2, 0xfc, 0x6c, 0x3d, 0xd6, 0x4e, 0x32,
+	0xe3, 0x15, 0x9f, 0xc1, 0x46, 0x77, 0x38, 0xd1, 0x1c, 0x74, 0xda, 0x33, 0xb4, 0x09, 0x7a, 0xa1,
+	0x39, 0x64, 0xcf, 0xe5, 0x36, 0xc9, 0xf8, 0xf0, 0x12, 0x19, 0x25, 0x9f, 0x59, 0xee, 0x39, 0xfa,
+	0x4b, 0xdd, 0x79, 0x2d, 0x7e, 0x0c, 0x4b, 0x3d, 0xb4, 0x99, 0xa5, 0x92, 0xc3, 0xe6, 0xf6, 0xde,
+	0x5d, 0xa4, 0x2c, 0x31, 0x33, 0x4d, 0x7b, 0xe3, 0x09, 0x39, 0xe9, 0x62, 0x4d, 0x4b, 0xe3, 0x89,
+	0xf8, 0x25, 0xc0, 0x8b, 0xa1, 0x6a, 0x9f, 0x0d, 0xf5, 0xc1, 0x99, 0x43, 0x8f, 0x20, 0xb7, 0xf7,
+	0x4f, 0x0b, 0x70, 0x07, 0x3e, 0x80, 0xe0, 0x26, 0x7a, 0x23, 0x46, 0x10, 0xa3, 0x4f, 0x81, 0x2a,
+	0x06, 0xdc, 0x07, 0x88, 0x87, 0x20, 0xb0, 0xe7, 0x32, 0x0a, 0x9a, 0x4b, 0xba, 0x8e, 0xb9, 0x3e,
+	0x81, 0xac, 0xa1, 0x39, 0x17, 0xa6, 0x75, 0x4e, 0x71, 0x31, 0xb7, 0xf7, 0xde, 0x82, 0x43, 0xd4,
+	0x38, 0xb7, 0x58, 0x82, 0xc2, 0xd8, 0xbc, 0xc0, 0x18, 0x86, 0x81, 0x4c, 0xd1, 0xd9, 0xbb, 0xc8,
+	0x12, 0xfe, 0x83, 0x05, 0xf8, 0x06, 0x03, 0x75, 0x6c, 0xad, 0x8a, 0x10, 0xb6, 0x3b, 0x26, 0x89,
+	0x9e, 0x66, 0xdb, 0x18, 0x5b, 0x53, 0x31, 0x76, 0x6f, 0x70, 0x6e, 0x71, 0x1f, 0x56, 0x6d, 0x0c,
+	0xb7, 0x7d, 0x8c, 0xb4, 0x7d, 0xe5, 0x07, 0xb3, 0x8b, 0xf1, 0x30, 0x15, 0x63, 0xf3, 0x96, 0x87,
+	0xf9, 0x67, 0xb3, 0xcb, 0x3c, 0xc5, 0xd6, 0x0c, 0x1b, 0x83, 0xca, 0x0a, 0x81, 0x17, 0x79, 0x4a,
+	0x8b, 0x98, 0xd9, 0x8b, 0x62, 0x0c, 0x1a, 0xa5, 0x05, 0x0a, 0xb9, 0xb9, 0xbd, 0x07, 0x8b, 0xa0,
+	0x0c, 0xd0, 0x46, 0x7e, 0x0c, 0x23, 0x69, 0xfb, 0xb5, 0xd1, 0xc3, 0xb0, 0xcc, 0xb6, 0xfc, 0xc7,
+	0x45, 0x38, 0x64, 0x65, 0xba, 0x52, 0xb2, 0x50, 0xdd, 0x3b, 0xc3, 0x18, 0x1e, 0x47, 0x57, 0xb4,
+	0xf1, 0xf4, 0x9a, 0x3f, 0x85, 0xe5, 0x97, 0x7a, 0xd7, 0x52, 0x31, 0x5d, 0x63, 0x66, 0x62, 0x47,
+	0x7e, 0x7f, 0x01, 0xfc, 0xb9, 0xcb, 0xce, 0x9e, 0xf4, 0x4b, 0xbd, 0xaf, 0x99, 0x14, 0xd3, 0x17,
+	0x3f, 0xe9, 0xe7, 0x8c, 0x97, 0xed, 0x77, 0xa1, 0x9e, 0x6b, 0x98, 0x43, 0xcf, 0x31, 0xeb, 0xa5,
+	0x62, 0xec, 0x77, 0xea, 0xb2, 0x33, 0x0b, 0x5d, 0xe8, 0x2f, 0x74, 0xca, 0x89, 0x8b, 0x2d, 0x74,
+	0x8a, 0xac, 0xe2, 0x01, 0xac, 0x31, 0x48, 0xf0, 0x31, 0x6c, 0x5d, 0xe3, 0x31, 0x48, 0x16, 0x64,
+	0x78, 0xd4, 0x8c, 0x13, 0xb1, 0xa3, 0x41, 0x3a, 0x45, 0xbc, 0x57, 0x8d, 0x98, 0xd2, 0x4f, 0x13,
+	0x2c, 0x49, 0x9c, 0xf3, 0x94, 0x77, 0xae, 0x4d, 0xc6, 0x36, 0xed, 0x9a, 0x14, 0x3f, 0x87, 0x2c,
+	0xde, 0x20, 0xab, 0x33, 0x70, 0x43, 0x66, 0xc1, 0x87, 0x8b, 0xa5, 0xa1, 0x8f, 0x12, 0x42, 0x6a,
+	0x42, 0xd6, 0xfd, 0x8c, 0xe8, 0x12, 0x2e, 0xaa, 0x46, 0xac, 0x7a, 0x4a, 0xd2, 0x76, 0x05, 0x7c,
+	0x0d, 0x6c, 0xc1, 0x26, 0x45, 0x92, 0xa2, 0x00, 0xcb, 0x43, 0x75, 0x62, 0xe0, 0x83, 0xb1, 0x49,
+	0x9b, 0xa4, 0xb4, 0x0b, 0x19, 0x1e, 0xaf, 0x51, 0x86, 0x63, 0x3a, 0x58, 0x1c, 0x4d, 0x65, 0xf0,
+	0x23, 0x63, 0x96, 0xa6, 0x2a, 0x82, 0x8b, 0x94, 0x1e, 0xc3, 0x92, 0x1b, 0x5d, 0xe3, 0x22, 0x8e,
+	0x20, 0xc5, 0x62, 0x2b, 0x9a, 0x96, 0x3c, 0xde, 0xe5, 0x76, 0x79, 0x59, 0x7d, 0x47, 0x89, 0xd5,
+	0xa7, 0xf3, 0x93, 0x63, 0x05, 0xc1, 0x23, 0xd1, 0x48, 0x65, 0x44, 0x3a, 0xbe, 0xf4, 0x14, 0x20,
+	0x10, 0x6d, 0xe3, 0xee, 0xcf, 0x50, 0xd3, 0x20, 0x1b, 0x17, 0xf5, 0x8b, 0x24, 0x64, 0xbd, 0xb0,
+	0x88, 0x98, 0x91, 0xd9, 0xd5, 0x87, 0x9a, 0xd2, 0x7d, 0x8d, 0x65, 0x8f, 0x62, 0xbd, 0x72, 0x31,
+	0xd1, 0x05, 0xe7, 0x95, 0x7b, 0x7c, 0xac, 0x66, 0xc9, 0x79, 0x7d, 0xfe, 0xd4, 0x1c, 0x32, 0x72,
+	0xd3, 0x25, 0x88, 0xb7, 0xe1, 0x86, 0x2b, 0x66, 0xac, 0xf6, 0xce, 0x35, 0x87, 0x10, 0x99, 0x37,
+	0x2c, 0x21, 0x6a, 0xc9, 0xdb, 0x9c, 0x84, 0x05, 0x30, 0xd9, 0xb9, 0x0b, 0x88, 0x58, 0xa6, 0x85,
+	0xb7, 0xe0, 0x96, 0x2b, 0x8c, 0xc2, 0x8e, 0x16, 0xb0, 0xc1, 0x0a, 0x31, 0x6c, 0xc1, 0x7a, 0x98,
+	0x81, 0x5b, 0x04, 0xbc, 0x2b, 0xe9, 0x3a, 0x53, 0x8d, 0x72, 0x54, 0x9f, 0x07, 0x89, 0xb8, 0x0f,
+	0x7b, 0xdf, 0x29, 0xe9, 0x21, 0xe4, 0x43, 0x19, 0x01, 0x0b, 0x6f, 0x6c, 0x34, 0xc6, 0x13, 0x07,
+	0xe3, 0xba, 0x77, 0xab, 0x67, 0xdc, 0x84, 0xd2, 0xff, 0x26, 0x20, 0xeb, 0x25, 0x80, 0xb0, 0x57,
+	0xa3, 0x6b, 0x04, 0x1d, 0xc6, 0x77, 0xea, 0x22, 0x08, 0x61, 0x97, 0x71, 0x7b, 0x88, 0x24, 0x2b,
+	0xff, 0xa7, 0xf9, 0x37, 0xb0, 0x9a, 0x8e, 0x3c, 0x06, 0x6e, 0x5a, 0xdc, 0x4d, 0x35, 0x2c, 0xdb,
+	0xb5, 0x26, 0xab, 0x9e, 0x2d, 0xf4, 0x2d, 0x7c, 0x19, 0x64, 0x45, 0xa9, 0x0c, 0xf9, 0x50, 0x66,
+	0x99, 0x79, 0x72, 0x51, 0x37, 0x4a, 0x86, 0xdd, 0x88, 0xbb, 0xec, 0x37, 0xb0, 0xe4, 0xa6, 0x18,
+	0xdc, 0xde, 0x98, 0x8c, 0xba, 0x18, 0xc6, 0x12, 0x14, 0x6a, 0xe2, 0x4a, 0xf8, 0x43, 0x02, 0x56,
+	0xa6, 0xa9, 0xe6, 0x4d, 0x2a, 0x26, 0x5c, 0x03, 0x08, 0x33, 0x37, 0x4b, 0x42, 0xa9, 0xf0, 0x43,
+	0xc3, 0xf5, 0x54, 0xa6, 0xd2, 0x8c, 0xe1, 0xd0, 0x2f, 0x1d, 0x73, 0x1c, 0xb1, 0x58, 0x4a, 0x7c,
+	0x07, 0xee, 0x04, 0x36, 0x73, 0x03, 0x57, 0x80, 0x2b, 0x43, 0x5c, 0xf7, 0x60, 0x93, 0x81, 0xed,
+	0xa1, 0xa6, 0x8d, 0xb1, 0xb8, 0x0f, 0xac, 0x2f, 0xd1, 0x3a, 0x1e, 0xb9, 0x8b, 0x9e, 0x38, 0x73,
+	0xe4, 0x2c, 0xf9, 0xca, 0x17, 0x90, 0xa6, 0x84, 0x78, 0x3d, 0xf3, 0xfe, 0x7b, 0x02, 0xf2, 0xa1,
+	0x9c, 0xf8, 0x55, 0x40, 0x4c, 0x61, 0xef, 0xf1, 0x15, 0xd2, 0xe9, 0x4e, 0x0d, 0x71, 0x91, 0x28,
+	0xb0, 0xfd, 0x00, 0xd2, 0x44, 0x5e, 0x81, 0x4c, 0xbd, 0x7d, 0x54, 0x69, 0x0a, 0xff, 0x80, 0x8d,
+	0xd8, 0xd2, 0x7e, 0xa7, 0xdd, 0xae, 0xd7, 0x84, 0x04, 0x23, 0xb7, 0xeb, 0x9d, 0xd2, 0x91, 0x90,
+	0x94, 0xf6, 0x60, 0xd9, 0xcf, 0xae, 0x71, 0x63, 0x0c, 0x06, 0x5f, 0x9e, 0x59, 0xe3, 0x02, 0x7e,
+	0x92, 0x80, 0x65, 0x3f, 0xa7, 0xce, 0xbc, 0x96, 0x17, 0x93, 0xe1, 0xac, 0xc1, 0xf0, 0xbc, 0x44,
+	0x0f, 0x58, 0x8d, 0x05, 0x95, 0x31, 0x3e, 0x04, 0x3d, 0xb4, 0x61, 0xda, 0xf3, 0x04, 0x6f, 0x89,
+	0x23, 0x32, 0xde, 0x9b, 0xbb, 0xd0, 0x8d, 0xbe, 0x79, 0x11, 0xb9, 0xdd, 0x24, 0x0b, 0xeb, 0xee,
+	0x0a, 0xe7, 0xe7, 0x8f, 0xe7, 0x57, 0x09, 0x48, 0x53, 0x16, 0xbf, 0x0f, 0x45, 0xda, 0x9e, 0x02,
+	0x12, 0x3b, 0xf6, 0x8c, 0x8a, 0x2c, 0x03, 0xf4, 0x54, 0x63, 0xe6, 0xe0, 0x78, 0x48, 0x6b, 0x62,
+	0x18, 0x61, 0x8f, 0x4a, 0x79, 0x3a, 0x11, 0x84, 0xef, 0xc8, 0x0f, 0x2e, 0x41, 0x41, 0xef, 0x0f,
+	0xa3, 0xde, 0xe9, 0x39, 0x7e, 0xde, 0x7a, 0x15, 0x3d, 0xb9, 0xb7, 0xe2, 0xbc, 0x8a, 0xf8, 0x24,
+	0xad, 0x48, 0xbf, 0x4d, 0x80, 0x38, 0xa7, 0xb4, 0xde, 0x9c, 0xd9, 0x26, 0x41, 0x4e, 0xbe, 0x11,
+	0xd9, 0x22, 0x49, 0x54, 0xec, 0x95, 0xa7, 0xf1, 0x8e, 0xcf, 0x39, 0x64, 0x48, 0x52, 0xdc, 0x67,
+	0xc9, 0xff, 0xe3, 0x2b, 0x55, 0x32, 0x3b, 0xed, 0x57, 0xc7, 0xda, 0x4b, 0x6d, 0x28, 0x7d, 0x00,
+	0x59, 0xf7, 0x93, 0xf9, 0xc7, 0x90, 0x7d, 0xb8, 0x31, 0xc5, 0xeb, 0xed, 0xa7, 0x47, 0x90, 0x7e,
+	0x87, 0x15, 0x31, 0x6f, 0x5d, 0xc5, 0xcf, 0x20, 0xeb, 0xee, 0x47, 0xec, 0x97, 0xf7, 0x26, 0x1c,
+	0xe3, 0xd1, 0xc4, 0x13, 0xb8, 0xe1, 0xf2, 0x62, 0x9f, 0x8f, 0x55, 0xba, 0x6a, 0x0d, 0x78, 0xcd,
+	0x94, 0xdb, 0xdb, 0x8b, 0x2d, 0xa5, 0xec, 0x21, 0xc5, 0x0a, 0xac, 0x7a, 0xe2, 0xf8, 0xf9, 0x53,
+	0x24, 0x6a, 0x27, 0xb6, 0x28, 0xae, 0x7e, 0x15, 0xd6, 0xa6, 0x4d, 0x26, 0x15, 0xf0, 0xae, 0x65,
+	0x1f, 0xc7, 0x10, 0xe4, 0x01, 0x29, 0xb8, 0xe2, 0xbd, 0xe4, 0xf8, 0xd9, 0x50, 0x8e, 0x36, 0xc6,
+	0xa6, 0x9a, 0x89, 0x79, 0xb4, 0x58, 0x4c, 0x89, 0x40, 0x2d, 0xc4, 0xb0, 0xd3, 0xf4, 0x55, 0x47,
+	0x65, 0x15, 0xab, 0xa1, 0xf5, 0xd8, 0x44, 0x02, 0x7d, 0x30, 0xe6, 0x69, 0xca, 0x08, 0x2c, 0xf9,
+	0x38, 0x6c, 0x05, 0x0b, 0xbe, 0x99, 0xf9, 0x81, 0xd6, 0x49, 0xd2, 0x6e, 0x0c, 0x49, 0x1e, 0x8e,
+	0xce, 0x54, 0x07, 0x61, 0x30, 0x34, 0xbb, 0xf8, 0x9c, 0x7d, 0x43, 0xb9, 0x3d, 0xf4, 0x47, 0x8b,
+	0x45, 0x1d, 0x12, 0xd2, 0x37, 0x14, 0xbd, 0x98, 0x26, 0x6c, 0x45, 0x05, 0x06, 0x4b, 0xf4, 0xcd,
+	0xeb, 0xf4, 0xab, 0x35, 0xb8, 0xe5, 0xca, 0x9c, 0xe9, 0x7f, 0x6f, 0x5d, 0x47, 0x1e, 0x5a, 0xcf,
+	0x95, 0x17, 0x6e, 0x83, 0x77, 0xe3, 0xaa, 0xec, 0x15, 0x7e, 0xe8, 0x14, 0xae, 0x20, 0xea, 0x5e,
+	0xf8, 0x40, 0xe0, 0x51, 0x5c, 0x29, 0x14, 0x00, 0x4f, 0x60, 0x33, 0x20, 0x22, 0xa8, 0x5a, 0xf1,
+	0x3a, 0xaa, 0xa1, 0x8f, 0x9d, 0x6b, 0x96, 0xa1, 0xa1, 0x38, 0xaf, 0x15, 0xcb, 0xc6, 0xf5, 0xb1,
+	0x67, 0x04, 0xf4, 0xf3, 0xc7, 0x53, 0x48, 0x8f, 0xd0, 0x57, 0xa8, 0x36, 0xbc, 0xbc, 0x49, 0x77,
+	0xf1, 0x27, 0xc8, 0x8d, 0x6d, 0x59, 0x74, 0x44, 0xc0, 0x1b, 0xed, 0x18, 0x4f, 0x37, 0x54, 0x13,
+	0x1e, 0x63, 0x0e, 0xf2, 0xe5, 0xd8, 0x93, 0xd1, 0x48, 0xc5, 0xb0, 0x04, 0x71, 0x3d, 0xd3, 0x13,
+	0xd5, 0xe2, 0x40, 0x16, 0x9e, 0xec, 0x9e, 0xa5, 0x69, 0x86, 0xd2, 0xb5, 0x58, 0x73, 0x60, 0xb0,
+	0xe9, 0x03, 0xef, 0x51, 0x63, 0x84, 0xa7, 0x16, 0x41, 0xf7, 0x7d, 0x24, 0x3a, 0xf9, 0x86, 0xad,
+	0x0f, 0x0c, 0x36, 0x48, 0xc6, 0x3c, 0xe3, 0xe7, 0x20, 0xb7, 0x7d, 0x7d, 0x1a, 0x43, 0x22, 0xa1,
+	0x5b, 0x2e, 0x98, 0x2a, 0x37, 0xbc, 0x39, 0x4f, 0xa6, 0x63, 0x69, 0xc6, 0x00, 0x1f, 0xe2, 0x6a,
+	0xdc, 0x9b, 0x73, 0xc5, 0xb9, 0x38, 0x16, 0x3d, 0x79, 0x5b, 0xa9, 0x58, 0x9a, 0x6a, 0xd3, 0xe0,
+	0x38, 0xe6, 0x15, 0x9c, 0x12, 0xac, 0x49, 0x28, 0xa6, 0x25, 0xf9, 0x64, 0xf4, 0x58, 0x7c, 0x8c,
+	0x11, 0x43, 0x4b, 0xe6, 0xe0, 0x91, 0xa3, 0xb5, 0xe1, 0x26, 0x97, 0x39, 0x19, 0x8f, 0x87, 0x3a,
+	0xea, 0xef, 0xb8, 0x71, 0xf9, 0xc6, 0xc2, 0x8c, 0x17, 0x14, 0xea, 0xa3, 0x79, 0x70, 0xfe, 0x1a,
+	0x80, 0x4b, 0x25, 0x51, 0x6b, 0x0b, 0x47, 0x25, 0x41, 0x51, 0x0c, 0x22, 0xfd, 0x05, 0xbb, 0x0c,
+	0x2f, 0x95, 0xb1, 0xa1, 0x3b, 0x75, 0xcb, 0xbc, 0x7c, 0xe0, 0x55, 0xc8, 0x5d, 0xb8, 0xe9, 0x25,
+	0x24, 0xb4, 0xe9, 0x30, 0x5a, 0x8c, 0x60, 0x63, 0xe4, 0x2d, 0x4f, 0xc6, 0xd1, 0x72, 0x04, 0x17,
+	0x79, 0xf5, 0x16, 0x46, 0xfa, 0xbd, 0x1d, 0x5f, 0x0c, 0xe2, 0x32, 0xde, 0x9e, 0xee, 0x41, 0x22,
+	0x85, 0x11, 0xaf, 0x9b, 0xb1, 0x74, 0x72, 0x7d, 0xda, 0x7c, 0xf1, 0x22, 0x22, 0x9b, 0x37, 0x7a,
+	0x58, 0x79, 0x07, 0x38, 0x82, 0x1b, 0x50, 0xbf, 0x27, 0xf5, 0x40, 0x98, 0xc9, 0xbc, 0xa8, 0xfd,
+	0x90, 0xde, 0x5d, 0x97, 0x86, 0x94, 0x09, 0xaf, 0xb5, 0x43, 0x8b, 0xfb, 0x44, 0xae, 0x33, 0x16,
+	0x13, 0x9e, 0x74, 0x23, 0x58, 0x78, 0x79, 0x1b, 0xba, 0x13, 0x84, 0xcf, 0xfc, 0x5f, 0x82, 0x78,
+	0x4e, 0xf6, 0xcd, 0x3b, 0x2d, 0x4c, 0xa8, 0xac, 0xec, 0x4d, 0x2c, 0xf4, 0x11, 0x8f, 0xcc, 0xeb,
+	0xd9, 0x9f, 0x27, 0xa0, 0x10, 0xc9, 0xc3, 0xa5, 0x50, 0x01, 0xff, 0xf1, 0x55, 0xf3, 0x38, 0xaf,
+	0xe2, 0x67, 0xea, 0xa0, 0x68, 0xe3, 0xb0, 0xfd, 0xc4, 0x2d, 0xec, 0xf3, 0xb0, 0x5c, 0xad, 0xc9,
+	0xa5, 0x76, 0xf5, 0x79, 0x05, 0x6b, 0xfb, 0x2c, 0xa4, 0x8e, 0xeb, 0xa7, 0x58, 0xd8, 0x63, 0x91,
+	0x7f, 0x52, 0x29, 0x57, 0x3b, 0x27, 0x42, 0x52, 0x5c, 0x86, 0xf4, 0x51, 0xf5, 0xf0, 0x48, 0x48,
+	0x49, 0x3f, 0x26, 0x01, 0x02, 0xf9, 0x3e, 0xb4, 0x8b, 0x5f, 0xaf, 0x07, 0xf4, 0x13, 0x9f, 0xc1,
+	0x2a, 0xa6, 0xf1, 0xf1, 0x50, 0x7d, 0xed, 0xba, 0x6e, 0x8a, 0xb4, 0x7a, 0x1a, 0x2b, 0x8b, 0x33,
+	0x18, 0xd7, 0x89, 0x5b, 0xe6, 0x04, 0xd6, 0x78, 0xc4, 0xb4, 0x55, 0x6c, 0xf0, 0xe8, 0x87, 0x95,
+	0x74, 0x5c, 0x71, 0x14, 0x2f, 0x5b, 0x88, 0x3b, 0x41, 0xd8, 0x0e, 0xfb, 0x47, 0xdc, 0x87, 0x15,
+	0xaa, 0x64, 0x49, 0x50, 0x86, 0x04, 0xc5, 0xc8, 0x8f, 0x55, 0x84, 0xf8, 0x32, 0xd8, 0x90, 0xa4,
+	0x10, 0xa9, 0x5c, 0xae, 0x7c, 0x7f, 0x61, 0x7c, 0xdc, 0xfb, 0x63, 0x0d, 0x06, 0xb1, 0xe2, 0xed,
+	0xd4, 0xea, 0x35, 0x76, 0x79, 0xf8, 0x75, 0xd8, 0x68, 0xb6, 0xf0, 0xf6, 0xf0, 0xab, 0x52, 0x3e,
+	0xac, 0xf0, 0xbb, 0xeb, 0x9c, 0xb4, 0x5b, 0x42, 0x8a, 0x7d, 0x95, 0xca, 0x27, 0xb2, 0x90, 0x66,
+	0x77, 0x5b, 0x79, 0x5e, 0xae, 0x2b, 0x8f, 0x85, 0x8c, 0xff, 0x2d, 0x0b, 0x4b, 0xb8, 0xc3, 0x0a,
+	0x0a, 0x52, 0xbe, 0x55, 0x9a, 0xed, 0xb6, 0x90, 0x65, 0xbd, 0xdd, 0x51, 0xab, 0xdc, 0x90, 0x85,
+	0x65, 0xfe, 0xd9, 0xc1, 0xcf, 0x15, 0x72, 0x86, 0x16, 0x7e, 0x01, 0xfb, 0xaa, 0x96, 0x2b, 0x35,
+	0x21, 0xe7, 0x0b, 0xd9, 0x17, 0xf2, 0xe4, 0x41, 0xed, 0x8a, 0xb0, 0xca, 0x30, 0x95, 0xa3, 0x66,
+	0xa3, 0x2c, 0x14, 0x38, 0xbc, 0x21, 0x37, 0x84, 0xb5, 0x69, 0x1f, 0x29, 0x48, 0xff, 0x93, 0x84,
+	0xd5, 0x70, 0xad, 0xf6, 0x77, 0x7f, 0xaa, 0x43, 0x3e, 0x78, 0xd0, 0xed, 0xaf, 0x21, 0xc3, 0xcf,
+	0x8a, 0x76, 0x3b, 0xa9, 0x7e, 0x5b, 0x29, 0xe3, 0x35, 0x2f, 0x41, 0x92, 0x7a, 0x6f, 0xb4, 0x74,
+	0xfd, 0xe0, 0x80, 0xdf, 0x71, 0xb9, 0xfe, 0x7d, 0x05, 0xef, 0x58, 0x40, 0x38, 0x7e, 0x29, 0xad,
+	0x4e, 0xab, 0x51, 0xa9, 0x95, 0x85, 0xb4, 0xf4, 0xdf, 0x09, 0x58, 0x8b, 0x54, 0xb1, 0x2c, 0xae,
+	0x4e, 0x4b, 0xd7, 0x39, 0xcd, 0x1c, 0xc5, 0xd5, 0x29, 0xc7, 0x4c, 0x5b, 0x17, 0x59, 0x0f, 0xf5,
+	0x8f, 0x7e, 0x42, 0x98, 0xae, 0x4f, 0x1b, 0x40, 0x1e, 0x2f, 0xff, 0x0d, 0xef, 0x3d, 0x5c, 0x65,
+	0xfe, 0xad, 0x8c, 0x17, 0x23, 0x03, 0xc2, 0x95, 0x79, 0x03, 0x42, 0xa0, 0xa6, 0xf4, 0x37, 0x09,
+	0x80, 0x40, 0x8d, 0x8c, 0xa7, 0x20, 0x89, 0xa6, 0x31, 0xef, 0x2a, 0x68, 0x69, 0x76, 0x14, 0x90,
+	0x74, 0x47, 0x9a, 0xeb, 0xb4, 0x1e, 0xb9, 0xc7, 0x94, 0xdf, 0xe1, 0xdf, 0x75, 0x65, 0x87, 0xae,
+	0x31, 0x3d, 0xb3, 0x1c, 0xba, 0xc5, 0xe9, 0xe4, 0x40, 0x82, 0x02, 0xd7, 0xd5, 0xbf, 0x44, 0x7f,
+	0x76, 0x20, 0x7d, 0x8e, 0xa9, 0xc3, 0xf5, 0xde, 0xed, 0x5d, 0x48, 0xd3, 0x23, 0xc8, 0x41, 0xb6,
+	0x56, 0x57, 0xca, 0x72, 0x5b, 0x46, 0x4f, 0xf5, 0x9d, 0x36, 0xe1, 0x3a, 0x6d, 0xd2, 0x73, 0xda,
+	0x94, 0xf4, 0x0d, 0x14, 0x22, 0xe5, 0x78, 0x78, 0x9c, 0xb3, 0x30, 0x02, 0x4a, 0x3f, 0xa2, 0xdf,
+	0x53, 0x45, 0x8e, 0xde, 0xe6, 0xe7, 0xe9, 0x39, 0x13, 0xc1, 0x8d, 0x40, 0x89, 0x10, 0x15, 0x29,
+	0x81, 0x38, 0x3e, 0x33, 0x0d, 0x2d, 0x8c, 0x4c, 0xb9, 0xd5, 0xc9, 0x9c, 0x4b, 0x99, 0x1a, 0x6e,
+	0xfb, 0x8d, 0x17, 0x93, 0x09, 0xf2, 0x4c, 0xdf, 0x41, 0x48, 0xce, 0x74, 0x02, 0xb3, 0x35, 0xeb,
+	0xfc, 0xd9, 0x37, 0x2e, 0x7a, 0xae, 0x46, 0x8b, 0xb7, 0xa3, 0x8f, 0x60, 0xe5, 0x0d, 0x4b, 0xae,
+	0xdb, 0xf1, 0xa5, 0xb7, 0xe0, 0x16, 0x1f, 0x48, 0xb9, 0x76, 0x0f, 0x1c, 0x2a, 0x47, 0x7a, 0x6f,
+	0x83, 0xe4, 0x4d, 0xc0, 0xe6, 0xf0, 0xe4, 0x17, 0x0d, 0xd2, 0x57, 0x89, 0xe1, 0x01, 0xdc, 0x0f,
+	0x33, 0xa8, 0xfd, 0x1f, 0x26, 0xb6, 0x13, 0x1a, 0xbd, 0x16, 0xbc, 0x22, 0x50, 0x37, 0x30, 0x2c,
+	0xce, 0x08, 0x5a, 0xf3, 0x04, 0x61, 0xb9, 0xe6, 0xf9, 0x1f, 0xba, 0x98, 0xa2, 0x19, 0x6a, 0x77,
+	0x18, 0x12, 0x24, 0x78, 0x37, 0xed, 0x0d, 0x1e, 0x58, 0xa7, 0xa8, 0x60, 0x62, 0x31, 0x06, 0x9a,
+	0x4d, 0x7f, 0x1c, 0x92, 0x14, 0x1f, 0xc2, 0xb6, 0xfb, 0xf7, 0x2d, 0x7e, 0x90, 0x9e, 0x23, 0x49,
+	0x24, 0xde, 0xf7, 0xe0, 0xde, 0x1b, 0x79, 0xb9, 0x07, 0xae, 0x7b, 0x56, 0x98, 0xf2, 0x85, 0x7d,
+	0x60, 0xc3, 0x8b, 0x83, 0x61, 0x06, 0x8e, 0xbe, 0x79, 0xd9, 0x6f, 0x0d, 0x9b, 0xde, 0x25, 0x84,
+	0x17, 0x27, 0xc6, 0xb9, 0x61, 0x5e, 0x70, 0x17, 0xa2, 0xa1, 0x40, 0x52, 0x7c, 0x0c, 0x0f, 0x5c,
+	0xe9, 0xf4, 0x7b, 0xd0, 0xa5, 0x8a, 0x15, 0x29, 0x16, 0x3d, 0x82, 0x77, 0x16, 0x20, 0xf8, 0x19,
+	0x6e, 0xd3, 0x30, 0xed, 0x5d, 0xb8, 0x1b, 0xe5, 0x0e, 0x2b, 0x29, 0x91, 0xd0, 0xb7, 0xe1, 0xf6,
+	0x3c, 0x36, 0x2e, 0x69, 0x8b, 0x24, 0x3d, 0x85, 0x47, 0x23, 0xf5, 0x95, 0x12, 0xfb, 0xb4, 0x77,
+	0x48, 0xf0, 0x0e, 0xbc, 0x17, 0x40, 0x5d, 0xc6, 0x7f, 0x97, 0x82, 0xea, 0x13, 0x58, 0x0d, 0xa5,
+	0xe5, 0xed, 0x6d, 0x37, 0x28, 0x5d, 0x92, 0x3c, 0xa5, 0xff, 0x4c, 0x46, 0x7e, 0xab, 0x91, 0x43,
+	0xf5, 0xdb, 0x93, 0xab, 0x75, 0xf5, 0xbc, 0x7a, 0x9b, 0xff, 0x73, 0x0f, 0x1f, 0xa8, 0xff, 0x5f,
+	0xa0, 0x6e, 0xab, 0x96, 0x8f, 0xdd, 0xba, 0xad, 0x54, 0x39, 0x3e, 0xe6, 0xe3, 0xf4, 0xc6, 0x11,
+	0x2b, 0xe6, 0x28, 0xa9, 0x9f, 0x56, 0x0f, 0xaa, 0x98, 0xd4, 0xb1, 0x2c, 0xdb, 0x3f, 0xee, 0x54,
+	0xda, 0x75, 0x2c, 0x9c, 0x78, 0xf5, 0xd6, 0x2a, 0x35, 0x2b, 0x58, 0x78, 0x65, 0x98, 0x16, 0x72,
+	0xa3, 0x81, 0xa5, 0x1b, 0x2b, 0xf3, 0x5a, 0x58, 0x55, 0x65, 0xc5, 0x35, 0xc8, 0x75, 0xb0, 0x9e,
+	0x2f, 0xd5, 0x3b, 0xb5, 0x36, 0x6a, 0xcc, 0xfe, 0xea, 0x28, 0x57, 0x7f, 0x5e, 0x69, 0x7a, 0x84,
+	0x15, 0x16, 0xa2, 0xcb, 0x95, 0x03, 0xb9, 0x73, 0xdc, 0xc6, 0x22, 0xae, 0x00, 0x70, 0x70, 0x2c,
+	0xb7, 0x8e, 0x8e, 0xb1, 0xc0, 0x6f, 0x0b, 0x39, 0xe9, 0x3f, 0xb0, 0x5e, 0x88, 0xce, 0x16, 0xe8,
+	0xf7, 0x0b, 0xde, 0xfb, 0xf5, 0x54, 0x4c, 0x7a, 0xec, 0x71, 0xf9, 0xbf, 0x5f, 0x5d, 0xa6, 0x2c,
+	0x7b, 0xdb, 0x23, 0xdd, 0x50, 0xfa, 0x96, 0xaa, 0x1b, 0xa1, 0xe5, 0x94, 0xbf, 0xcc, 0x2e, 0x78,
+	0x66, 0x99, 0x17, 0x0a, 0x3f, 0x4b, 0x80, 0x30, 0x33, 0x99, 0xa8, 0x84, 0xae, 0xe7, 0x93, 0xab,
+	0xcf, 0x36, 0xde, 0x54, 0x60, 0x6f, 0x7f, 0x31, 0xbd, 0x98, 0xb2, 0xdc, 0x7c, 0xc6, 0xbb, 0xa1,
+	0x72, 0xf5, 0x24, 0xd2, 0x0d, 0xe1, 0x1d, 0x71, 0x63, 0xa5, 0xe8, 0x97, 0x90, 0x26, 0x7d, 0xa7,
+	0xa5, 0xf7, 0x41, 0x9c, 0x33, 0xf3, 0x98, 0xad, 0x68, 0xa5, 0x5f, 0x63, 0xcb, 0x17, 0x99, 0x19,
+	0x5c, 0xb9, 0x65, 0x08, 0xe3, 0xe3, 0xb6, 0x0c, 0x47, 0xae, 0x82, 0xeb, 0xb0, 0xc6, 0x3a, 0x06,
+	0xa5, 0xde, 0x54, 0x3a, 0xb5, 0x67, 0xb5, 0xfa, 0x69, 0x8d, 0x3b, 0x61, 0xa3, 0x5e, 0x6f, 0xa2,
+	0xb2, 0xd8, 0x11, 0x9e, 0xd4, 0xcb, 0x95, 0xa6, 0xdc, 0x76, 0xfd, 0xf0, 0xb0, 0x5e, 0x2f, 0xa3,
+	0xb6, 0xa8, 0xf8, 0x61, 0xb3, 0x22, 0x33, 0x65, 0xbf, 0x82, 0x7c, 0x68, 0x90, 0x72, 0xd5, 0xd4,
+	0xfd, 0xcb, 0x04, 0x88, 0x73, 0x66, 0x27, 0x87, 0x21, 0x3b, 0x7c, 0x7a, 0x9d, 0xf9, 0x4b, 0x5c,
+	0x5b, 0x7c, 0x39, 0xaf, 0x7b, 0x8a, 0x6f, 0x80, 0x3f, 0x27, 0x61, 0x7d, 0xde, 0x9c, 0xe6, 0x28,
+	0xa4, 0xc1, 0x67, 0xd7, 0x1a, 0xf6, 0xc4, 0x55, 0xe1, 0x4f, 0x5e, 0x24, 0xc1, 0x07, 0x5d, 0xad,
+	0x3d, 0x97, 0x8f, 0xab, 0x2c, 0xc0, 0xb1, 0x16, 0xa0, 0xda, 0x2a, 0xd5, 0x6b, 0xb5, 0x4a, 0xa9,
+	0x4d, 0xa5, 0xd7, 0x26, 0x88, 0x55, 0x7c, 0xfa, 0xcd, 0x03, 0xb9, 0x54, 0x51, 0x70, 0x4d, 0xde,
+	0x3f, 0x46, 0x7a, 0x32, 0xd4, 0xf9, 0xa7, 0xd8, 0xff, 0x5a, 0x25, 0xb9, 0x56, 0xab, 0xd6, 0x0e,
+	0x31, 0xc8, 0x88, 0x50, 0x90, 0x3b, 0xd8, 0xa7, 0xd5, 0xda, 0xd5, 0x92, 0xdc, 0x66, 0xb4, 0x0c,
+	0x0b, 0x24, 0x72, 0xab, 0x55, 0x2f, 0x55, 0x39, 0x61, 0x89, 0xc5, 0x0e, 0x8f, 0x80, 0x02, 0xb3,
+	0x6c, 0xa3, 0x83, 0x7a, 0xa7, 0xa9, 0x9c, 0xca, 0xdf, 0x29, 0x47, 0x72, 0xad, 0xdc, 0x3a, 0x92,
+	0x9f, 0x55, 0x04, 0xf6, 0xc7, 0x90, 0x6b, 0x87, 0xcd, 0x7a, 0xa7, 0x11, 0x20, 0xb2, 0xbf, 0x7d,
+	0x5c, 0x29, 0xd5, 0x4f, 0x1a, 0xc7, 0x15, 0x86, 0x05, 0x0a, 0x4a, 0xf5, 0xe6, 0x89, 0x5c, 0xc3,
+	0x20, 0x84, 0xba, 0xaf, 0x76, 0xf0, 0x20, 0xd5, 0x76, 0x15, 0x95, 0xfa, 0x1e, 0xd7, 0xf3, 0xd2,
+	0x7f, 0x25, 0x61, 0xc5, 0x9f, 0x66, 0x5d, 0xe1, 0x47, 0xce, 0xe8, 0x20, 0x2c, 0xae, 0x71, 0xff,
+	0xdf, 0x33, 0xae, 0x9b, 0x28, 0xc8, 0xb0, 0xf8, 0xa1, 0xf8, 0x46, 0x4a, 0x30, 0x23, 0xd5, 0x6b,
+	0x0a, 0x96, 0xbb, 0xb5, 0x4a, 0xfb, 0xb4, 0xde, 0x7c, 0xd6, 0x12, 0x58, 0x0b, 0xb0, 0x86, 0xb4,
+	0xd0, 0x0d, 0xb0, 0xdf, 0xc6, 0x04, 0x24, 0xfa, 0x14, 0xa5, 0xd5, 0x66, 0x6d, 0x78, 0x94, 0xda,
+	0xd8, 0x6b, 0xa0, 0x95, 0x8b, 0xb0, 0x11, 0xe5, 0xa5, 0x95, 0x25, 0x66, 0xa2, 0x56, 0xfd, 0xa0,
+	0xad, 0x60, 0x1f, 0x9d, 0xdd, 0xfe, 0x17, 0x58, 0x8b, 0xfe, 0xe1, 0x27, 0x5a, 0xad, 0x55, 0xad,
+	0xe1, 0x1d, 0x97, 0x8e, 0xe4, 0xe6, 0x21, 0x65, 0x3b, 0x7c, 0x97, 0x18, 0xdc, 0xdb, 0x42, 0x42,
+	0x4a, 0x2e, 0x27, 0xd8, 0x2f, 0xfc, 0xa5, 0x4e, 0xb3, 0x89, 0x97, 0x8a, 0x79, 0x8f, 0x11, 0xb0,
+	0x91, 0xe1, 0x88, 0x4e, 0xad, 0x71, 0xdc, 0x39, 0x64, 0x98, 0x14, 0x5b, 0xf8, 0x6b, 0x00, 0x00,
+	0x00, 0xff, 0xff, 0xe6, 0xc9, 0x82, 0x96, 0x7a, 0x2d, 0x00, 0x00,
 }

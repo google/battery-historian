@@ -1,0 +1,799 @@
+<!--
+Copyright 2016 Google Inc. All rights reserved.
+Licensed under the Apache License, Version 2.0 (the "License"); you may not use
+this file except in compliance with the License. You may obtain a copy of the
+License at
+      http://www.apache.org/licenses/LICENSE-2.0
+Unless required by applicable law or agreed to in writing, software distributed
+under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
+CONDITIONS OF ANY KIND, either express or implied. See the License for the
+specific language governing permissions and limitations under the License.
+-->
+
+{{define "checkin"}}
+<p>Duration / Realtime: <span id="realtime">{{.CheckinSummary.Realtime}}</span></p>
+
+<div class="summary-title" id="aggregated-checkin">
+  <span>Aggregated Checkin Stats:</span>
+</div>
+<div>
+  <table id="checkin" class="summary-content to-datatable no-paging no-ordering no-searching no-info">
+    <thead>
+      <tr>
+        <th>Metric</th>
+        <th>Value</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Screen Off Discharge Rate (%/hr)</td>
+        <td>{{printf "%.2f  (Discharged: %.f%%)" .CheckinSummary.ScreenOffDischargeRatePerHr.V .CheckinSummary.ScreenOffDischargePoints}}</td>
+      </tr>
+
+      <tr>
+        <td>Screen On Discharge Rate (%/hr)</td>
+        <td>{{printf "%.2f  (Discharged: %.f%%)" .CheckinSummary.ScreenOnDischargeRatePerHr.V .CheckinSummary.ScreenOnDischargePoints}}</td>
+      </tr>
+
+      <tr>
+        <td>Screen On Time</td>
+        <td>{{.CheckinSummary.ScreenOnTime.V }}</td>
+      </tr>
+
+      <tr>
+        <td>Screen Off Uptime</td>
+        <td>{{.CheckinSummary.ScreenOffUptime.V }}</td>
+      </tr>
+
+      <tr data-jump="#userspace-wakelocks" class="row-clickable table-jump">
+        <td>Userspace Wakelock Time</td>
+        <td>{{.CheckinSummary.PartialWakelockTime.V }}</td>
+      </tr>
+
+      <tr data-jump="#kernel-wakesources" class="row-clickable table-jump">
+        <td>Kernel Overhead Time</td>
+        <td>{{.CheckinSummary.KernelOverheadTime.V }}</td>
+      </tr>
+
+      <tr data-jump="#mobile-traffic" class="row-clickable table-jump">
+        <td>Mobile KBs/hr</td>
+        <td>{{printf "%.2f" .CheckinSummary.MobileKiloBytesPerHr.V }}</td>
+      </tr>
+
+      <tr data-jump="#wifi-traffic" class="row-clickable table-jump">
+        <td>WiFi KBs/hr</td>
+        <td>{{printf "%.2f" .CheckinSummary.WifiKiloBytesPerHr.V }}</td>
+      </tr>
+
+      <tr data-jump="#mobile-active" class="row-clickable table-jump">
+        <td>Mobile Active Time</td>
+        <td>{{.CheckinSummary.MobileActiveTime.V }}</td>
+      </tr>
+
+      <tr>
+        <td>Signal Scanning Time</td>
+        <td>{{.CheckinSummary.SignalScanningTime.V }}</td>
+      </tr>
+
+      <tr>
+        <td>Full Wakelock Time</td>
+        <td>{{.CheckinSummary.FullWakelockTime.V }}</td>
+      </tr>
+
+      <tr>
+        <td>Interactive Time</td>
+        <td>{{.CheckinSummary.InteractiveTime.V }}</td>
+      </tr>
+
+      <tr>
+        <td>Phone Call Time</td>
+        <td>{{.CheckinSummary.PhoneCallTime.V }}</td>
+      </tr>
+
+      <tr>
+        <td>Device Idle Mode Enabled Time</td>
+        <td>{{.CheckinSummary.DeviceIdleModeEnabledTime.V }}</td>
+      </tr>
+
+      <tr>
+        <td>Device Idling Time</td>
+        <td>{{.CheckinSummary.DeviceIdlingTime.V }}</td>
+      </tr>
+      {{if ge .CheckinSummary.ReportVersion 14}}
+        <tr>
+          <td>Wifi On Time</td>
+          <td>{{.CheckinSummary.WifiOnTime.V }}</td>
+        </tr>
+        <tr>
+          <td>Wifi Idle Time</td>
+          <td>{{.CheckinSummary.WifiIdleTime.V }}</td>
+        </tr>
+        <tr>
+          <td>Wifi Transmit Time</td>
+          <td>{{.CheckinSummary.WifiTransmitTime.V }}</td>
+        </tr>
+        <tr>
+          <td>Wifi Power Usage</td>
+          <td>{{printf "%.2f%%/hr, %.2f%% total" .CheckinSummary.WifiDischargeRatePerHr.V .CheckinSummary.WifiDischargePoints}}</td>
+        </tr>
+        <tr>
+          <td>Bluetooth Idle Time</td>
+          <td>{{.CheckinSummary.BluetoothIdleTime.V }}</td>
+        </tr>
+        <tr>
+          <td>Bluetooth Transmit Time</td>
+          <td>{{.CheckinSummary.BluetoothTransmitTime.V }}</td>
+        </tr>
+        <tr>
+          <td>Bluetooth Power Usage</td>
+          <td>{{printf "%.2f%%/hr, %.2f%% total" .CheckinSummary.BluetoothDischargeRatePerHr.V .CheckinSummary.BluetoothDischargePoints}}</td>
+        </tr>
+      {{end}}
+    </tbody>
+  </table>
+</div>
+
+<div class="summary-title-inline" id="device-power-estimates">
+  <span>Device's Power Estimates:</span>
+</div>
+<div class="summary-content sliding">
+  <table class="to-datatable">
+    <colgroup>
+      <col span="1" width="5%">
+      <col span="1" width="45%">
+      <col span="1" width="10%">
+      <col span="1" width="40%">
+    </colgroup>
+    <thead>
+      <tr>
+        <th>Ranking</th>
+        <th>Name</th>
+        <th>Uid</th>
+        <th>Battery Percentage Consumed</th>
+      </tr>
+    </thead>
+    <tbody>
+      {{range $i, $ent := .CheckinSummary.DevicePowerEstimates}}
+      <tr>
+        <td>{{$i}}</td>
+        <td>{{$ent.Name}}</td>
+        <td>{{$ent.UID}}</td>
+        <td>{{printf "%.2f%%" $ent.Percent}}</td>
+      </tr>
+      {{end}}
+    </tbody>
+  </table>
+</div>
+
+{{if .CheckinSummary.UserspaceWakelocks}}
+<div class="summary-title-inline" id="userspace-wakelocks">
+  <span>Userspace Wakelocks:</span>
+</div>
+<div class="summary-content sliding">
+  <table class="to-datatable">
+    <colgroup>
+      <col span="1" width="5%">
+      <col span="1" width="45%">
+      <col span="1" width="10%">
+      <col span="1" width="10%">
+      <col span="1" width="10%">
+      <col span="1" width="10%">
+      <col span="1" width="10%">
+    </colgroup>
+    <thead>
+      <tr>
+        <th>Ranking</th>
+        <th>Name</th>
+        <th>Uid</th>
+        <th class="duration">Duration / Hr</th>
+        <th>Count / Hr</th>
+        <th class="duration">Total Duration</th>
+        <th>Total Count</th>
+      </tr>
+    </thead>
+    <tbody>
+      {{range $id, $wl := .CheckinSummary.UserspaceWakelocks}}
+      <tr>
+        <td>{{$id}}</td>
+        <td>{{$wl.Name}}</td>
+        <td>{{$wl.UID}}</td>
+        <td class="to-norm-timeval">{{$wl.Duration}}</td>
+        <td class="to-norm-val">{{$wl.Count}}</td>
+        <td>{{$wl.Duration}}</td>
+        <td>{{$wl.Count}}</td>
+      </tr>
+      {{end}}
+    </tbody>
+  </table>
+</div>
+{{end}}
+
+{{if .CheckinSummary.SyncTasks}}
+<div class="summary-title-inline" id="syncmanager-syncs">
+  <span>SyncManager Syncs:</span>
+</div>
+<div class="summary-content sliding">
+  <table class="to-datatable">
+    <colgroup>
+      <col span="1" width="5%">
+      <col span="1" width="45%">
+      <col span="1" width="10%">
+      <col span="1" width="10%">
+      <col span="1" width="10%">
+      <col span="1" width="10%">
+      <col span="1" width="10%">
+    </colgroup>
+    <thead>
+      <tr>
+        <th>Ranking</th>
+        <th>Name</th>
+        <th>Uid</th>
+        <th class="duration">Duration / Hr</th>
+        <th>Count / Hr</th>
+        <th class="duration">Total Duration</th>
+        <th>Total Count</th>
+      </tr>
+    </thead>
+    <tbody>
+      {{range $i, $wl := .CheckinSummary.SyncTasks}}
+      <tr>
+        <td>{{$i}}</td>
+        <td>{{$wl.Name}}</td>
+        <td>{{$wl.UID}}</td>
+        <td class="to-norm-timeval">{{$wl.Duration}}</td>
+        <td class="to-norm-val">{{$wl.Count}}</td>
+        <td>{{$wl.Duration}}</td>
+        <td>{{$wl.Count}}</td>
+      </tr>
+      {{end}}
+    </tbody>
+  </table>
+</div>
+{{end}}
+
+{{if .CheckinSummary.CPUUsage}}
+<div class="summary-title-inline" id="cpu-use">
+  <span>CPU Usage By App:</span>
+</div>
+<div class="summary-content sliding">
+  <table class="to-datatable">
+    <colgroup>
+      <col span="1" width="3%">
+      <col span="1" width="36%">
+      <col span="1" width="7%">
+      <col span="1" width="10%">
+      <col span="1" width="10%">
+      <col span="1" width="8%">
+      <col span="1" width="9%">
+      <col span="1" width="9%">
+      <col span="1" width="8%">
+    </colgroup>
+    <thead>
+      <tr>
+        <th>Ranking</th>
+        <th>Name</th>
+        <th>Uid</th>
+        <th class="duration">User Time / Hr</th>
+        <th class="duration">System Time / Hr</th>
+        <th>Battery Use / Hr</th>
+        <th class="duration">User Time</th>
+        <th class="duration">System Time</th>
+        <th title="Device estimated battery use due to CPU usage">Battery Use</th>
+      </tr>
+    </thead>
+    <tbody>
+      {{range $i, $c := .CheckinSummary.CPUUsage}}
+      <tr>
+        <td>{{$i}}</td>
+        <td>{{$c.Name}}</td>
+        <td>{{$c.UID}}</td>
+        <td class="to-norm-timeval">{{$c.UserTime}}</td>
+        <td class="to-norm-timeval">{{$c.SystemTime}}</td>
+        <td class="to-norm-pctval">{{printf "%.2f%%" $c.PowerPct}}</td>
+        <td>{{$c.UserTime}}</td>
+        <td>{{$c.SystemTime}}</td>
+        <td>{{printf "%.2f%%" $c.PowerPct}}</td>
+      </tr>
+      {{end}}
+    </tbody>
+  </table>
+</div>
+{{end}}
+
+{{if .CheckinSummary.TopMobileActiveApps}}
+<div class="summary-title-inline" id="mobile-active">
+  <span>Mobile Radio Activity Per App:</span>
+</div>
+<div class="summary-content sliding">
+  <table class="to-datatable">
+    <colgroup>
+      <col span="1" width="5%">
+      <col span="1" width="45%">
+      <col span="1" width="10%">
+      <col span="1" width="10%">
+      <col span="1" width="10%">
+      <col span="1" width="10%">
+      <col span="1" width="10%">
+    </colgroup>
+    <thead>
+      <tr>
+        <th>Ranking</th>
+        <th>Name</th>
+        <th>Uid</th>
+        <th class="duration">Duration / Hr</th>
+        <th>Count / Hr</th>
+        <th class="duration">Total Duration</th>
+        <th>Count</th>
+      </tr>
+    </thead>
+    <tbody>
+      {{range $i, $app := .CheckinSummary.TopMobileActiveApps}}
+      <tr>
+        <td>{{$i}}</td>
+        <td>{{$app.Name}}</td>
+        <td>{{$app.UID}}</td>
+        <td class="to-norm-timeval">{{$app.Duration}}</td>
+        <td class="to-norm-val">{{$app.Count}}</td>
+        <td>{{$app.Duration}}</td>
+        <td>{{$app.Count}}</td>
+      </tr>
+      {{end}}
+    </tbody>
+  </table>
+</div>
+{{end}}
+
+{{if .CheckinSummary.TopMobileTrafficApps}}
+<div class="summary-title-inline" id="mobile-traffic">
+  <span>Mobile Traffic Per App:</span>
+</div>
+<div class="summary-content sliding">
+ <table class="to-datatable">
+    <colgroup>
+      <col span="1" width="5%">
+      <col span="1" width="45%">
+      <col span="1" width="8%">
+      <col span="1" width="21%">
+      <col span="1" width="21%">
+    </colgroup>
+    <thead>
+      <tr>
+        <th>Ranking</th>
+        <th>Name</th>
+        <th>Uid</th>
+        <th>MB / Hr</th>
+        <th>Total MB</th>
+      </tr>
+    </thead>
+    <tbody>
+      {{range $i, $app := .CheckinSummary.TopMobileTrafficApps}}
+      <tr>
+        <td>{{$i}}</td>
+        <td>{{$app.Name}}</td>
+        <td>{{$app.UID}}</td>
+        <td class="to-norm-val">{{printf "%.2f" $app.MobileMegaBytes}}</td>
+        <td>{{printf "%.2f" $app.MobileMegaBytes}}</td>
+      </tr>
+      {{end}}
+    </tbody>
+  </table>
+</div>
+{{end}}
+
+{{if .CheckinSummary.WifiScanActivity}}
+<div class="summary-title-inline" id="wifi-scan-activity">
+  <span>WiFi Scan Activity Per App:</span>
+</div>
+<div class="summary-content sliding">
+  <table class="to-datatable">
+    <colgroup>
+      <col span="1" width="3%">
+      <col span="1" width="50%">
+      <col span="1" width="7%">
+      {{if ge .CheckinSummary.ReportVersion 12}}
+      <col span="1" width="10%">
+      <col span="1" width="10%">
+      <col span="1" width="10%">
+      <col span="1" width="10%">
+      {{else}}
+      <col span="1" width="20%">
+      <col span="1" width="20%">
+      {{end}}
+    </colgroup>
+    <thead>
+      <tr>
+        <th>Ranking</th>
+        <th>Name</th>
+        <th>Uid</th>
+        <th class="duration">Duration / Hr</th>
+        {{if ge .CheckinSummary.ReportVersion 12}}
+        <!-- Scan count was added during the time when the report version was 12. No point showing columns with no real data. -->
+        <th>Count / Hr</th>
+        {{end}}
+        <th class="duration">Duration</th>
+        {{if ge .CheckinSummary.ReportVersion 12}}
+        <th>Count</th>
+        {{end}}
+      </tr>
+    </thead>
+    <tbody>
+      {{if ge .CheckinSummary.ReportVersion 12}}
+        {{range $i, $app := .CheckinSummary.WifiScanActivity}}
+        <tr>
+          <td>{{$i}}</td>
+          <td>{{$app.Name}}</td>
+          <td>{{$app.UID}}</td>
+          <td class="to-norm-timeval">{{$app.Duration}}</td>
+          <td class="to-norm-val">{{$app.Count}}</td>
+          <td>{{$app.Duration}}</td>
+          <td>{{$app.Count}}</td>
+        </tr>
+        {{end}}
+      {{else}}
+        {{range $i, $app := .CheckinSummary.WifiScanActivity}}
+        <tr>
+          <td>{{$i}}</td>
+          <td>{{$app.Name}}</td>
+          <td>{{$app.UID}}</td>
+          <td class="to-norm-timeval">{{$app.Duration}}</td>
+          <td>{{$app.Duration}}</td>
+        </tr>
+        {{end}}
+      {{end}}
+    </tbody>
+  </table>
+</div>
+{{end}}
+
+{{if .CheckinSummary.WifiFullLockActivity}}
+<div class="summary-title-inline" id="wifi-full-activity">
+  <span>WiFi Full Lock Activity Per App:</span>
+</div>
+<div class="summary-content sliding">
+  <table class="to-datatable">
+    <colgroup>
+      <col span="1" width="5%">
+      <col span="1" width="45%">
+      <col span="1" width="10%">
+      <col span="1" width="10%">
+      <col span="1" width="10%">
+      <col span="1" width="10%">
+    </colgroup>
+    <thead>
+      <tr>
+        <th>Ranking</th>
+        <th>Name</th>
+        <th>Uid</th>
+        <th class="duration">Duration / Hr</th>
+        <th class="duration">Duration</th>
+      </tr>
+    </thead>
+    <tbody>
+      {{range $i, $app := .CheckinSummary.WifiFullLockActivity}}
+      <tr>
+        <td>{{$i}}</td>
+        <td>{{$app.Name}}</td>
+        <td>{{$app.UID}}</td>
+        <td class="to-norm-timeval">{{$app.Duration}}</td>
+        <td>{{$app.Duration}}</td>
+      </tr>
+      {{end}}
+    </tbody>
+  </table>
+</div>
+{{end}}
+
+{{if .CheckinSummary.TopWifiTrafficApps}}
+<div class="summary-title-inline" id="wifi-traffic">
+  <span>WiFi Traffic Per App:</span>
+</div>
+<div class="summary-content sliding">
+  <table class="to-datatable">
+    <colgroup>
+      <col span="1" width="5%">
+      <col span="1" width="65%">
+      <col span="1" width="10%">
+      <col span="1" width="10%">
+      <col span="1" width="10%">
+    </colgroup>
+    <thead>
+      <tr>
+        <th>Ranking</th>
+        <th>Name</th>
+        <th>Uid</th>
+        <th>MB / Hr</th>
+        <th>MB</th>
+      </tr>
+    </thead>
+    <tbody>
+      {{range $i, $app := .CheckinSummary.TopWifiTrafficApps}}
+      <tr>
+        <td>{{$i}}</td>
+        <td>{{$app.Name}}</td>
+        <td>{{$app.UID}}</td>
+        <td class="to-norm-val">{{printf "%.2f" $app.WifiMegaBytes}}</td>
+        <td>{{printf "%.2f" $app.WifiMegaBytes}}</td>
+      </tr>
+      {{end}}
+    </tbody>
+  </table>
+</div>
+{{end}}
+
+{{if .CheckinSummary.KernelWakelocks}}
+<div class="summary-title-inline" id="kernel-wakesources">
+  <span>Kernel Wakesources:</span>
+</div>
+<div class="summary-content sliding">
+  <table class="to-datatable">
+    <colgroup>
+      <col span="1" width="5%">
+      <col span="1" width="45%">
+      <col span="1" width="12.5%">
+      <col span="1" width="12.5%">
+      <col span="1" width="12.5%">
+      <col span="1" width="12.5%">
+    </colgroup>
+    <thead>
+      <tr>
+        <th>Ranking</th>
+        <th>Name</th>
+        <th class="duration">Duration / Hr</th>
+        <th>Count / Hr</th>
+        <th class="duration">Total Duration</th>
+        <th>Total Count</th>
+      </tr>
+    </thead>
+    <tbody>
+      {{range $i, $wl := .CheckinSummary.KernelWakelocks}}
+      <tr>
+        <td>{{$i}}</td>
+        <td>{{$wl.Name}}</td>
+        <td class="to-norm-timeval">{{$wl.Duration}}</td>
+        <td class="to-norm-val">{{$wl.Count}}</td>
+        <td>{{$wl.Duration}}</td>
+        <td>{{$wl.Count}}</td>
+      </tr>
+      {{end}}
+    </tbody>
+  </table>
+</div>
+{{end}}
+
+{{if .CheckinSummary.WakeupReasons}}
+<div class="summary-title-inline" id="kernel-reasons">
+  <span>Kernel Wakeup Reasons:</span>
+</div>
+<div class="summary-content sliding">
+  <table class="to-datatable">
+    <colgroup>
+      <col span="1" width="5%">
+      <col span="1" width="45%">
+      <col span="1" width="12.5%">
+      <col span="1" width="12.5%">
+      <col span="1" width="12.5%">
+      <col span="1" width="12.5%">
+    </colgroup>
+    <thead>
+      <tr>
+        <th>Ranking</th>
+        <th>Name</th>
+        <th class="duration">Duration / Hr</th>
+        <th>Count / Hr</th>
+        <th class="duration">Total Duration</th>
+        <th>Total Count</th>
+      </tr>
+    </thead>
+    <tbody>
+      {{range $i, $wr := .CheckinSummary.WakeupReasons}}
+      <tr>
+        <td>{{$i}}</td>
+        <td>{{$wr.Name}}</td>
+        <td class="to-norm-timeval">{{$wr.Duration}}</td>
+        <td class="to-norm-val">{{$wr.Count}}</td>
+        <td>{{$wr.Duration}}</td>
+        <td>{{$wr.Count}}</td>
+      </tr>
+      {{end}}
+    </tbody>
+  </table>
+</div>
+{{end}}
+
+{{if .CheckinSummary.AppWakeups}}
+<div class="summary-title-inline" id="wakeups">
+  <span>App Wakeup Alarms:</span>
+</div>
+<div class="summary-content sliding">
+  <table class="to-datatable">
+    <colgroup>
+      <col span="1" style="width: 5%;">
+      <col span="1" style="width: 55%;">
+      <col span="1" style="width: 20%;">
+      <col span="1" style="width: 20%;">
+    </colgroup>
+    <thead>
+      <tr>
+        <th>Ranking</th>
+        <th>Name</th>
+        <th>Frequency (count/hr)</th>
+        <th>Count</th>
+      </tr>
+    </thead>
+    <tbody>
+      {{range $i, $aw := .CheckinSummary.AppWakeups}}
+      <tr>
+        <td>{{$i}}</td>
+        <td>{{$aw.Name}}</td>
+        <td>{{printf "%.2f" $aw.CountPerHr}}</td>
+        <td>{{$aw.Count}}</td>
+      </tr>
+      {{end}}
+    </tbody>
+  </table>
+</div>
+{{end}}
+
+{{if .CheckinSummary.ANRAndCrash}}
+<div class="summary-title-inline" id="anr-crash">
+  <span>App ANRs and Crashes:</span>
+</div>
+<div class="summary-content sliding">
+  <table class="to-datatable">
+    <colgroup>
+      <col span="1" style="width: 5%;">
+      <col span="1" style="width: 65%;">
+      <col span="1" style="width: 15%;">
+      <col span="1" style="width: 15%;">
+    </colgroup>
+    <thead>
+      <tr>
+        <th>Ranking</th>
+        <th>Name (App Name : Process Name)</th>
+        <th>ANRs</th>
+        <th>Crashes</th>
+      </tr>
+    </thead>
+    <tbody>
+      {{range $i, $ac := .CheckinSummary.ANRAndCrash}}
+      <tr>
+        <td>{{$i}}</td>
+        <td>{{$ac.Name}}</td>
+        <td>{{$ac.ANRCount}}</td>
+        <td>{{$ac.CrashCount}}</td>
+      </tr>
+      {{end}}
+    </tbody>
+  </table>
+</div>
+{{end}}
+
+{{if .CheckinSummary.GPSUse}}
+<div class="summary-title-inline" id="gps-use">
+  <span>GPS Use By App:</span>
+</div>
+<div class="summary-content sliding">
+  <table class="to-datatable">
+    <colgroup>
+      <col span="1" width="5%">
+      <col span="1" width="45%">
+      <col span="1" width="10%">
+      <col span="1" width="10%">
+      <col span="1" width="10%">
+      <col span="1" width="10%">
+      <col span="1" width="10%">
+    </colgroup>
+    <thead>
+      <tr>
+        <th>Ranking</th>
+        <th>Name</th>
+        <th>Uid</th>
+        <th class="duration">Duration / Hr</th>
+        <th>Count / Hr</th>
+        <th class="duration">Duration</th>
+        <th>Count</th>
+      </tr>
+    </thead>
+    <tbody>
+      {{range $i, $g := .CheckinSummary.GPSUse}}
+      <tr>
+        <td>{{$i}}</td>
+        <td>{{$g.Name}}</td>
+        <td>{{$g.UID}}</td>
+        <td class="to-norm-timeval">{{$g.Duration}}</td>
+        <td class="to-norm-val">{{$g.Count}}</td>
+        <td>{{$g.Duration}}</td>
+        <td>{{$g.Count}}</td>
+      </tr>
+      {{end}}
+    </tbody>
+  </table>
+</div>
+{{end}}
+
+{{if .CheckinSummary.CameraUse}}
+<div class="summary-title-inline" id="camera-use">
+  <span>Camera Use By App:</span>
+</div>
+<div class="summary-content sliding">
+  <table class="to-datatable">
+    <colgroup>
+      <col span="1" width="5%">
+      <col span="1" width="45%">
+      <col span="1" width="10%">
+      <col span="1" width="10%">
+      <col span="1" width="10%">
+      <col span="1" width="10%">
+      <col span="1" width="10%">
+    </colgroup>
+    <thead>
+      <tr>
+        <th>Ranking</th>
+        <th>Name</th>
+        <th>Uid</th>
+        <th class="duration">Duration / Hr</th>
+        <th>Count / Hr</th>
+        <th class="duration">Duration</th>
+        <th>Count</th>
+      </tr>
+    </thead>
+    <tbody>
+      {{range $i, $g := .CheckinSummary.CameraUse}}
+      <tr>
+        <td>{{$i}}</td>
+        <td>{{$g.Name}}</td>
+        <td>{{$g.UID}}</td>
+        <td class="to-norm-timeval">{{$g.Duration}}</td>
+        <td class="to-norm-val">{{$g.Count}}</td>
+        <td>{{$g.Duration}}</td>
+        <td>{{$g.Count}}</td>
+      </tr>
+      {{end}}
+    </tbody>
+  </table>
+</div>
+{{end}}
+
+{{if .CheckinSummary.FlashlightUse}}
+<div class="summary-title-inline" id="flashlight-use">
+  <span>Flashlight Use By App:</span>
+</div>
+<div class="summary-content sliding">
+  <table class="to-datatable">
+    <colgroup>
+      <col span="1" width="5%">
+      <col span="1" width="45%">
+      <col span="1" width="10%">
+      <col span="1" width="10%">
+      <col span="1" width="10%">
+      <col span="1" width="10%">
+      <col span="1" width="10%">
+    </colgroup>
+    <thead>
+      <tr>
+        <th>Ranking</th>
+        <th>Name</th>
+        <th>Uid</th>
+        <th class="duration">Duration / Hr</th>
+        <th>Count / Hr</th>
+        <th class="duration">Duration</th>
+        <th>Count</th>
+      </tr>
+    </thead>
+    <tbody>
+      {{range $i, $g := .CheckinSummary.FlashlightUse}}
+      <tr>
+        <td>{{$i}}</td>
+        <td>{{$g.Name}}</td>
+        <td>{{$g.UID}}</td>
+        <td class="to-norm-timeval">{{$g.Duration}}</td>
+        <td class="to-norm-val">{{$g.Count}}</td>
+        <td>{{$g.Duration}}</td>
+        <td>{{$g.Count}}</td>
+      </tr>
+      {{end}}
+    </tbody>
+  </table>
+</div>
+{{end}}
+{{end}}
