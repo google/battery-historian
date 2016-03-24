@@ -170,6 +170,8 @@ historian.HistorianV2.prototype.zoomHandler_ = function() {
 historian.HistorianV2.prototype.handleMouse_ = function() {
   this.context_.svg
       .on('mousemove', function() {
+        this.seriesLevel_.showSummary();
+        this.bars_.showSeriesInfo();
         this.levelLine_.renderTimeInfo();
       }.bind(this))
       .on('mouseout', function() {

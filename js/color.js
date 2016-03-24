@@ -249,7 +249,9 @@ historian.color.valueTextMap_[historian.metrics.Csv.BRIGHTNESS] = {
 /** @private {!Object<string>} */
 historian.color.valueTextMap_[historian.metrics.Csv.CHARGING_STATUS] = {
   'c': 'charging',
-  'd': 'discharging'
+  'd': 'discharging',
+  'n': 'not charging',
+  'f': 'full'
 };
 
 

@@ -33,7 +33,7 @@ Next, install Java from <http://www.oracle.com/technetwork/java/javase/downloads
 Next, download the Battery Historian code and its dependencies:
 
 ```
-$ go get -d github.com/google/battery-historian/...
+$ go get -d -u github.com/google/battery-historian/...
 ```
 
 Finally, run Battery Historian!
@@ -72,11 +72,15 @@ You are all set now. Run `historian` and visit <http://localhost:9999> and uploa
 
 ## Screenshots
 
+##### Timeline:
+
 ![Timeline](/screenshots/timeline.png "Timeline Visualization")
+
+##### System stats:
 
 ![System](/screenshots/system.png "Aggregated System statistics since the device was last fully charged")
 
-![History](/screenshots/history.png "Aggregated statistics during distinct discharge sessions")
+##### App stats:
 
 ![App](/screenshots/app.png "Application specific statistics")
 
