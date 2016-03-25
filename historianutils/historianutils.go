@@ -76,7 +76,11 @@ func RunCommand(name string, args ...string) (string, error) {
 
 	// Run the script.
 	if err := cmd.Run(); err != nil {
-		return "", fmt.Errorf("failed to run command: %v -- %s", err, stderr)
+		c := name
+		if len(args) > 0 {
+			c += " " + strings.Join(args, " ")
+		}
+		return "", fmt.Errorf("failed to run command %q:\n  %v\n  %s", c, err, stderr.String())
 	}
 
 	return stdout.String(), nil

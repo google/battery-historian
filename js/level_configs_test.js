@@ -100,7 +100,8 @@ var testPowermonitorConfig = function() {
   var header = 'metric,type,start_time,end_time,value,opt\n';
   // Non default y domain.
   data = historian.data.processHistorianV2Data(
-      header + 'Powermonitor,int,1000,2000,-10,\n' + 'Powermonitor,int,2000,3000,1001,\n',
+      header + 'Powermonitor,int,1000,2000,-10,\n' +
+      'Powermonitor,int,2000,3000,1001,\n',
       2300, {}, '', true);
   assertObjectEquals({min: -10, max: 1001},
       data.configs.getConfig(data.defaultLevelMetric).yDomain);

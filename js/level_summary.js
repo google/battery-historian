@@ -23,9 +23,6 @@ goog.provide('historian.levelSummary.DimensionTypes');
 goog.provide('historian.levelSummary.Dimensions');
 
 goog.require('goog.array');
-goog.require('goog.asserts');
-goog.require('historian.metrics');
-goog.require('historian.metrics.Csv');
 goog.require('historian.time');
 
 
@@ -214,6 +211,7 @@ historian.LevelSummaryData.prototype.parseCsv_ = function(csv) {
   this.numItems = values.length;
   this.properties = properties;
 };
+
 
 /**
  * Find the items intersecting the given time range.

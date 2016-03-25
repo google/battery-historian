@@ -68,7 +68,8 @@ $ adb bugreport > bugreport.txt
 
 ### Start analyzing!
 
-You are all set now. Run `historian` and visit <http://localhost:9999> and upload the `bugreport.txt` file to start analyzing.
+You are all set now. Run `historian` and visit <http://localhost:9999> and
+upload the `bugreport.txt` file to start analyzing.
 
 ## Screenshots
 
@@ -188,7 +189,8 @@ $ stop monsoon.py
 
 ##### Modifying the proto files
 
-If you want to modify the proto files (pb/\*/\*.proto), first download the additional tools necessary:
+If you want to modify the proto files (pb/\*/\*.proto), first download the
+additional tools necessary:
 
 Install the standard C++ implementation of protocol buffers from <https://github.com/google/protobuf/blob/master/src/README.md>
 

@@ -36,6 +36,7 @@ const (
 	closureCompilerURL = "http://dl.google.com/closure-compiler/" + closureCompilerZip
 
 	thirdPartyDir = "third_party"
+	compiledDir   = "compiled"
 )
 
 var rebuild = flag.Bool("rebuild", false, "Whether or not clear all setup files and start from scratch.")
@@ -86,20 +87,25 @@ func main() {
 	if *rebuild {
 		fmt.Println("\nClearing files...")
 		if err := deletePath(thirdPartyDir); err != nil {
-			fmt.Printf("Failed to delete third_party directory: %v\n", err)
+			fmt.Printf("Failed to delete %s directory: %v\n", thirdPartyDir, err)
 			return
 		}
-		if err := deletePath("compiled"); err != nil {
-			fmt.Printf("Failed to delete compiled directory: %v\n", err)
+		if err := deletePath(compiledDir); err != nil {
+			fmt.Printf("Failed to delete %s directory: %v\n", compiledDir, err)
 			return
 		}
 	}
 
 	os.Mkdir(thirdPartyDir, 0777)
-	os.Mkdir("compiled", 0777)
+	os.Mkdir(compiledDir, 0777)
 
-	closureLibraryDir := path.Join(thirdPartyDir, "closure-library")
-	closureCompilerDir := path.Join(thirdPartyDir, "closure-compiler")
+	wd, err := os.Getwd()
+	if err != nil {
+		fmt.Printf("Unable to get working directory: %v\n", err)
+		return
+	}
+	closureLibraryDir := path.Join(wd, thirdPartyDir, "closure-library")
+	closureCompilerDir := path.Join(wd, thirdPartyDir, "closure-compiler")
 	axisDir := path.Join(thirdPartyDir, "flot-axislabels")
 
 	if _, err := os.Stat(closureLibraryDir); os.IsNotExist(err) {
@@ -119,6 +125,11 @@ func main() {
 		os.Mkdir(closureCompilerDir, 0777)
 
 		resp, err := http.Get(closureCompilerURL)
+		if err != nil {
+			fmt.Printf("Failed to download Closure compiler: %v\n", err)
+			fmt.Printf("\nIf this persists, please manually download the compiler from %s into the %s directory, unzip it into the %s diretory, and rerun this script.\n\n", closureCompilerURL, closureCompilerDir, closureCompilerDir)
+			return
+		}
 		defer resp.Body.Close()
 
 		contents, err := ioutil.ReadAll(resp.Body)
@@ -160,7 +171,7 @@ func main() {
 		fmt.Printf("Couldn't generate runfile: %v\n", err)
 		return
 	}
-	if err = saveFile("compiled/historian_deps-runfiles.js", []byte(out)); err != nil {
+	if err = saveFile(path.Join(wd, compiledDir, "historian_deps-runfiles.js"), []byte(out)); err != nil {
 		fmt.Printf("Couldn't save runfiles file: %v\n", err)
 		return
 	}
@@ -174,8 +185,8 @@ func main() {
 		"--js", path.Join(closureLibraryDir, "closure/goog/**/*.js"),
 		"--only_closure_dependencies",
 		"--generate_exports",
-		"--js_output_file", "compiled/historian-optimized.js",
-		"--output_manifest", "compiled/manifest.MF",
+		"--js_output_file", path.Join(wd, compiledDir, "historian-optimized.js"),
+		"--output_manifest", path.Join(wd, compiledDir, "manifest.MF"),
 		"--compilation_level", "SIMPLE_OPTIMIZATIONS",
 	)
 }

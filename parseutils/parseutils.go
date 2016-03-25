@@ -293,8 +293,8 @@ func (s *ServiceUID) assign(curTime int64, summaryActive bool, summaryStartTime 
 		return fmt.Errorf("unknown transition for %q:%q", desc, tr)
 	}
 	// We need to keep the raw UID so that services can be sufficiently distinguished in the csv mapping,
-	// but Powerbug only deals with app IDs (with the user ID removed) so we have to make sure the csv
-	// prints only the app ID.
+	// but Battery Historian only deals with app IDs (with the user ID removed)
+	// so we have to make sure the csv prints only the app ID.
 	csv.AddEntryWithOpt(desc, s, curTime, fmt.Sprint(appID))
 	return nil
 }
