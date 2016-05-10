@@ -627,6 +627,7 @@ func (pd *ParsedData) parseBugReport(fname, contents string) error {
 			// TODO: Display activity manager events even if battery data is invalid. Currently they will not be displayed.
 			ce = "Exception found in battery dump."
 			errs = append(errs, errors.New("exception found in battery dump"))
+			log.Printf(ce)
 			close(summariesCh)
 			close(checkinCh)
 		} else {
