@@ -622,49 +622,47 @@ func (pd *ParsedData) parseBugReport(fname, contents string) error {
 	} else {
 		// No point running these if we don't support the sdk version since we won't get any data from them.
 		bs := bugreportutils.ExtractBatterystatsCheckin(contents)
-
 		if strings.Contains(bs, "Exception occurred while dumping") {
 			// TODO: Display activity manager events even if battery data is invalid. Currently they will not be displayed.
 			ce = "Exception found in battery dump."
 			errs = append(errs, errors.New("exception found in battery dump"))
-			log.Printf(ce)
-			close(summariesCh)
-			close(checkinCh)
-		} else {
-			pkgs, pkgErrs := packageutils.ExtractAppsFromBugReport(contents)
-			errs = append(errs, pkgErrs...)
-
-			// Activity manager events are only parsed for supported sdk versions, even though they are still present in unsupported sdk version reports.
-			// This is as the events are rendered with Historian v2, which is not generated for unsupported sdk versions.
-			go func() {
-				amCSV, warnings, errs := activity.Parse(pkgs, contents)
-				activityManagerCh <- activityManagerData{amCSV, warnings, errs}
-			}()
-
-			go func() {
-				var ctr checkinutil.IntCounter
-
-				s := &sessionpb.Checkin{
-					Checkin:          proto.String(bs),
-					BuildFingerprint: proto.String(meta.BuildFingerprint),
-				}
-				stats, warnings, pbsErrs := checkinparse.ParseBatteryStats(&ctr, checkinparse.CreateCheckinReport(s), pkgs)
-				checkinCh <- checkinData{stats, warnings, pbsErrs}
-				log.Printf("Trace finished processing checkin.")
-				if stats == nil {
-					ce = "Could not parse aggregated battery stats."
-					errs = append(errs, errors.New("could not parse aggregated battery stats"))
-					// Only returning from this goroutine.
-					return
-				}
-				pd.deviceType = stats.GetBuild().GetDevice()
-			}()
-
-			go func() {
-				summariesCh <- analyze(bs, pkgs)
-				log.Printf("Trace finished processing summary data.")
-			}()
+			log.Printf(ce + "\nResults may be incorrect.")
+			bs = strings.Split(bs, "Exception occurred while dumping")[0]
 		}
+
+		pkgs, pkgErrs := packageutils.ExtractAppsFromBugReport(contents)
+		errs = append(errs, pkgErrs...)
+
+		// Activity manager events are only parsed for supported sdk versions, even though they are still present in unsupported sdk version reports.
+		// This is as the events are rendered with Historian v2, which is not generated for unsupported sdk versions.
+		go func() {
+			amCSV, warnings, errs := activity.Parse(pkgs, contents)
+			activityManagerCh <- activityManagerData{amCSV, warnings, errs}
+		}()
+
+		go func() {
+			var ctr checkinutil.IntCounter
+
+			s := &sessionpb.Checkin{
+				Checkin:          proto.String(bs),
+				BuildFingerprint: proto.String(meta.BuildFingerprint),
+			}
+			stats, warnings, pbsErrs := checkinparse.ParseBatteryStats(&ctr, checkinparse.CreateCheckinReport(s), pkgs)
+			checkinCh <- checkinData{stats, warnings, pbsErrs}
+			log.Printf("Trace finished processing checkin.")
+			if stats == nil {
+				ce = "Could not parse aggregated battery stats."
+				errs = append(errs, errors.New("could not parse aggregated battery stats"))
+				// Only returning from this goroutine.
+				return
+			}
+			pd.deviceType = stats.GetBuild().GetDevice()
+		}()
+
+		go func() {
+			summariesCh <- analyze(bs, pkgs)
+			log.Printf("Trace finished processing summary data.")
+		}()
 	}
 
 	if historianOutput.err == nil {
