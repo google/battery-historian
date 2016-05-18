@@ -27,6 +27,7 @@ goog.provide('historian.AMProcValue');
 goog.provide('historian.AMValue');
 goog.provide('historian.ANRValue');
 goog.provide('historian.AggregatedEntry');
+goog.provide('historian.AggregatedEntryValue');
 goog.provide('historian.AggregatedValue');
 goog.provide('historian.ClusteredSeriesData');
 goog.provide('historian.Entry');
@@ -39,6 +40,7 @@ goog.provide('historian.TimeToDelta');
 goog.provide('historian.Value');
 goog.provide('historian.data');
 goog.provide('historian.data.ClusterEntry');
+goog.provide('historian.data.ClusterEntryValue');
 goog.provide('historian.data.ServiceMapper');
 
 goog.require('goog.asserts');
@@ -153,6 +155,13 @@ historian.Value;
 
 
 /**
+ * Possible types for an aggregated entry.
+ * @typedef {!historian.AggregatedValue|!historian.RunningValue}
+ */
+historian.AggregatedEntryValue;
+
+
+/**
  * A single data point created from aggregating the values
  * from a number of data points.
  *
@@ -163,7 +172,7 @@ historian.Value;
  *   startTime: number,
  *   endTime: number,
  *   value: number,
- *   services: !Array<!historian.AggregatedValue|!historian.RunningValue>
+ *   services: !Array<!historian.AggregatedEntryValue>
  * }}
  */
 historian.AggregatedEntry;
@@ -281,10 +290,12 @@ historian.data.processLevelSummaryData = function(csv) {
  *     readable format.
  * @param {string} location The location of the bug report.
  * @param {boolean} displayPowermonitor Whether to display powermonitor data.
+ * @param {!Object<number>} groupToLogStart Map from group name to the earliest
+ *     start of the logs the event was found in.
  * @return {historian.HistorianV2Data}
  */
 historian.data.processHistorianV2Data = function(csvText, deviceCapacity,
-    timeToDelta, location, displayPowermonitor) {
+    timeToDelta, location, displayPowermonitor, groupToLogStart) {
   // The metric to overlay as the level line.
   var levelMetric = displayPowermonitor ? historian.metrics.Csv.POWERMONITOR :
       historian.metrics.Csv.BATTERY_LEVEL;
@@ -326,7 +337,9 @@ historian.data.processHistorianV2Data = function(csvText, deviceCapacity,
     if (d.metric != historian.metrics.Csv.AM_PROC &&
         d.metric != historian.metrics.Csv.AM_LOW_MEMORY &&
         d.metric != historian.metrics.Csv.AM_ANR &&
-        d.metric != historian.metrics.Csv.CRASHES) {
+        d.metric != historian.metrics.Csv.CRASHES &&
+        d.metric != historian.metrics.Csv.BLUETOOTH_SCAN) {
+      // TODO: pass in the log source via csv instead.
       return d.startTime;
     }
     // d3.extent ignores undefined return values.
@@ -431,6 +444,9 @@ historian.data.processHistorianV2Data = function(csvText, deviceCapacity,
     }
     barGroups[groupName].series.push(series);
   }
+  historian.data.addUnavailableSeries_(
+      data.extent[0], barGroups, groupToLogStart);
+
   if (historian.metrics.Csv.BATTERY_LEVEL in barGroups) {
     // The data to display bar and level is the same, except for battery level
     // data. This needs to be converted to instant non clustered events.
@@ -456,6 +472,40 @@ historian.data.processHistorianV2Data = function(csvText, deviceCapacity,
   data.nameToBarGroup = barGroups;
   data.nameToLevelGroup = levelGroups;
   return data;
+};
+
+
+/**
+ * Adds an extra series of UNAVAILABLE_TYPE to log groups where the log start
+ * time is after the bug report start time. This signifies that data was not
+ * available for that time period.
+ * @param {number} reportStart Start time of the bug report.
+ * @param {!Object<!historian.SeriesGroup>} barGroups Map from group name to
+ *     series group data.
+ * @param {!Object<number>} groupToLogStart Map from group name to the earliest
+ *     start time of the logs the event was found in.
+ * @private
+ */
+historian.data.addUnavailableSeries_ =
+    function(reportStart, barGroups, groupToLogStart) {
+  for (var groupName in groupToLogStart) {
+    var logStart = groupToLogStart[groupName];
+    if (!(groupName in barGroups) || reportStart > logStart) {
+      continue;
+    }
+    // We want this series to be rendered before any other series in the
+    // group, in case it overlaps with any entries rendered as circles.
+    barGroups[groupName].series.unshift({
+      name: groupName + ': no data',
+      type: historian.metrics.UNAVAILABLE_TYPE,
+      values: [{
+        startTime: reportStart,
+        endTime: logStart,
+        value: 'No log data exists during this time'
+      }],
+      cluster: false
+    });
+  }
 };
 
 
@@ -527,7 +577,7 @@ historian.data.createTicks_ = function(name, series, cluster) {
  */
 historian.data.splitAMProcValue_ = function(value, startTime, endTime) {
   var parts = value.split('~');
-  goog.asserts.assert(parts.length == 4);
+  goog.asserts.assert(parts.length >= 4);
   return {
     startTime: startTime,
     endTime: endTime,
@@ -548,7 +598,7 @@ historian.data.splitAMProcValue_ = function(value, startTime, endTime) {
 historian.data.splitANR_ = function(value) {
   // TODO: replace with JSON.
   var parts = value.split('~');
-  goog.asserts.assert(parts.length == 5);
+  goog.asserts.assert(parts.length >= 5);
   return {
     pid: parseInt(parts[0], 10),
     packageName: parts[1],
@@ -1012,6 +1062,26 @@ historian.data.clusterSingle_ = function(series, minDuration) {
 };
 
 
+/**
+ * Holds the details corresponding to a value in the cluster.
+ *
+ * count: number of times the value occurred.
+ * duration: total duration the value occurred.
+ * value: the value from the original entry.
+ * ids: map from the original entry IDs to true if present.
+ * extra: additional data for the entry.
+ *
+ * @typedef {{
+ *   count: number,
+ *   duration: number,
+ *   value: (!historian.Value|!historian.AggregatedEntryValue),
+ *   ids: !Object<boolean>,
+ *   extra: !Array<!historian.Value|!historian.AggregatedEntryValue>,
+ * }}
+ */
+historian.data.ClusterEntryValue;
+
+
 
 /**
  * Class for holding entries belonging to a cluster.
@@ -1024,7 +1094,7 @@ historian.data.clusterSingle_ = function(series, minDuration) {
 historian.data.ClusterEntry = function(d, forceSingleCount) {
   /**
    * Map from value to count and duration.
-   * @type {!Object}
+   * @type {!Object<!historian.data.ClusterEntryValue>}
    */
   this.clusteredValues = {};
 
@@ -1055,7 +1125,7 @@ historian.data.ClusterEntry = function(d, forceSingleCount) {
 
 /**
  * Adds entry to the cluster.
- * @param {(historian.Entry | historian.AggregatedEntry)} d
+ * @param {!historian.Entry|!historian.AggregatedEntry} d
  *     The data entry to add.
  * @param {boolean} forceSingleCount If true, adds one to the cluster count.
  * @private
@@ -1112,13 +1182,14 @@ historian.data.ClusterEntry.prototype.add_ = function(d, forceSingleCount) {
     }
     this.clusteredValues[key].duration += duration;
   }, this);
-  this.clusteredCount += totalCount;
+  this.clusteredCount += (forceSingleCount) ? 1 : totalCount;
 };
 
 
 /**
  * Returns the key for the value used to index the cluster's values object.
- * @param {!historian.Value} v The value to get the key for.
+ * @param {!historian.Value|!historian.AggregatedEntryValue} v The value to
+ *     get the key for.
  * @return {string}
  * @private
  */
@@ -1156,7 +1227,7 @@ historian.data.ClusterEntry.prototype.getSortedValues = function() {
 
 /**
  * Returns the value with the maximum duration.
- * @return {(number|string|historian.KernelUptimeValue)}
+ * @return {!historian.Value|!historian.AggregatedEntryValue}
  */
 historian.data.ClusterEntry.prototype.getMaxValue = function() {
   var maxValue = '';
@@ -1177,8 +1248,9 @@ historian.data.ClusterEntry.prototype.getMaxValue = function() {
 
 /**
  * Returns the extra info associated with a value in the cluster.
- * @param {string} value The value to get the info for.
- * @return {!Array<!historian.Entry>}
+ * @param {!historian.Value|!historian.AggregatedValue} value The value to get
+ *     the info for.
+ * @return {!Array<!historian.Value|!historian.AggregatedEntryValue>}
  */
 historian.data.ClusterEntry.prototype.getExtraInfo = function(value) {
   var key = historian.data.ClusterEntry.key_(value);

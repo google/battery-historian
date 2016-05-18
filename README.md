@@ -149,10 +149,10 @@ Historian plots and relates events in real time (PST or UTC), whereas kernel
 trace files logs events in jiffies (seconds since boot time). In order to relate
 these events there is a script which approximates the jiffies to utc time. The
 script reads the UTC times logged in the dmesg when the system suspends and
-resumes. The scope of the script is limited to the amount of time stamps present
+resumes. The scope of the script is limited to the amount of timestamps present
 in the dmesg. Since the script uses the dmesg log when the system suspends,
-there are different scripts for each of the device, with only difference being
-the device specific dmesg log it tries to find. These scripts have been
+there are different scripts for each device, with the only difference being
+the device-specific dmesg log it tries to find. These scripts have been
 integrated into the Battery Historian tool itself.
 
 ##### Powermonitor analysis

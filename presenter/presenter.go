@@ -17,6 +17,7 @@
 package presenter
 
 import (
+	"errors"
 	"fmt"
 	"html/template"
 	"math"
@@ -30,6 +31,7 @@ import (
 	"github.com/google/battery-historian/historianutils"
 	"github.com/google/battery-historian/parseutils"
 	bspb "github.com/google/battery-historian/pb/batterystats_proto"
+	"github.com/google/battery-historian/wakeupreason"
 )
 
 func abs(x float32) float32 {
@@ -248,8 +250,10 @@ func parseAppStats(checkin *bspb.BatteryStats, sensors map[int32]bugreportutils.
 
 	for _, app := range checkin.GetApp() {
 		a := AppStat{
-			DevicePowerPrediction: 100 * float32(app.GetPowerUseItem().GetComputedPowerMah()) / bCapMah,
-			RawStats:              app,
+			RawStats: app,
+		}
+		if bCapMah > 0 {
+			a.DevicePowerPrediction = 100 * float32(app.GetPowerUseItem().GetComputedPowerMah()) / bCapMah
 		}
 
 		if app.GetName() == "" {
@@ -257,7 +261,7 @@ func parseAppStats(checkin *bspb.BatteryStats, sensors map[int32]bugreportutils.
 		}
 
 		// Only add it to AppStat if the CPU field exists and is therefore populated.
-		if app.Cpu != nil {
+		if app.Cpu != nil && bCapMah > 0 {
 			a.CPUPowerPrediction = 100 * (app.Cpu.GetPowerMaMs() / (1000 * 60 * 60)) / bCapMah
 		}
 
@@ -778,10 +782,49 @@ func MultiFileData(data []HTMLData) MultiFileHTMLData {
 	return m
 }
 
+// decodeWakeupReasons performs final processing of the aggregated checkin before displaying it.
+func decodeWakeupReasons(c *aggregated.Checkin) ([]string, []error) {
+	if !wakeupreason.IsSupportedDevice(c.Device) {
+		return nil, nil
+	}
+
+	var errs []error
+	var warns []string
+	// Range copies the values from the slice, preventing modification.
+	for i := 0; i < len(c.WakeupReasons); i++ {
+		w := &c.WakeupReasons[i]
+		n := w.Name
+		if strings.HasPrefix(n, "Abort:") {
+			// Aborts won't be in the mapping.
+			continue
+		}
+		r, unknown, err := wakeupreason.FindSubsystem(c.Device, n)
+		for _, u := range unknown {
+			warns = append(warns, fmt.Sprintf("Unknown wakeup reason %q", u))
+		}
+		if err != nil {
+			if err.Error() == wakeupreason.ErrDeviceNotFound.Error() {
+				// This shouldn't happen since we call IsSupportedDevice before looping.
+				errs = append(errs, fmt.Errorf("wakeup_reason flip flopped on supported device %q", c.Device))
+			} else {
+				errs = append(errs, err)
+			}
+		}
+		if rs := strings.TrimSpace(r); rs != "" {
+			w.Name = fmt.Sprintf("%s (%s)", rs, n)
+			w.Title = n
+		}
+	}
+	return warns, errs
+}
+
 // Data returns a single structure (HTMLData) containing aggregated battery stats in html format.
 func Data(meta *bugreportutils.MetaInfo, fname string, summaries []parseutils.ActivitySummary, checkinOutput *bspb.BatteryStats, historianOutput string, warnings []string, errs []error, overflow bool) HTMLData {
 	var output []UnplugSummary
 	ch := aggregated.ParseCheckinData(checkinOutput)
+	w, e := decodeWakeupReasons(&ch)
+	errs = append(errs, e...)
+	warnings = append(warnings, w...)
 
 	for _, s := range summaries {
 		duration := time.Duration(s.EndTimeMs-s.StartTimeMs) * time.Millisecond
@@ -843,6 +886,9 @@ func Data(meta *bugreportutils.MetaInfo, fname string, summaries []parseutils.Ac
 			},
 		}
 		output = append(output, t)
+	}
+	if checkinOutput.GetSystem().GetPowerUseSummary().GetBatteryCapacityMah() == 0 {
+		errs = append(errs, errors.New("device capacity is 0"))
 	}
 	return HTMLData{
 		DeviceID:        meta.DeviceID,

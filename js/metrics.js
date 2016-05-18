@@ -46,6 +46,13 @@ historian.metrics.ERROR_TYPE = 'error';
 
 
 /**
+ * Signifies when the metric is not available.
+ * @const {string}
+ */
+historian.metrics.UNAVAILABLE_TYPE = 'unavailable';
+
+
+/**
  * The string representing the metric in the historian V2 CSV input.
  *
  * @enum {string}
@@ -56,6 +63,7 @@ historian.metrics.Csv = {
   VOLTAGE: 'Voltage',
   BATTERY_LEVEL: 'Level',
   BRIGHTNESS: 'Brightness',
+  COULOMB_CHARGE: 'Coulomb charge',
   SIGNAL_STRENGTH: 'Mobile signal strength',
 
   // String metrics
@@ -274,7 +282,6 @@ historian.metrics.HIDDEN_BAR_METRICS_ = [
   historian.metrics.Csv.CHARGING_STATUS,
   historian.metrics.Csv.VOLTAGE,
   historian.metrics.Csv.BRIGHTNESS,
-  historian.metrics.Csv.WIFI_RADIO,
   historian.metrics.Csv.POWERMONITOR
 ];
 
@@ -389,6 +396,13 @@ historian.metrics.LOGCAT_METRICS_ = [
 
 
 /**
+ * Map from group name to descriptor to display in help tooltips.
+ * @type {!Object<string>}
+ */
+historian.metrics.descriptors = {};
+
+
+/**
  * Sets up the maps for testing properties for the metrics.
  */
 historian.metrics.initMetrics = function() {
@@ -410,6 +424,19 @@ historian.metrics.initMetrics = function() {
   historian.metrics.LOGCAT_METRICS_.forEach(function(m) {
     historian.metrics.logcatMetrics[m] = true;
   });
+  // Descriptors populated here will be shown in the corresponding help icon.
+  historian.metrics.descriptors[historian.metrics.Csv.WAKE_LOCK_HELD] =
+      'Userspace wakelocks prevent the CPU from sleeping. This may point ' +
+      'out problems with applications or services holding wakelocks too ' +
+      'frequently, or may be a result of errors encountered performing ' +
+      'operations normally expected to complete quickly, such as network ' +
+      'sync operations. Some wakelocks are intentionally held for ' +
+      'relatively long times to prevent the system from sleeping during ' +
+      'activities such as screen off audio playback.\n\n' +
+      'Only the first app to acquire the wakelock is shown. Please see the ' +
+      'system stats Userspace Wakelocks table for absolute numbers.\n\n' +
+      'You can also enable full wakelock reporting:\n' +
+      'adb shell dumpsys batterystats --enable full-wake-history';
 };
 
 

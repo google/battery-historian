@@ -15,7 +15,6 @@
 //
 // Protocol buffers for BatteryStats.
 // See frameworks/base/core/java/android/os/BatteryStats.java.
-// Note: all resource usage metrics must be defined as float with default 0.
 
 syntax = "proto2";
 
@@ -117,6 +116,8 @@ message BatteryStats {
 
     message Apk {
       // #wakeup alarms that executed. Not int because some packages share the UID.
+      // The wakeup count is split further by name in the wakeup_alarm field in
+      // report version 17 and up.
       optional float wakeups = 1;
       message Service {
         // e.g., com.google.android.gms.icing.service.IndexService.
@@ -140,7 +141,17 @@ message BatteryStats {
     };
     optional Audio audio = 19; // aud.
 
+    // Idle for bluetooth is associated with scanning.
     optional ControllerActivity bluetooth_controller = 25; // ble
+
+    // Bluetooth misc data.
+    message BluetoothMisc {
+      // Duration spent BLE scanning.
+      optional int64 ble_scan_time_msec = 1;
+      // BLE scan count.
+      optional int32 ble_scan_count = 2;
+    }
+    optional BluetoothMisc bluetooth_misc = 28; // blem
 
     message Camera {
       // Duration spent running camera.
@@ -176,6 +187,10 @@ message BatteryStats {
     };
     optional Foreground foreground = 5; // fg.
 
+    // The modem controller doesn't provide a mechanism for determining when an
+    // app has the modem active but is not transmitting data, so there's no way
+    // to idle modem time to a specific UID, hence, idle time will always be 0
+    // for app.modem_controller.
     optional ControllerActivity modem_controller = 26; // mcd.
 
     message Network {
@@ -244,25 +259,35 @@ message BatteryStats {
 
     message StateTime {
       // All of these (non-deprecated) states are mutually exclusive and can be
-      // trusted with report version >= 17.
+      // added together to find the total time a uid has had any processes
+      // running at all. They should not be trusted for report versions < 17.
 
-      // Time the uid had any processes in foreground state.
+      // In approximate order or priority (top being what the framework considers
+      // most important and is thus least likely to kill when resources are needed):
+      // top > foreground service > top sleeping > foreground > background > cached
+
+      // Time the uid had any processes in an active foreground state, but none
+      // in the "top sleeping" or better state.
       optional float foreground_time_msec = 1;
       // Time the uid had any process in active state (not cached).
       // Deprecated as of report version 17.
       optional float active_time_msec = 2 [deprecated = true];
-      // Time the uid had any processes running at all.
+      // Time the uid had any processes that were sitting around cached, not in
+      // one of the other active states.
       optional float cached_time_msec = 3;
-      // Time the uid had any processes in the top state.
+      // Time the uid had any processes in the top state (or above, such as
+      // persistent).
       optional int64 top_time_msec = 4;
       // Time the uid had any process with a started out bound foreground
-      // service.
+      // service, but none in the "top" state.
       optional int64 foreground_service_time_msec = 5;
-      // Time the uid had any process that is top while the device was sleeping.
+      // Time the uid had any process that is top while the device was sleeping,
+      // but none in the "foreground service" or better state.
       // Sleeping is mostly screen off, but also includes the the time when the
       // screen is on but the device has not yet been unlocked.
       optional int64 top_sleeping_time_msec = 6;
-      // Time the uid had any process in an active background state.
+      // Time the uid had any process in an active background state, but none in
+      // the "foreground" or better state.
       optional int64 background_time_msec = 7;
     };
     optional StateTime state_time = 15; // st.
@@ -281,6 +306,8 @@ message BatteryStats {
         OTHER = 0;
         BUTTON = 1;
         TOUCH = 2;
+        // When an accessibility service takes an action on behalf of the user.
+        ACCESSIBILITY = 3;
       };
       optional Name name = 1;
       optional float count = 2;
@@ -321,6 +348,13 @@ message BatteryStats {
     };
     repeated Wakelock wakelock = 11; // wl.
 
+    message WakeupAlarm {
+      optional string name = 1;
+      optional int32 count = 2;
+    }
+    // The sum of these counts should equal apk.wakeups.
+    repeated WakeupAlarm wakeup_alarm = 29; // wua.
+
     message Wifi {
       // Duration holding Wifi-lock.
       optional float full_wifi_lock_time_msec = 1;
@@ -335,9 +369,10 @@ message BatteryStats {
     };
     optional Wifi wifi = 12; // wfl.
 
+    // Idle for wifi is associated with wifi full locks.
     optional ControllerActivity wifi_controller = 27; // wfcd.
 
-    // Next tag: 28
+    // Next tag: 30
   };
   repeated App app = 26; // App-level stats.
 
@@ -413,7 +448,7 @@ message BatteryStats {
       // #times entering the state.
       optional float count = 3;
     };
-    repeated BluetoothState bluetooth_state = 4; // bst & bsc.
+    repeated BluetoothState bluetooth_state = 4 [deprecated=true]; // bst & bsc.
 
     // ChargeStep tracks data for which conditions were continuously held for
     // the entire duration. Field for which the conditions were not consistent

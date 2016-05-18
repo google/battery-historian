@@ -55,7 +55,13 @@ specific language governing permissions and limitations under the License.
           <li id="tab-historian" data-toggle="tooltip" title="Data visualization for history stats, version 1">
             <a href="#historian" data-toggle="tab">Historian</a>
           </li>
-          <span class="sdk-version-21"><span id="toggle-historian" class="glyphicon glyphicon-remove btn btn-default btn-right-tabs btn-xxs" data-toggle="collapse" data-target="#panel-historian"></span></span>
+          <span class="sdk-version-21">
+            <span id="toggle-historian"
+                  class="glyphicon glyphicon-remove btn btn-default btn-right-tabs btn-xxs"
+                  data-toggle="collapse"
+                  data-target="#panel-historian">
+            </span>
+          </span>
         </ul>
       </div>
       <div class="panel-body">
@@ -63,6 +69,11 @@ specific language governing permissions and limitations under the License.
           <!-- historian v2 -->
           <div id="historian-v2" class="tab-pane fade in active" >
             <div class="graph"></div>
+             <div id="power-selector-container">
+               <select id="power-selector" class="btn btn-default" data-toggle="tooltip">
+                 <br></br>
+               </select>
+             </div>
           </div>
           <!-- historian v1 -->
           <div id="historian" class="tab-pane fade">
@@ -70,6 +81,22 @@ specific language governing permissions and limitations under the License.
             <div id="historian-chart" class="hidden">{{ .Historian }}</div>
           </div>
         </div>
+      </div>
+    </div>
+  </div>
+  <div class="col-xs-12">
+    <!-- Power statistics -->
+    <div id="panel-powerstats" class="panel panel-default collapse in">
+      <div class="panel-heading">
+        <span>Power Statistics</span>
+        <span id="toggle-powerstats"
+              class="glyphicon glyphicon-remove btn btn-default btn-right btn-xxs"
+              data-toggle="collapse"
+              data-target="#panel-powerstats">
+        </span>
+      </div>
+      <div class="panel-body">
+        {{template "powerstats" .}}
       </div>
     </div>
   </div>

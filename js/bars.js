@@ -42,11 +42,12 @@ goog.require('historian.utils');
  * @param {!historian.TimeToDelta} timeToDelta The map from timestamp to human
  *     readable format.
  * @param {!historian.State} state Global Historian state.
+ * @param {!historian.power.Estimator} powerEstimator
  * @constructor
  * @struct
  */
-historian.Bars = function(
-    context, barData, levelData, serviceMapper, timeToDelta, state) {
+historian.Bars = function(context, barData, levelData, serviceMapper,
+    timeToDelta, state, powerEstimator) {
   /** @private {!historian.BarData} */
   this.barData_ = barData;
 
@@ -74,6 +75,9 @@ historian.Bars = function(
   /** @private {!historian.State} */
   this.state_ = state;
 
+  /** @private {!historian.power.Estimator} */
+  this.powerEstimator_ = powerEstimator;
+
   /**
    * @type {?{
    *   series: !historian.ClusteredSeriesData,
@@ -96,6 +100,10 @@ historian.Bars.ROW_LABEL_HEIGHT_PX = 10;
 
 /** @const @private {number} */
 historian.Bars.LABEL_OFFSET_PX_ = 10;
+
+
+/** @const @private {number} */
+historian.Bars.HELP_ICON_OFFSET_PX_ = -historian.Context.MARGINS.LEFT + 10;
 
 
 /** @const @private {number} */
@@ -166,25 +174,69 @@ historian.Bars.prototype.update = function() {
   // Re-render divider lines and labels.
   this.renderDividerLines_();
   this.renderLabels_();
+
+  // Hide tooltip on re-render.
+  if (this.tooltip_) {
+    this.tooltip_.hide();
+  }
 };
 
 
 /**
- * Renders the labels of the series.
+ * Renders the labels and help icons for each group.
  * @private
  */
 historian.Bars.prototype.renderLabels_ = function() {
   this.context_.svgChart.selectAll('.series-label-group').remove();
 
   var labelGroup = this.context_.svgChart.append('g')
-      .attr('class', 'series-label-group')
-      .attr('transform', 'translate(' +
-            (-historian.Bars.LABEL_OFFSET_PX_) + ',0)');
+      .attr('class', 'series-label-group');
 
-  labelGroup.selectAll('.series-label')
+  var enterGroups = labelGroup.selectAll('.series-label')
       .data(this.groupsToRender_)
       .enter()
-      .append('text')
+      .append('g')
+      .attr('transform', function(group) {
+        // The divider lines are drawn using group index, however contents
+        // are one level above them.
+        return 'translate(0,' + this.getRowY(group.index + 1) + ')';
+      }.bind(this));
+
+  // Render the help icons.
+  var rowHeight = this.getRowY(0) - this.getRowY(1);
+  // Set to be slightly smaller than row height to avoid looking too crowded.
+  // If the icon is small it's hard to tell what it is, so not setting as a
+  // static height.
+  var iconSize = rowHeight * 0.9;
+  var tooltip = null;
+  // foreignObject appears to be the only way to include a span in SVG, for the
+  // glyphicon help icon.
+  enterGroups.append('svg:foreignObject')
+      .attr('class', function(group) {
+        // Only show the help icon if there is a descriptor for the group.
+        return group.name in historian.metrics.descriptors ?
+            'help-icon-container' : 'hidden';
+      })
+      .attr('font-size', iconSize)  // Glyphicon size is set with font size.
+      .attr('x', historian.Bars.HELP_ICON_OFFSET_PX_)
+      .attr('y', (rowHeight - iconSize) / 2)  // To center it exactly.
+      .append('xhtml:span')
+      .attr('class', 'help-icon glyphicon glyphicon-info-sign')
+      .on('mouseover', function(group) {
+        if (group.name in historian.metrics.descriptors) {
+          var desc = historian.metrics.descriptors[group.name];
+          tooltip = new historian.Tooltip(
+              [group.name, desc], this.state_, 'help-tooltip');
+        }
+      }.bind(this))
+      .on('mouseout', function() {
+        if (tooltip) {
+          tooltip.hide();
+        }
+      }.bind(this));
+
+  // Render the group labels.
+  enterGroups.append('text')
       .attr('name', function(group) {
         return group.name;
       })
@@ -200,11 +252,12 @@ historian.Bars.prototype.renderLabels_ = function() {
         }
         return classes;
       })
+      // Note that labels are outside the translated clip rect.
+      // So we need to add the offset.
+      .attr('x', -historian.Bars.LABEL_OFFSET_PX_)
       .attr('y', function(group) {
-        // Note that labels are outside the translated clip rect.
-        // So we need to add the offset.
-        return this.getRowY(group.index + 0.5) +
-            historian.Bars.ROW_LABEL_HEIGHT_PX / 2;
+        // Position of text refers to the bottom of the text.
+        return (rowHeight / 2) + (historian.Bars.ROW_LABEL_HEIGHT_PX / 2);
       }.bind(this))
       .text(function(group) {
         if (group.name == historian.metrics.Csv.WAKELOCK_IN) {
@@ -597,6 +650,20 @@ historian.Bars.prototype.showSeriesInfo = function() {
 
   formattedLines.push('<b>' + name + '</b>' + ': ' +
       bar.clusteredCount + ' occurences');
+
+  if (series.name == historian.metrics.Csv.CPU_RUNNING) {
+    var powerEvents = bar.sorted
+        .map(function(runningEvent) {
+          return this.powerEstimator_.getRunningPowerEvent(runningEvent);
+        }, this)
+        .filter(function(event) {
+          return event != null;
+        });
+    if (powerEvents.length > 0) {
+      var power = this.powerEstimator_.getEventsPower(powerEvents).toFixed(3);
+      formattedLines.push('<b>Energy consumed:</b> ' + power + ' mAh');
+    }
+  }
 
   // Boolean entries don't have associated values other than true.
   // Don't display values for wakelocks as it's only the

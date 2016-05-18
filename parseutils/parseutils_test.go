@@ -4863,3 +4863,135 @@ func TestUIDAndPackageNameMappingAndMatching(t *testing.T) {
 		}
 	}
 }
+
+func TestTopAppSummary(t *testing.T) {
+	input := strings.Join([]string{
+		`9,hsp,0,10031,"com.google.android.googlequicksearchbox"`,
+		`9,hsp,4,10066,"com.google.android.apps.messaging"`,
+		`9,hsp,19,10038,"com.android.calendar/com.google/noogler@google.com"`,
+		`9,h,0:RESET:TIME:1456809000000`,
+		`9,h,0,+S,Etp=0`,  // Turn screen on, top app = search
+		`9,h,3000,-Etp=0`, // Remove search from the top.
+		`9,h,0,+Etp=4`,    // Put messaging on top (1).
+		`9,h,5000,-S`,     // Turn screen off.
+		`9,h,7000,-Etp=4`, // Remove messaging from the top.
+		`9,h,0,+Etp=19`,   // Put calendar on top.
+		`9,h,500,+S`,      // Turn screen on.
+		`9,h,400,-Etp=19`, // Remove calendar from the top.
+		`9,h,0,+Etp=4`,    // Put messaging on top (2).
+		`9,h,50,-S`,       // Turn screen off.
+		`9,h,70,-Etp=4`,   // Remove messaging from the top.
+		`9,h,0,+Etp=0`,    // Activate search top (should not count because screen is off).
+
+	}, "\n")
+	want := newActivitySummary(FormatTotalTime)
+	want.StartTimeMs = 1456809000000
+	want.EndTimeMs = 1456809016020
+	want.TopApplicationSummary[`"com.google.android.googlequicksearchbox"`] = Dist{
+		Num:           1,
+		TotalDuration: 3000 * time.Millisecond,
+		MaxDuration:   3000 * time.Millisecond,
+	}
+	want.TopApplicationSummary[`"com.google.android.apps.messaging"`] = Dist{
+		Num:           2,
+		TotalDuration: 5050 * time.Millisecond,
+		MaxDuration:   5000 * time.Millisecond,
+	}
+	want.TopApplicationSummary[`"com.android.calendar/com.google/XXX@google.com"`] = Dist{
+		Num:           1,
+		TotalDuration: 400 * time.Millisecond,
+		MaxDuration:   400 * time.Millisecond,
+	}
+
+	wantCSV := strings.Join([]string{
+		csv.FileHeader,
+		`Top app,service,1456809000000,1456809003000,"com.google.android.googlequicksearchbox",10031`,
+		`Top app,service,1456809003000,1456809008000,"com.google.android.apps.messaging",10066`,
+		`Screen,bool,1456809000000,1456809008000,true,unknown screen on reason`,
+		`Top app,service,1456809015500,1456809015900,"com.android.calendar/com.google/XXX@google.com",10038`,
+		`Top app,service,1456809015900,1456809015950,"com.google.android.apps.messaging",10066`,
+		`Screen,bool,1456809015500,1456809015950,true,unknown screen on reason`,
+	}, "\n")
+
+	var b bytes.Buffer
+	result := AnalyzeHistory(&b, input, FormatTotalTime, emptyUIDPackageMapping, true)
+	validateHistory(input, t, result, 0, 1)
+
+	s := result.Summaries[0]
+	if want.StartTimeMs != s.StartTimeMs {
+		t.Errorf("AnalyzeHistory(%s,...).Summaries[0].StartTimeMs = %d, want %d", input, s.StartTimeMs, want.StartTimeMs)
+	}
+	if want.EndTimeMs != s.EndTimeMs {
+		t.Errorf("AnalyzeHistory(%s,...).Summaries[0].EndTimeMs = %d, want %d", input, s.EndTimeMs, want.EndTimeMs)
+	}
+	if !reflect.DeepEqual(want.TopApplicationSummary, s.TopApplicationSummary) {
+		// TODO: write function that find the difference between maps
+		t.Errorf("AnalyzeHistory(%s,...).Summaries[0].TopApplicationSummary = %v, want %v", input, s.TopApplicationSummary, want.TopApplicationSummary)
+	}
+
+	gotCSV := normalizeCSV(b.String())
+	wantCSVNormalized := normalizeCSV(wantCSV)
+	if !reflect.DeepEqual(gotCSV, wantCSVNormalized) {
+		t.Errorf("AnalyzeHistory(%s,...) generated incorrect csv:\n  got: %q\n  want: %q", input, gotCSV, wantCSVNormalized)
+	}
+}
+
+func TestTopAppMultipleSummaries(t *testing.T) {
+	input := strings.Join([]string{
+		`9,hsp,0,10031,"com.google.android.googlequicksearchbox"`,
+		`9,h,0:RESET:TIME:1456809000000`,
+		`9,h,0,+S,Etp=0`,  // Turn screen on, top app = search
+		`9,h,1000,Bs=c`,   // Charging the phone.
+		`9,h,2000,Bs=d`,   // Done charging.
+		`9,h,5000,-Etp=0`, // Remove search from the top.
+	}, "\n")
+
+	want := []*ActivitySummary{
+		newActivitySummary(FormatTotalTime),
+		newActivitySummary(FormatTotalTime),
+	}
+	want[0].StartTimeMs = 1456809000000
+	want[0].EndTimeMs = 1456809001000
+	want[0].TopApplicationSummary[`"com.google.android.googlequicksearchbox"`] = Dist{
+		Num:           1,
+		TotalDuration: 1000 * time.Millisecond,
+		MaxDuration:   1000 * time.Millisecond,
+	}
+	want[1].StartTimeMs = 1456809003000
+	want[1].EndTimeMs = 1456809008000
+	want[1].TopApplicationSummary[`"com.google.android.googlequicksearchbox"`] = Dist{
+		Num:           1,
+		TotalDuration: 5000 * time.Millisecond,
+		MaxDuration:   5000 * time.Millisecond,
+	}
+
+	wantCSV := strings.Join([]string{
+		csv.FileHeader,
+		`Charging status,string,1456809001000,1456809003000,c,`,
+		`Charging status,string,1456809003000,1456809008000,d,`,
+		`Top app,service,1456809000000,1456809008000,"com.google.android.googlequicksearchbox",10031`,
+		`Screen,bool,1456809000000,1456809008000,true,unknown screen on reason`,
+	}, "\n")
+
+	var b bytes.Buffer
+	result := AnalyzeHistory(&b, input, FormatTotalTime, emptyUIDPackageMapping, true)
+	validateHistory(input, t, result, 0, 2)
+
+	for i, s := range result.Summaries {
+		if want[i].StartTimeMs != s.StartTimeMs {
+			t.Errorf("AnalyzeHistory(%s,...).Summaries[%v].StartTimeMs = %d, want %d", input, i, s.StartTimeMs, want[i].StartTimeMs)
+		}
+		if want[i].EndTimeMs != s.EndTimeMs {
+			t.Errorf("AnalyzeHistory(%s,...).Summaries[%v].EndTimeMs = %d, want %d", input, i, s.EndTimeMs, want[i].EndTimeMs)
+		}
+		if !reflect.DeepEqual(want[i].TopApplicationSummary, s.TopApplicationSummary) {
+			t.Errorf("AnalyzeHistory(%s,...).Summaries[%v].TopApplicationSummary = %v, want %v", input, i, s.TopApplicationSummary, want[i].TopApplicationSummary)
+		}
+	}
+
+	gotCSV := normalizeCSV(b.String())
+	wantCSVNormalized := normalizeCSV(wantCSV)
+	if !reflect.DeepEqual(gotCSV, wantCSVNormalized) {
+		t.Errorf("AnalyzeHistory(%s,...) generated incorrect csv:\n  got: %q\n  want: %q", input, gotCSV, wantCSVNormalized)
+	}
+}

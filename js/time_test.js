@@ -134,6 +134,10 @@ window.testParseTimeString = function() {
       expected: MSECS_IN_HOUR + 4 * MSECS_IN_SEC + 900
     },
     {
+      input: '1.234ms',
+      expected: 1.234
+    },
+    {
       input: '1hs',
       expected: 0
     },
@@ -147,10 +151,6 @@ window.testParseTimeString = function() {
     },
     {
       input: '25.334',
-      expected: 0
-    },
-    {
-      input: '1.234ms',
       expected: 0
     }
   ];

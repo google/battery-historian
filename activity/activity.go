@@ -51,21 +51,36 @@ var (
 )
 
 const (
-	// ProcStartEvent is the string for matching application process start events in the bug report.
-	ProcStartEvent = "am_proc_start"
+	// procStartEvent is the string for matching application process start events in the bug report.
+	procStartEvent = "am_proc_start"
 
-	// ProcDiedEvent is the string for matching application process died events in the bug report.
-	ProcDiedEvent = "am_proc_died"
+	// procDiedEvent is the string for matching application process died events in the bug report.
+	procDiedEvent = "am_proc_died"
 
-	// ANREvent is the string for matching application not responding events in the bug report.
-	ANREvent = "am_anr"
+	// anrEvent is the string for matching application not responding events in the bug report.
+	anrEvent = "am_anr"
 
-	// LowMemoryEvent is the string for matching low memory events in the bug report.
-	LowMemoryEvent = "am_low_memory"
+	// lowMemoryEvent is the string for matching low memory events in the bug report.
+	lowMemoryEvent = "am_low_memory"
 
-	// AMProc is the CSV description for the Activity Manager Process related events.
-	AMProc = "Activity Manager Proc"
+	// lowMemoryANRGroup is the group name for low memory and application not responding events.
+	lowMemoryANRGroup = "AM Low Memory / ANR"
+
+	// amProc is the CSV description for the Activity Manager Process related events.
+	amProc = "Activity Manager Proc"
+
+	// crashes is the the CSV description of Crash events.
+	crashes = "Crashes"
 )
+
+// LogsData contains the CSV generated from the system and event logs and the start times of the logs.
+type LogsData struct {
+	CSV string
+	// GroupToLogStart is a map from group name to the earliest start time of the logs the group's events were found in.
+	GroupToLogStart map[string]int64
+	Warnings        []string
+	Errs            []error
+}
 
 // procEntry stores the timestamp and details extracted from an am_proc_start or am_proc_died event.
 type procEntry struct {
@@ -118,6 +133,9 @@ type parser struct {
 
 	// pidMappings maps from PID to app info.
 	pidMappings map[string][]bugreportutils.AppInfo
+
+	// crashSource stores the last seen crash details.
+	crashSource string
 }
 
 // newParser creates a parser for the given bugreport.
@@ -172,97 +190,122 @@ func (p *parser) fullTimestamp(month, day, partialTimestamp, remainder string) (
 
 // Parse writes a CSV entry for each line matching activity manager proc start and died, ANR and low memory events.
 // Package info is used to match crash events to UIDs. Errors encountered during parsing will be collected into an errors slice and will continue parsing remaining events.
-func Parse(pkgs []*usagepb.PackageInfo, f string) (string, []string, []error) {
+func Parse(pkgs []*usagepb.PackageInfo, f string) LogsData {
 	p, warnings, err := newParser(f)
+	res := LogsData{Warnings: warnings}
 	if err != nil {
-		return "", nil, []error{err}
+		res.Errs = append(res.Errs, err)
+		return res
 	}
+	// Track the first timestamp seen in the current log section.
+	var firstSectionTime int64
+	// Mapping from group name to the single earliest timestamp seen in all sections the group's events were found in.
+	res.GroupToLogStart = make(map[string]int64)
 
-	var errs []error
-	crashSource := ""
 	for _, line := range strings.Split(f, "\n") {
+		if m, _ := historianutils.SubexpNames(bugreportutils.BugReportSectionRE, line); m {
+			// New section, reset the first seen time.
+			firstSectionTime = 0
+			continue
+		}
 		m, result := historianutils.SubexpNames(logEntryRE, line)
 		if !m {
 			continue
 		}
 		timestamp, err := p.fullTimestamp(result["month"], result["day"], result["timeStamp"], result["remainder"])
 		if err != nil {
-			errs = append(errs, err)
+			res.Errs = append(res.Errs, err)
 			continue
 		}
-		details := result["details"]
-		pid := result["pid"]
-
-		if m, _ = historianutils.SubexpNames(bluetoothScanRE, details); m {
-			p.parseBluetoothScan(timestamp, pid)
-			continue
+		// Store the first time seen for the current section.
+		if firstSectionTime == 0 {
+			firstSectionTime = timestamp
 		}
-		if m, result = historianutils.SubexpNames(crashStartRE, details); m {
-			crashSource = result["source"]
-			continue
+		if timestamp < firstSectionTime {
+			// Log timestamps should be in sorted order, but still handle the case where they aren't.
+			res.Errs = append(res.Errs, fmt.Errorf("expect log timestamps in sorted order, got section start: %v, event timestamp: %v", firstSectionTime, timestamp))
+			firstSectionTime = timestamp
 		}
-		if m, result = historianutils.SubexpNames(crashProcessRE, details); m && crashSource != "" {
-			var uid string
-			pkg, err := packageutils.GuessPackage(result["process"], "", pkgs)
-			if err != nil {
-				errs = append(errs, err)
-				// Still want to show the crash event even if there was an error matching a package.
-			} else if pkg != nil {
-				uid = fmt.Sprintf("%d", pkg.GetUid())
+		n, warning, err := p.parseEvent(pkgs, timestamp, result["details"], result["pid"])
+		if n != "" {
+			// Store the section start time if no time was stored for the event.
+			// Overwrite the earliest section time for a group if the current section has an earlier start time.
+			if t, ok := res.GroupToLogStart[n]; !ok || t > firstSectionTime {
+				res.GroupToLogStart[n] = firstSectionTime
 			}
-
-			p.csvState.PrintInstantEvent(csv.Entry{
-				Desc:  "Crashes",
-				Start: timestamp,
-				Type:  "service",
-				Value: fmt.Sprintf("%s: %s", result["process"], crashSource),
-				Opt:   uid,
-			})
-			crashSource = ""
-			continue
 		}
-
-		m, result = historianutils.SubexpNames(activityManagerRE, details)
-		if !m {
-			// Non matching lines are ignored but not considered errors.
-			continue
+		if err != nil {
+			res.Errs = append(res.Errs, err)
 		}
-		t := result["transitionType"]
-		// Format of the value is defined at frameworks/base/services/core/java/com/android/server/am/EventLogTags.logtags.
-		v := result["value"]
-
-		switch t {
-		case LowMemoryEvent:
-			p.parseLowMemory(timestamp, v)
-
-		case ANREvent:
-			warning, err := p.parseANR(pkgs, timestamp, v)
-			if err != nil {
-				errs = append(errs, err)
-			}
-			if warning != "" {
-				warnings = append(warnings, warning)
-			}
-
-		case ProcStartEvent, ProcDiedEvent:
-			warning, err := p.parseProc(timestamp, v, t)
-			if err != nil {
-				errs = append(errs, err)
-			}
-			if warning != "" {
-				warnings = append(warnings, warning)
-			}
-
-		default:
-			errs = append(errs, fmt.Errorf("unknown transition for %q: %q", AMProc, t))
+		if warning != "" {
+			res.Warnings = append(res.Warnings, warning)
 		}
 	}
 	// If there was no corresponding am_proc_died event, set the end time to 0.
 	p.csvState.PrintAllReset(0)
-	return p.buf.String(), warnings, errs
+	res.CSV = p.buf.String()
+	return res
 }
 
-func (p *parser) parseBluetoothScan(timestamp int64, pid string) {
+// parseEvent parses a single event from the log data, and returns the group name the event belongs to and any warning or error.
+func (p *parser) parseEvent(pkgs []*usagepb.PackageInfo, timestamp int64, details, pid string) (string, string, error) {
+	if strings.Contains(details, "dumpstate: begin") {
+		p.csvState.PrintInstantEvent(csv.Entry{
+			Desc:  "Logcat misc",
+			Start: timestamp,
+			Type:  "string",
+			Value: "bug report collection triggered",
+		})
+		return "Logcat misc", "", nil
+	}
+
+	if m, _ := historianutils.SubexpNames(bluetoothScanRE, details); m {
+		return p.parseBluetoothScan(timestamp, pid), "", nil
+	}
+	if m, result := historianutils.SubexpNames(crashStartRE, details); m {
+		p.crashSource = result["source"]
+		return "", "", nil
+	}
+	if m, result := historianutils.SubexpNames(crashProcessRE, details); m && p.crashSource != "" {
+		var uid string
+		pkg, err := packageutils.GuessPackage(result["process"], "", pkgs)
+		// Still want to show the crash event even if there was an error matching a package, so don't early return.
+		if err == nil && pkg != nil {
+			uid = strconv.Itoa(int(pkg.GetUid()))
+		}
+		p.csvState.PrintInstantEvent(csv.Entry{
+			Desc:  crashes,
+			Start: timestamp,
+			Type:  "service",
+			Value: fmt.Sprintf("%s: %s", result["process"], p.crashSource),
+			Opt:   uid,
+		})
+		p.crashSource = ""
+		return crashes, "", err
+	}
+
+	m, result := historianutils.SubexpNames(activityManagerRE, details)
+	if !m {
+		// Non matching lines are ignored but not considered errors.
+		return "", "", nil
+	}
+	t := result["transitionType"]
+	// Format of the value is defined at frameworks/base/services/core/java/com/android/server/am/EventLogTags.logtags.
+	v := result["value"]
+
+	switch t {
+	case lowMemoryEvent:
+		return p.parseLowMemory(timestamp, v), "", nil
+	case anrEvent:
+		return p.parseANR(pkgs, timestamp, v)
+	case procStartEvent, procDiedEvent:
+		return p.parseProc(timestamp, v, t)
+	default:
+		return "", "", fmt.Errorf("unknown transition for %q: %q", amProc, t)
+	}
+}
+
+func (p *parser) parseBluetoothScan(timestamp int64, pid string) string {
 	var appName string
 	var uid string
 	apps, ok := p.pidMappings[pid]
@@ -290,9 +333,10 @@ func (p *parser) parseBluetoothScan(timestamp int64, pid string) {
 		Value: fmt.Sprintf("%s (PID: %s)", appName, pid),
 		Opt:   uid,
 	})
+	return "Bluetooth Scan"
 }
 
-func (p *parser) parseLowMemory(timestamp int64, v string) {
+func (p *parser) parseLowMemory(timestamp int64, v string) string {
 	// The value is the number of processes.
 	p.csvState.PrintInstantEvent(csv.Entry{
 		Desc:  "AM Low Memory",
@@ -300,17 +344,18 @@ func (p *parser) parseLowMemory(timestamp int64, v string) {
 		Type:  "service",
 		Value: v,
 	})
+	return lowMemoryANRGroup
 }
 
-func (p *parser) parseANR(pkgs []*usagepb.PackageInfo, timestamp int64, v string) (string, error) {
+func (p *parser) parseANR(pkgs []*usagepb.PackageInfo, timestamp int64, v string) (string, string, error) {
 	// Expected format of v is: User,pid,Package Name,Flags,reason.
 	parts := strings.Split(v, ",")
 	if len(parts) < 5 {
-		return "", fmt.Errorf("%s: got %d parts, want 5", ANREvent, len(parts))
+		return "", "", fmt.Errorf("%s: got %d parts, want 5", anrEvent, len(parts))
 	}
 	warning := ""
 	if len(parts) > 5 {
-		warning = fmt.Sprintf("%s: got %d parts, expected 5", ANREvent, len(parts))
+		warning = fmt.Sprintf("%s: got %d parts, expected 5", anrEvent, len(parts))
 	}
 
 	var uid string
@@ -329,40 +374,40 @@ func (p *parser) parseANR(pkgs []*usagepb.PackageInfo, timestamp int64, v string
 		Type:  "service",
 		Value: strings.Join(parts, "~"),
 	})
-	return warning, err
+	return lowMemoryANRGroup, warning, err
 }
 
-func (p *parser) parseProc(timestamp int64, v string, t string) (string, error) {
+func (p *parser) parseProc(timestamp int64, v string, t string) (string, string, error) {
 	e, warning, err := procEvent(timestamp, v, t)
 	if err != nil {
-		return warning, err
+		return "", warning, err
 	}
 	storedEvent, alreadyActive := p.activeProcMap[e.pid]
 	switch t {
-	case ProcStartEvent:
+	case procStartEvent:
 		if alreadyActive {
 			// Double positive transition. Ignore the event.
-			return warning, fmt.Errorf("two positive transitions for %q, value %q", AMProc, v)
+			return "", warning, fmt.Errorf("two positive transitions for %q, value %q", amProc, v)
 		}
 		// Store the new event.
 		p.activeProcMap[e.pid] = e
-		p.csvState.AddEntryWithOpt(AMProc, e, timestamp, e.uid)
-		return warning, nil
+		p.csvState.AddEntryWithOpt(amProc, e, timestamp, e.uid)
+		return amProc, warning, nil
 
-	case ProcDiedEvent:
+	case procDiedEvent:
 		if !alreadyActive {
 			// No corresponding start event.
-			p.csvState.AddEntryWithOpt(AMProc, e, 0, e.uid)
-			p.csvState.AddEntryWithOpt(AMProc, e, timestamp, e.uid)
-			return warning, nil
+			p.csvState.AddEntryWithOpt(amProc, e, 0, e.uid)
+			p.csvState.AddEntryWithOpt(amProc, e, timestamp, e.uid)
+			return amProc, warning, nil
 		}
 		// Corresponding start event exists, complete the event with the current timestamp.
-		p.csvState.AddEntryWithOpt(AMProc, storedEvent, timestamp, storedEvent.uid)
+		p.csvState.AddEntryWithOpt(amProc, storedEvent, timestamp, storedEvent.uid)
 		delete(p.activeProcMap, storedEvent.pid)
-		return warning, nil
+		return amProc, warning, nil
 
 	default:
-		return warning, fmt.Errorf("unknown transition: %v", t)
+		return "", warning, fmt.Errorf("unknown transition: %v", t)
 	}
 }
 
@@ -371,21 +416,21 @@ func (p *parser) parseProc(timestamp int64, v string, t string) (string, error) 
 func procEvent(start int64, v string, t string) (*procEntry, string, error) {
 	warning := ""
 	switch t {
-	case ProcStartEvent:
+	case procStartEvent:
 		// Expected format of v is: User,PID,UID,Process Name,Type,Component.
 		parts := strings.Split(v, ",")
 		if len(parts) < 6 {
-			return nil, warning, fmt.Errorf("%s: got %d parts, want 6", ProcStartEvent, len(parts))
+			return nil, warning, fmt.Errorf("%s: got %d parts, want 6", procStartEvent, len(parts))
 		}
 		if len(parts) > 6 {
-			warning = fmt.Sprintf("%s: got %d parts, expected 6", ProcStartEvent, len(parts))
+			warning = fmt.Sprintf("%s: got %d parts, expected 6", procStartEvent, len(parts))
 		}
 		if _, err := strconv.Atoi(parts[1]); err != nil {
-			return nil, warning, fmt.Errorf("%s: could not parse pid %v: %v", ProcStartEvent, parts[1], err)
+			return nil, warning, fmt.Errorf("%s: could not parse pid %v: %v", procStartEvent, parts[1], err)
 		}
 		uid, err := packageutils.AppIDFromString(parts[2])
 		if err != nil {
-			return nil, warning, fmt.Errorf("%s: could not parse uid %v: %v", ProcStartEvent, parts[2], err)
+			return nil, warning, fmt.Errorf("%s: could not parse uid %v: %v", procStartEvent, parts[2], err)
 		}
 		return &procEntry{
 			start:     start,
@@ -395,17 +440,17 @@ func procEvent(start int64, v string, t string) (*procEntry, string, error) {
 			component: parts[5],
 		}, warning, nil
 
-	case ProcDiedEvent:
+	case procDiedEvent:
 		// Expected format of v is: User,PID,Process Name.
 		parts := strings.Split(v, ",")
 		if len(parts) < 3 {
-			return nil, warning, fmt.Errorf("%s: got %d parts, want 3", ProcDiedEvent, len(parts))
+			return nil, warning, fmt.Errorf("%s: got %d parts, want 3", procDiedEvent, len(parts))
 		}
 		if len(parts) > 3 {
-			warning = fmt.Sprintf("%s: got %d parts, expected 3", ProcDiedEvent, len(parts))
+			warning = fmt.Sprintf("%s: got %d parts, expected 3", procDiedEvent, len(parts))
 		}
 		if _, err := strconv.Atoi(parts[1]); err != nil {
-			return nil, warning, fmt.Errorf("%s: could not parse pid %v: %v", ProcDiedEvent, parts[1], err)
+			return nil, warning, fmt.Errorf("%s: could not parse pid %v: %v", procDiedEvent, parts[1], err)
 		}
 		return &procEntry{
 			start:   start,

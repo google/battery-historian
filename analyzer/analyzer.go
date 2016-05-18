@@ -92,6 +92,8 @@ type uploadResponse struct {
 	CriticalError       string                   `json:"criticalError"` // Critical errors are ones that cause parsing of important data to abort early and should be shown prominently to the user.
 	FileName            string                   `json:"fileName"`
 	Location            string                   `json:"location"`
+	// GroupToLogStart is a map from logcat group name to the earliest start time of the logs the group's events were found in.
+	GroupToLogStart map[string]int64 `json:"groupToLogStart"`
 }
 
 type uploadResponseCompare struct {
@@ -114,12 +116,6 @@ type checkinData struct {
 	batterystats *bspb.BatteryStats
 	warnings     []string
 	err          []error
-}
-
-type activityManagerData struct {
-	csv      string
-	warnings []string
-	errs     []error
 }
 
 // UploadedFile is a user uploaded bugreport or its associated file to be analyzed.
@@ -165,7 +161,7 @@ func (pd *ParsedData) Cleanup() {
 }
 
 // SendAsJSON creates and sends the HTML output and json response from the ParsedData.
-func (pd *ParsedData) SendAsJSON(w http.ResponseWriter) {
+func (pd *ParsedData) SendAsJSON(w http.ResponseWriter, r *http.Request) {
 	if err := pd.processKernelTrace(); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -196,7 +192,7 @@ func (pd *ParsedData) SendAsJSON(w http.ResponseWriter) {
 			return
 		}
 	}
-	js, err := json.Marshal(uploadResponseCompare{
+	unzipped, err := json.Marshal(uploadResponseCompare{
 		UploadResponse:  pd.responseArr,
 		HTML:            buf.String(),
 		UsingComparison: (len(pd.data) == numberOfFilesToCompare),
@@ -207,7 +203,19 @@ func (pd *ParsedData) SendAsJSON(w http.ResponseWriter) {
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
-	w.Write(js)
+
+	// Gzip data if it's accepted by the requester.
+	if strings.Contains(r.Header.Get("Accept-Encoding"), "gzip") {
+		gzipped, err := historianutils.GzipCompress(unzipped)
+		if err == nil {
+			w.Header().Add("Content-Encoding", "gzip")
+			w.Write(gzipped)
+			return
+		}
+		// Send ungzipped data.
+		log.Printf("failed to gzip data: %v", err)
+	}
+	w.Write(unzipped)
 }
 
 // processKernelTrace converts the kernel trace file with a bug report into a Historian parseable format, and then parses the result into a CSV.
@@ -317,7 +325,7 @@ func InitTemplates(dir string) {
 		templatePath(dir, "body.html"), templatePath(dir, "summaries.html"),
 		templatePath(dir, "checkin.html"), templatePath(dir, "history.html"), templatePath(dir, "appstats.html"),
 		templatePath(dir, "tables.html"), templatePath(dir, "tablesidebar.html"),
-		templatePath(dir, "histogramstats.html"),
+		templatePath(dir, "histogramstats.html"), templatePath(dir, "powerstats.html"),
 	))
 	compareTempl = template.Must(template.ParseFiles(
 		templatePath(dir, "body.html"), templatePath(dir, "compare_summaries.html"),
@@ -342,6 +350,7 @@ func SetIsOptimized(optimized bool) {
 	isOptimizedJs = optimized
 }
 
+// closeConnection closes the http connection and writes a response.
 func closeConnection(w http.ResponseWriter, s string) {
 	if flusher, ok := w.(http.Flusher); ok {
 		w.Header().Set("Connection", "close")
@@ -383,7 +392,6 @@ func HTTPAnalyzeHandler(w http.ResponseWriter, r *http.Request) {
 	log.Printf("Trace starting reading uploaded file. %d bytes", r.ContentLength)
 	defer log.Printf("Trace ended analyzing file.")
 
-	var refCount int
 	//get the multipart reader for the request.
 	reader, err := r.MultipartReader()
 	if err != nil {
@@ -461,22 +469,22 @@ func HTTPAnalyzeHandler(w http.ResponseWriter, r *http.Request) {
 
 		fs = append(fs, UploadedFile{part.FormName(), fname, contents})
 	}
-	AnalyzeAndResponse(w, fs, refCount)
+	AnalyzeAndResponse(w, r, fs)
 }
 
 // AnalyzeAndResponse analyzes the uploaded files and sends the HTTP response in JSON.
-func AnalyzeAndResponse(w http.ResponseWriter, files []UploadedFile, refCount int) {
+func AnalyzeAndResponse(w http.ResponseWriter, r *http.Request, files []UploadedFile) {
 	pd := &ParsedData{}
 	defer pd.Cleanup()
-	if err := pd.AnalyzeFiles(files, refCount); err != nil {
+	if err := pd.AnalyzeFiles(files); err != nil {
 		http.Error(w, fmt.Sprintf("failed to analyze file: %v", err), http.StatusInternalServerError)
 		return
 	}
-	pd.SendAsJSON(w)
+	pd.SendAsJSON(w, r)
 }
 
 // AnalyzeFiles processes and analyzes a bugreport package.
-func (pd *ParsedData) AnalyzeFiles(files []UploadedFile, refCount int) error {
+func (pd *ParsedData) AnalyzeFiles(files []UploadedFile) error {
 	hasBugreport := false
 	for _, file := range files {
 		contents := string(file.Contents)
@@ -598,21 +606,22 @@ func (pd *ParsedData) parseBugReport(fname, contents string) error {
 	historianCh := make(chan historianData)
 	summariesCh := make(chan summariesData)
 	checkinCh := make(chan checkinData)
-	activityManagerCh := make(chan activityManagerData)
+	activityManagerCh := make(chan activity.LogsData)
+	var loc string
 
-	// Create a temporary file to save the bug report, for the Historian script.
-	brFile, err := writeTempFile(contents)
-
-	historianOutput := historianData{"", err}
-	if err == nil {
-		// Don't run the Historian script if could not create temporary file.
+	go func() {
+		// Create a temporary file to save the bug report, for the Historian script.
+		brFile, err := writeTempFile(contents)
+		if err != nil {
+			historianCh <- historianData{err: err}
+			return
+		}
+		// Don't run the Historian script if it could not create temporary file.
 		defer os.Remove(brFile)
-		go func() {
-			html, err := generateHistorianPlot(fname, brFile)
-			historianCh <- historianData{html, err}
-			log.Printf("Trace finished generating Historian plot.")
-		}()
-	}
+		html, err := generateHistorianPlot(fname, brFile)
+		historianCh <- historianData{html, err}
+		log.Printf("Trace finished generating Historian plot.")
+	}()
 
 	var errs []error
 	ce := ""
@@ -622,76 +631,74 @@ func (pd *ParsedData) parseBugReport(fname, contents string) error {
 	} else {
 		// No point running these if we don't support the sdk version since we won't get any data from them.
 		bs := bugreportutils.ExtractBatterystatsCheckin(contents)
-
 		if strings.Contains(bs, "Exception occurred while dumping") {
-			// TODO: Display activity manager events even if battery data is invalid. Currently they will not be displayed.
 			ce = "Exception found in battery dump."
 			errs = append(errs, errors.New("exception found in battery dump"))
-			close(summariesCh)
-			close(checkinCh)
-		} else {
-			pkgs, pkgErrs := packageutils.ExtractAppsFromBugReport(contents)
-			errs = append(errs, pkgErrs...)
-
-			// Activity manager events are only parsed for supported sdk versions, even though they are still present in unsupported sdk version reports.
-			// This is as the events are rendered with Historian v2, which is not generated for unsupported sdk versions.
-			go func() {
-				amCSV, warnings, errs := activity.Parse(pkgs, contents)
-				activityManagerCh <- activityManagerData{amCSV, warnings, errs}
-			}()
-
-			go func() {
-				var ctr checkinutil.IntCounter
-
-				s := &sessionpb.Checkin{
-					Checkin:          proto.String(bs),
-					BuildFingerprint: proto.String(meta.BuildFingerprint),
-				}
-				stats, warnings, pbsErrs := checkinparse.ParseBatteryStats(&ctr, checkinparse.CreateCheckinReport(s), pkgs)
-				checkinCh <- checkinData{stats, warnings, pbsErrs}
-				log.Printf("Trace finished processing checkin.")
-				if stats == nil {
-					ce = "Could not parse aggregated battery stats."
-					errs = append(errs, errors.New("could not parse aggregated battery stats"))
-					// Only returning from this goroutine.
-					return
-				}
-				pd.deviceType = stats.GetBuild().GetDevice()
-			}()
-
-			go func() {
-				summariesCh <- analyze(bs, pkgs)
-				log.Printf("Trace finished processing summary data.")
-			}()
 		}
+		// Extract device location.
+		go func() {
+			// Retrieve the bugreport end time by parsing the bugreport content.
+			// The bugreport time is preferred over calculating end time using TotalRealtimeMsec
+			// since TotalRealtimeMsec does not account for periods of time when the device was powered off.
+			d, err := bugreportutils.DumpState(contents)
+			if err != nil {
+				log.Printf("failed to extract time information from bugreport dumpstate: %v\n", err)
+			} else {
+				loc = d.Location().String()
+			}
+		}()
+
+		pkgs, pkgErrs := packageutils.ExtractAppsFromBugReport(contents)
+		errs = append(errs, pkgErrs...)
+
+		// Activity manager events are only parsed for supported sdk versions, even though they are still present in unsupported sdk version reports.
+		// This is because the events are rendered with Historian v2, which is not generated for unsupported sdk versions.
+		go func() {
+			activityManagerCh <- activity.Parse(pkgs, contents)
+		}()
+
+		go func() {
+			var ctr checkinutil.IntCounter
+			s := &sessionpb.Checkin{
+				Checkin:          proto.String(bs),
+				BuildFingerprint: proto.String(meta.BuildFingerprint),
+			}
+			stats, warnings, pbsErrs := checkinparse.ParseBatteryStats(&ctr, checkinparse.CreateCheckinReport(s), pkgs)
+			checkinCh <- checkinData{stats, warnings, pbsErrs}
+			log.Printf("Trace finished processing checkin.")
+			if stats == nil {
+				ce = "Could not parse aggregated battery stats."
+				errs = append(errs, errors.New("could not parse aggregated battery stats"))
+				return
+			}
+			pd.deviceType = stats.GetBuild().GetDevice()
+		}()
+
+		go func() {
+			summariesCh <- analyze(bs, pkgs)
+			log.Printf("Trace finished processing summary data.")
+		}()
 	}
 
-	if historianOutput.err == nil {
-		historianOutput = <-historianCh
-	}
+	historianOutput := <-historianCh
 	if historianOutput.err != nil {
 		historianOutput.html = fmt.Sprintf("Error generating historian plot: %v", historianOutput.err)
 	}
 
 	var summariesOutput summariesData
 	var checkinOutput checkinData
-	var activityManagerOutput activityManagerData
+	var activityManagerOutput activity.LogsData
+
 	if meta.SdkVersion >= minSupportedSDK {
 		summariesOutput = <-summariesCh
 		checkinOutput = <-checkinCh
 		activityManagerOutput = <-activityManagerCh
-		errs = append(errs, append(summariesOutput.errs, append(activityManagerOutput.errs, checkinOutput.err...)...)...)
+		errs = append(errs, append(summariesOutput.errs, append(activityManagerOutput.Errs, checkinOutput.err...)...)...)
 	}
 
 	log.Printf("Trace finished generating Historian plot and summaries.")
-	var loc string
-	if d, err := bugreportutils.DumpState(contents); err != nil {
-		log.Printf("Failed to extract time information from bugreport dumpstate: %v", err)
-	} else {
-		loc = d.Location().String()
-	}
 
-	warnings := append(checkinOutput.warnings, activityManagerOutput.warnings...)
+	warnings := append(checkinOutput.warnings, activityManagerOutput.Warnings...)
 	data := presenter.Data(meta,
 		fname, summariesOutput.summaries,
 		checkinOutput.batterystats, historianOutput.html,
@@ -700,7 +707,7 @@ func (pd *ParsedData) parseBugReport(fname, contents string) error {
 
 	pd.responseArr = append(pd.responseArr, uploadResponse{
 		SDKVersion:      data.SDKVersion,
-		HistorianV2CSV:  appendCSVs(summariesOutput.historianV2CSV, activityManagerOutput.csv),
+		HistorianV2CSV:  appendCSVs(summariesOutput.historianV2CSV, activityManagerOutput.CSV),
 		LevelSummaryCSV: summariesOutput.levelSummaryCSV,
 		ReportVersion:   data.CheckinSummary.ReportVersion,
 		AppStats:        data.AppStats,
@@ -710,6 +717,7 @@ func (pd *ParsedData) parseBugReport(fname, contents string) error {
 		CriticalError:   ce,
 		FileName:        data.Filename,
 		Location:        loc,
+		GroupToLogStart: activityManagerOutput.GroupToLogStart,
 	})
 	pd.data = append(pd.data, data)
 	return nil

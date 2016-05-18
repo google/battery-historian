@@ -229,6 +229,10 @@ historian.color.colorMap_[historian.metrics.Csv.WAKELOCK_IN] = function() {
 historian.color.error_ = goog.functions.constant('red');
 
 
+/** @private {function(string): string} */
+historian.color.unavailable_ = goog.functions.constant('lightgray');
+
+
 /**
  * Maps a value into a string to display.
  * @private {!Object<!Object<(number|string), string>>}
@@ -256,6 +260,27 @@ historian.color.valueTextMap_[historian.metrics.Csv.CHARGING_STATUS] = {
 
 
 /** @private {!Object<string>} */
+historian.color.valueTextMap_[historian.metrics.Csv.HEALTH] = {
+  '?': 'unknown',
+  'c': 'cold',
+  'd': 'dead',
+  'g': 'good',
+  'h': 'overheat',
+  'f': 'failure',
+  'v': 'over-voltage'
+};
+
+
+/** @private {!Object<string>} */
+historian.color.valueTextMap_[historian.metrics.Csv.PLUG_TYPE] = {
+  'a': 'ac',
+  'n': 'none',
+  'u': 'usb',
+  'w': 'wireless'
+};
+
+
+/** @private {!Object<string>} */
 historian.color.valueTextMap_[historian.metrics.Csv.WIFI_SUPPLICANT] = {
   'asced': 'ASSOCIATED',
   'ascing': 'ASSOCIATING',
@@ -274,8 +299,8 @@ historian.color.valueTextMap_[historian.metrics.Csv.WIFI_SUPPLICANT] = {
 
 
 /**
- * Returns the formatted string for the value if defined in the valueTextMap_
- * above, otherwise returns the original value.
+ * Returns the formatted string for the value if it's a special case (eg. it's
+ * defined in the valueTextMap_ above), otherwise returns the original value.
  *
  * @param {string} metric Name of metric.
  * @param {string|number} v Value to format.
@@ -290,6 +315,11 @@ historian.color.valueFormatter = function(metric, v) {
         '<span style="background-color: #ffebcd">%s °C (%s °F)</span>',
         goog.string.htmlEscape(celcius.toFixed(1)),
         goog.string.htmlEscape(fahrenheit.toFixed(1)));
+  }
+
+  if (metric == historian.metrics.Csv.COULOMB_CHARGE) {
+    // Units are in mAh.
+    return goog.string.subs('%s mAh', v);
   }
 
   if (metric in historian.color.valueTextMap_) {
@@ -315,32 +345,32 @@ historian.color.generateSeriesColors = function(seriesData) {
   for (var groupName in seriesData) {
     var seriesGroup = seriesData[groupName];
     seriesGroup.series.forEach(function(s) {
-      if (s['type'] == historian.metrics.ERROR_TYPE) {
-        s['color'] = historian.color.error_;
+      if (s.type == historian.metrics.ERROR_TYPE) {
+        s.color = historian.color.error_;
+
+      } else if (s.type == historian.metrics.UNAVAILABLE_TYPE) {
+        s.color = historian.color.unavailable_;
 
       // Predefined color functions from config file.
-      } else if (s['name'] in historian.color.colorMap_) {
-        s['color'] = historian.color.colorMap_[s['name']];
+      } else if (s.name in historian.color.colorMap_) {
+        s.color = historian.color.colorMap_[s.name];
 
       // Create a different color for each string name.
       } else if (s.type == 'string' || s.type == 'service') {
-        s['color'] = d3.scale.category20c();
+        s.color = d3.scale.category20c();
 
       // Bool series only need one color (no entries for 0 values).
       } else if (s.type == 'bool') {
-        var seriesColor = color(s['name']);
-        s['color'] = function(c) {
-          return seriesColor;
-        };
+        s.color = goog.functions.constant('green');
 
       // Create a linear color scale.
       } else {
         var extent = d3.extent(s.values, function(d) {
           return d.value;
         });
-        s['color'] = d3.scale.linear()
+        s.color = d3.scale.linear()
             .domain([extent[0], extent[1]])
-            .range(['#FFFFFF', color(s['name'])]);
+            .range(['#FFFFFF', color(s.name)]);
       }
     });
   }

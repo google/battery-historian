@@ -94,6 +94,12 @@ rect.level-summary {
   opacity: 0.3;
 }
 
+.powermonitor-overlay {
+  fill: none;
+  stroke: green;
+  stroke-width: 4;
+}
+
 .level-timeinfo {
   background-color: rgba(255, 255, 255, .95);
   border: 1px solid #aaa;
@@ -164,4 +170,33 @@ rect.bar, circle.bar {
 
 rect.bar:hover, circle.bar:hover {
   stroke-opacity: 0.5;
+}
+
+#power-selector-container {
+  position: absolute;
+  right: 20px;
+  bottom: 0;
+}
+
+#power-selector {
+  height: 20px;
+  padding: 0;
+  width: 350px;
+}
+
+.help-icon {
+  position: static;
+}
+
+.help-icon-container {
+  cursor: pointer;
+  opacity: 0.5;
+}
+
+.help-icon-container:hover {
+  opacity: 0.9;
+}
+
+.historian-tooltip.help-tooltip {
+  white-space: pre-wrap;
 }

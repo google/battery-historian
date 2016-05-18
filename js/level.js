@@ -15,8 +15,8 @@
  */
 
 goog.provide('historian.LevelLine');
+goog.provide('historian.LevelLine.Data');
 
-goog.require('goog.array');
 goog.require('goog.asserts');
 goog.require('goog.string');
 goog.require('historian.Context');
@@ -91,7 +91,7 @@ historian.LevelLine.LEGEND_SIZE_PX_ = 15;
  * Legend is rendered with this offset to the right of the svg.
  * @const {number}
  */
-historian.LevelLine.LEGEND_X_OFFSET = 35;
+historian.LevelLine.LEGEND_X_OFFSET = 50;
 
 
 /**
@@ -137,7 +137,7 @@ historian.LevelLine.TIME_INFO_CLASS_ = 'level-timeinfo';
 
 
 /**
- * Removes all level related elemnts from the DOM.
+ * Removes all level related elements from the DOM.
  */
 historian.LevelLine.prototype.clear = function() {
   $('.' + historian.LevelLine.VIEW_INFO_CLASS_).remove();
@@ -181,13 +181,7 @@ historian.LevelLine.Data = function(data, context, enableSampling) {
   this.processedData_ = this.initialData_;
 
   /**
-   * Whether the filtered data is valid or has been invalidated.
-   * @private {boolean}
-   */
-  this.filteredValid_ = false;
-
-  /**
-   * Data that has been filtered with isInViewableRange.
+   * Data that has been filtered with inTimeRange.
    * Invalidated on pan or zoom.
    * @private {!Array<historian.Entry>}
    */
@@ -245,10 +239,10 @@ historian.LevelLine.prototype.displayTotalCharge_ = function() {
 
   // Get all the data points visible in the current view.
   // We don't want sampled data, so use the original data points.
-  var startTime = this.context_.xScale.invert(0);
-  var endTime = this.context_.xScale.invert(
+  var startTime = this.context_.invertPosition(0);
+  var endTime = this.context_.invertPosition(
       this.context_.visSize[historian.constants.WIDTH]);
-  var visibleData = historian.LevelLine.Data.inViewableRange(
+  var visibleData = historian.utils.inTimeRange(
       startTime, endTime, this.levelData_);
 
   var total = historian.utils.calculateTotalChargeFormatted(visibleData);
@@ -283,69 +277,15 @@ historian.LevelLine.calculateAvgCurrent_ = function(data) {
  * @return {!Array<historian.Entry>} The data to display.
  */
 historian.LevelLine.Data.prototype.getDisplayedData = function() {
-  if (!this.filteredValid_) {
-    var startTime = this.context_.xScale.invert(0);
-    var endTime = this.context_.xScale.invert(
-        this.context_.visSize[historian.constants.WIDTH]);
+  var startTime = this.context_.invertPosition(0);
+  var endTime = this.context_.invertPosition(
+      this.context_.visSize[historian.constants.WIDTH]);
 
-    this.filteredData_ = historian.LevelLine.Data.inViewableRange(
-        startTime, endTime, this.processedData_);
-    historian.LevelLine.Data.adjustLevelData_(
-        this.filteredData_, this.initialData_);
-  }
+  this.filteredData_ = historian.utils.inTimeRange(
+      startTime, endTime, this.processedData_);
+  historian.LevelLine.Data.adjustLevelData_(
+      this.filteredData_, this.initialData_);
   return this.filteredData_;
-};
-
-
-/**
- * Returns a copy of the data points visible in the current time range using
- * binary search.
- * The data entries should be contiguous and non overlapping. Both the query
- * time ranges and data entry time ranges should have an inclusive start time
- * and exclusive end time.
- * @param {number} startTime The start time of the viewable time range.
- * @param {number} endTime The end time of the viewable time range.
- * @param {!Array<historian.Entry>} data The data to filter.
- * @return {!Array<historian.Entry>} The visible points.
- */
-historian.LevelLine.Data.inViewableRange = function(startTime, endTime, data) {
-  if (goog.array.isEmpty(data)) {
-    return [];
-  }
-  // Requesting range that comes after last end time of data range or before
-  // first start time of data range.
-  if (startTime >= data[data.length - 1].endTime ||
-      endTime <= data[0].startTime) {
-    return [];
-  }
-
-  var startObj = {
-    startTime: startTime
-  };
-  var startIndex = goog.array.binarySearch(data, startObj, function(d1, d2) {
-    return d1.startTime - d2.startTime;
-  });
-  if (startIndex < 0) {
-    // If the start time was not found in the array, binarySearch returns the
-    // index it would have been inserted in, -1.
-    startIndex = -(startIndex + 1);
-
-    // We want the element that is right before the insertion point.
-    if (startIndex != 0) {
-      startIndex--;
-    }
-  }
-  var endObj = {
-    endTime: endTime
-  };
-  var endIndex = goog.array.binarySearch(data, endObj, function(d1, d2) {
-    return d1.endTime - d2.endTime;
-  });
-
-  if (endIndex < 0) {
-    endIndex = -(endIndex + 1);
-  }
-  return goog.array.slice(data, startIndex, endIndex + 1);
 };
 
 
@@ -408,7 +348,6 @@ historian.LevelLine.Data.adjustLevelData_ =
  * @private
  */
 historian.LevelLine.Data.prototype.processData_ = function(initialLoad) {
-  this.filteredValid_ = false;
   if (this.enableSampling_) {
     var process = initialLoad ||
         (this.context_.msPerPixel() > historian.time.MSECS_IN_SEC);
@@ -507,8 +446,8 @@ historian.LevelLine.prototype.renderTimeInfo = function() {
   this.renderTimePoint_(coords[0]);
 
   // Get the time value of the chart corresponding to the mouse position.
-  var xValue =
-      this.context_.xScale.invert(coords[0] - historian.Context.MARGINS.LEFT);
+  var xValue = this.context_.invertPosition(
+      coords[0] - historian.Context.MARGINS.LEFT);
 
   // Get the index of the data point corresponding to the time value.
   // The bisector finds where the time value bisects the data array.

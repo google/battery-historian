@@ -43,8 +43,8 @@ historian.LevelConfiguration;
 
 
 /**
- * Stores battery level and powermonitor configs and creates configs for other
- * metrics.
+ * Stores predefined level configurations for battery level, coulomb charge, and
+ * powermonitor.
  * @param {number} capacity The device capacity in mAh.
  * @param {!Array<!historian.Entry>} powermonitorData
  * @constructor
@@ -56,6 +56,8 @@ historian.LevelConfigs = function(capacity, powermonitorData) {
   // Predefined configurations.
   this.configs_[historian.metrics.Csv.BATTERY_LEVEL] =
       historian.LevelConfigs.batteryLevelConfig_(capacity);
+  this.configs_[historian.metrics.Csv.COULOMB_CHARGE] =
+      historian.LevelConfigs.coulombChargeConfig_(capacity);
   this.configs_[historian.metrics.Csv.POWERMONITOR] =
       historian.LevelConfigs.powermonitorConfig_(powermonitorData);
 };
@@ -139,6 +141,34 @@ historian.LevelConfigs.batteryLevelConfig_ = function(c) {
 
 
 /**
+ * Returns the configuration for showing the coulomb charge as the level line.
+ * @param {number} c The device capacity in mAh.
+ * @return {!historian.LevelConfiguration}
+ * @private
+ */
+historian.LevelConfigs.coulombChargeConfig_ = function(c) {
+  return {
+    displayPowerInfo: false,
+    enableSampling: false,
+    formatDischarge: function(delta) {
+      // The input will be the delta in absolute mAh. Need to multiply by 100 to
+      // make it a percentage and divide by the capacity to get the discharge
+      // rate.
+      return historian.LevelConfigs.formatBatteryDischarge_(c, 100 * delta / c);
+    },
+    // Coulomb charge is already in mAh.
+    formatLevel: function(n) {return n.toString();},
+    id: 'coulombcharge',
+    name: historian.metrics.Csv.COULOMB_CHARGE,
+    legendText: 'Coulomb Charge',
+    levelDisplayText: 'Coulomb Charge',
+    hiddenBarMetrics: [],
+    yDomain: {min: 0, max: c}
+  };
+};
+
+
+/**
  * The configuration for displaying powermonitor level data.
  * @param {!Array<!historian.Entry>} data
  * @return {!historian.LevelConfiguration}
@@ -159,6 +189,7 @@ historian.LevelConfigs.powermonitorConfig_ = function(data) {
     levelDisplayText: 'Powermonitor (mA)',
     hiddenBarMetrics: [
       historian.metrics.Csv.BATTERY_LEVEL,
+      historian.metrics.Csv.COULOMB_CHARGE,
       historian.metrics.Csv.POWERMONITOR
     ],
     yDomain: {

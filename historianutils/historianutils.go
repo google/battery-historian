@@ -17,6 +17,7 @@ package historianutils
 
 import (
 	"bytes"
+	"compress/gzip"
 	"fmt"
 	"os/exec"
 	"regexp"
@@ -27,18 +28,28 @@ var (
 	// ServiceDumpRE is a regular expression to match the beginning of a service dump.
 	ServiceDumpRE = regexp.MustCompile(`^DUMP\s+OF\s+SERVICE\s+(?P<service>\S+):`)
 
-	// PIIRE is a regular expression to match any PII string of the form abc@xxx.yyy.
-	PIIRE = regexp.MustCompile(`(?P<prefix>\S+/)?` + `(?P<account>\S+)` + `@` + `(?P<suffix>\S+\.\S+)`)
+	// piiEmailRE is a regular expression to match any PII string of the form abc@xxx.yyy.
+	piiEmailRE = regexp.MustCompile(`(?P<prefix>\S+/)?` + `(?P<account>\S+)` + `@` + `(?P<suffix>\S+\.\S+)`)
+
+	// piiSyncRE is a regular expression to match any PII string of the form *sync*/blah/blah/pii
+	piiSyncRE = regexp.MustCompile(`(?P<prefix>\*sync\*/\S+/)(?P<account>\S+)`)
 )
 
-// ScrubPII scrubs any part of the string that looks like an email address (@<blah>.com)
+// ScrubPII scrubs any part of the string that looks like PII (eg. an email address).
 // From:
 //     com.google.android.apps.plus.content.EsProvider/com.google/john.doe@gmail.com/extra
+//     or
+//     *sync*/com.app.android.conversations/com.app.android.account/Mr. Noogler
 // To:
 //     com.google.android.apps.plus.content.EsProvider/com.google/XXX@gmail.com/extra
+//     or
+//     *sync*/com.app.android.conversations/com.app.android.account/XXX
 func ScrubPII(input string) string {
-	if matches, result := SubexpNames(PIIRE, input); matches {
+	if matches, result := SubexpNames(piiEmailRE, input); matches {
 		return fmt.Sprintf("%sXXX@%s", result["prefix"], result["suffix"])
+	} else if matches, result := SubexpNames(piiSyncRE, input); matches {
+		// Syncs often have the PII at the end, though not always in email form.
+		return fmt.Sprintf("%sXXX", result["prefix"])
 	}
 	return input
 }
@@ -64,6 +75,15 @@ func ErrorsToString(errs []error) string {
 		fmt.Fprintln(&errorB, e.Error())
 	}
 	return errorB.String()
+}
+
+// GzipCompress compresses byte data.
+func GzipCompress(uncompressed []byte) ([]byte, error) {
+	var b bytes.Buffer
+	w := gzip.NewWriter(&b)
+	_, err := w.Write(uncompressed)
+	w.Close() // Must close this first to flush the bytes to the buffer.
+	return b.Bytes(), err
 }
 
 // RunCommand executes the given command and returns the output.

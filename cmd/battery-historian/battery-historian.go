@@ -32,7 +32,7 @@ var (
 	templateDir = flag.String("template_dir", "./templates", "Directory containing HTML templates.")
 
 	// resVersion should be incremented whenever the JS or CSS files are modified.
-	resVersion = flag.Int("res_version", 0, "The current version of JS and CSS files. Used to force JS and CSS reloading to avoid cache issues when rolling out new versions.")
+	resVersion = flag.Int("res_version", 1, "The current version of JS and CSS files. Used to force JS and CSS reloading to avoid cache issues when rolling out new versions.")
 )
 
 type analysisServer struct{}

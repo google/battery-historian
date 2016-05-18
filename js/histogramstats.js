@@ -214,18 +214,6 @@ historian.histogramstats.Charts = {
 
 
 /**
- * File types to be compared.
- * @enum {string}
- */
-historian.histogramstats.FileType = {
-  OLDER: 'Older File',
-  NEWER: 'Newer File',
-  EXTRACTED: 'Extracted File',
-  UPLOADED: 'Uploaded File'
-};
-
-
-/**
  * The SummaryStats data received from server analyzer.
  *
  * @typedef {{
@@ -1324,7 +1312,6 @@ historian.histogramstats.drawToolTips = function(tag, ticks, file) {
         previousPoint = item.datapoint;
 
         $(historian.histogramstats.Charts.TOOLTIP).remove();
-        var x = item.datapoint[0].toFixed(2);
         var y = item.datapoint[1].toFixed(2);
         // Get content for the tooltip.
         var label = item.series.xaxis.ticks[item.dataIndex].label;
@@ -2245,35 +2232,11 @@ historian.histogramstats.combineFileNames_ = function(fileName1, fileName2) {
 
 /**
  * Initializes file names based on the comparison entities.
- * File names are set as needed for 30 day history and regular bugreport
- * comparison use cases.
  * @param {string} fileName1 File name of the first file.
  * @param {string} fileName2 File name of the second file.
  * @private
  */
 historian.histogramstats.setFileNames_ = function(fileName1, fileName2) {
-  // If the files are from a regular A/B comparison, we use default strings
-  // File #1 and File #2 to refer to them. Else, we follow the below code
-  // to set new names for them.
-  var f1 = fileName1.split(':');
-  var f2 = fileName2.split(':');
-  if (!goog.array.isEmpty(f1) && !goog.array.isEmpty(f2)) {
-    var name1 = f1[0].trim();
-    var name2 = f2[0].trim();
-    // We save the new names only if we find the below pairs together.
-    // If none of the below match, we keep the default names.
-    if ((name1 == historian.histogramstats.FileType.OLDER &&
-        name2 == historian.histogramstats.FileType.NEWER) ||
-        (name2 == historian.histogramstats.FileType.OLDER &&
-        name1 == historian.histogramstats.FileType.NEWER) ||
-        (name1 == historian.histogramstats.FileType.UPLOADED &&
-        name2 == historian.histogramstats.FileType.EXTRACTED) ||
-        (name2 == historian.histogramstats.FileType.UPLOADED &&
-        name1 == historian.histogramstats.FileType.EXTRACTED)) {
-      historian.histogramstats.file1_ = name1;
-      historian.histogramstats.file2_ = name2;
-    }
-  }
   historian.histogramstats.fileOrdering.getInstance().set(
       historian.histogramstats.combineFileNames_(
       historian.histogramstats.file1_,

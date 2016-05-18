@@ -15,7 +15,44 @@ specific language governing permissions and limitations under the License.
   {{if .AppStats}}
   <div class="sdk-version-21 non-comparison" id="app-selector">
     <label>App Selection</label>
-    <select id="appSelector" data-toggle="tooltip" name="Pkg Name" title="Choosing an application here will display app-specific details in the 'App Stats' tab, and also app-specific syncs & wakelocks in 'Historian v2'.">
+    <div>
+      <span>Sort apps by</span>
+      <select id="appSorter">
+        <!-- TODO: support repeated fields -->
+        <option value="name">Name</option>
+        <option value=".CPUPowerPrediction" data-type="percentage">Device estimated power use</option>
+        {{if ge .CheckinSummary.ReportVersion 14}}
+        <option value="audio.total_time_msec" data-type="duration">Audio time</option>
+        <option value="audio.count">Audio count</option>
+        <option value="camera.total_time_msec" data-type="duration">Camera time</option>
+        <option value="camera.count">Camera count</option>
+        <option value="cpu.user_time_ms" data-type="duration">CPU user time</option>
+        <option value="cpu.system_time_ms" data-type="duration">CPU system time</option>
+        <option value="flashlight.total_time_msec" data-type="duration">Flashlight time</option>
+        <option value="flashlight.count">Flashlight count</option>
+        {{end}}
+        {{if ge .CheckinSummary.ReportVersion 17}}
+        <option value="state_time.background_time_msec" data-type="duration">Background time</option>
+        <option value="bluetooth_misc.ble_scan_time_msec" data-type="duration">BLE scan time</option>
+        <option value="bluetooth_misc.ble_scan_count">BLE scan count</option>
+        <option value="state_time.foreground_time_msec" data-type="duration">Foreground time</option>
+        <option value="state_time.foreground_service_time_msec" data-type="duration">Foreground service time</option>
+        <option value="state_time.top_time_msec" data-type="duration">Top time</option>
+        {{end}}
+        <option value="vibrator.total_time_msec" data-type="duration">Vibrator time</option>
+        <option value="vibrator.count">Vibrator count</option>
+        {{if ge .CheckinSummary.ReportVersion 14}}
+        <option value="video.total_time_msec" data-type="duration">Video time</option>
+        <option value="video.count">Video count</option>
+        {{end}}
+        <option value="wifi.full_wifi_lock_time_msec" data-type="duration">Full wifi lock time</option>
+        <option value="wifi.scan_time_msec" data-type="duration">Wifi scan time</option>
+        {{if ge .CheckinSummary.ReportVersion 12}}
+        <option value="wifi.scan_count">Wifi scan count</option>
+        {{end}}
+      </select>
+    </div>
+    <select id="appSelector" data-toggle="tooltip" name="Pkg Name" title="Choosing an application here will display app-specific details in the 'App Stats' tab, and also app-specific metrics in 'Historian v2'.">
       <option></option>
       {{range $app := .AppStats}}
       <option value="{{$app.RawStats.Uid}}">{{$app.RawStats.Name}} (Uid: {{$app.RawStats.Uid}})</option>

@@ -29,6 +29,12 @@ func TestScrubPII(t *testing.T) {
 		"wake.lock@1a23b4":                                   "wake.lock@1a23b4", // There are some wakelocks with this name format
 		"com.android.calendar/com.google/noogley@google.com": "com.android.calendar/com.google/XXX@google.com",
 		"lot-o-prefixes/with//com.google/noogley@google.com": "lot-o-prefixes/with//com.google/XXX@google.com",
+
+		// Syncs often have the PII at the end, though not always in email form.
+		"*sync*/com.android.contacts/com.google/noogler@google.com": "*sync*/com.android.contacts/com.google/XXX@google.com",
+		// There can be spaces in the string.
+		"*sync*/com.app1.android.conversations/com.app1.android.account/Mr. Noogler":              "*sync*/com.app1.android.conversations/com.app1.android.account/XXX",
+		"*sync*/com.app2.android.provider.App2Provider/com.app2.android.auth.login/noogler314159": "*sync*/com.app2.android.provider.App2Provider/com.app2.android.auth.login/XXX",
 	}
 	for in, want := range test {
 		got := ScrubPII(in)

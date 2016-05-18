@@ -23,6 +23,7 @@ import (
 	"strconv"
 
 	"github.com/golang/protobuf/proto"
+	"github.com/google/battery-historian/packageutils"
 
 	bspb "github.com/google/battery-historian/pb/batterystats_proto"
 	bldpb "github.com/google/battery-historian/pb/build_proto"
@@ -56,6 +57,9 @@ var (
 			0: true, // name
 		},
 		reflect.TypeOf(&bspb.BatteryStats_App_Wakelock{}): {
+			0: true, // name
+		},
+		reflect.TypeOf(&bspb.BatteryStats_App_WakeupAlarm{}): {
 			0: true, // name
 		},
 		reflect.TypeOf(&bspb.BatteryStats_ControllerActivity_TxLevel{}): {
@@ -113,8 +117,24 @@ func combineProtoStrings(str1, str2, conn string) *string {
 	return proto.String(str1 + conn + str2)
 }
 
+// appID returns an identifer for the app that should be unique and consistent between reports.
+func appID(app *bspb.BatteryStats_App) string {
+	if app == nil {
+		return ""
+	}
+	u := app.GetUid()
+	// Hard-coded UIDs should be consistent.
+	if u < packageutils.FirstApplicationUID {
+		return strconv.Itoa(int(u))
+	}
+	if n := app.GetName(); n != "" {
+		return n
+	}
+	return fmt.Sprintf("UNKNOWN_%d", u)
+}
+
 // ComputeDelta takes two protos and outputs a third one that
-// contains the difference between the two. second is subtracted from first.
+// contains the difference between the two. Second will be subtracted from first.
 func ComputeDelta(first, second *bspb.BatteryStats) *bspb.BatteryStats {
 	// Deep copy so we don't accidentally change the original protos.
 	p1, p2 := proto.Clone(first).(*bspb.BatteryStats), proto.Clone(second).(*bspb.BatteryStats)
@@ -126,18 +146,13 @@ func ComputeDelta(first, second *bspb.BatteryStats) *bspb.BatteryStats {
 	}
 	// App Diff
 	// Find apps which are in p1 but not in p2 and diff
-
-	appMap := make(map[string]*bspb.BatteryStats_App)
+	p2AppMap := make(map[string]*bspb.BatteryStats_App)
 	for _, a2 := range p2.GetApp() {
-		if a2.GetName() == "" {
-			fmt.Println("empty app2 name", a2)
-			a2.Name = proto.String(fmt.Sprintf("UNKNOWN_%d", a2.GetUid()))
-		}
-		appMap[a2.GetName()] = a2
+		p2AppMap[appID(a2)] = a2
 	}
 
 	for _, a1 := range p1.GetApp() {
-		a2, ok := appMap[a1.GetName()]
+		a2, ok := p2AppMap[appID(a1)]
 		if !ok {
 			d.App = append(d.App, proto.Clone(a1).(*bspb.BatteryStats_App))
 			continue
@@ -147,16 +162,12 @@ func ComputeDelta(first, second *bspb.BatteryStats) *bspb.BatteryStats {
 		}
 	}
 	// Find apps which are in p2 but not in p1 and get the diff
-	appMap2 := make(map[string]*bspb.BatteryStats_App)
+	p1AppMap := make(map[string]*bspb.BatteryStats_App)
 	for _, a1 := range p1.GetApp() {
-		if a1.GetName() == "" {
-			fmt.Println("empty app1 name", a1)
-			a1.Name = proto.String(fmt.Sprintf("UNKNOWN_%d", a1.GetUid()))
-		}
-		appMap2[a1.GetName()] = a1
+		p1AppMap[appID(a1)] = a1
 	}
 	for _, a2 := range p2.GetApp() {
-		if _, ok := appMap2[a2.GetName()]; !ok {
+		if _, ok := p1AppMap[appID(a2)]; !ok {
 			a1 := &bspb.BatteryStats_App{}
 			if a := subtractApp(a1, a2); a != nil {
 				d.App = append(d.App, a)
@@ -365,6 +376,10 @@ func subtractApp(a1, a2 *bspb.BatteryStats_App) *bspb.BatteryStats_App {
 		a.Apk = diff
 		changed = true
 	}
+	if diff := subtractMessage(a1.GetBluetoothMisc(), a2.GetBluetoothMisc()); diff != nil {
+		a.BluetoothMisc = diff.(*bspb.BatteryStats_App_BluetoothMisc)
+		changed = true
+	}
 	if diff := subtractController(a1.GetBluetoothController(), a2.GetBluetoothController()); diff != nil {
 		a.BluetoothController = diff
 		changed = true
@@ -399,6 +414,10 @@ func subtractApp(a1, a2 *bspb.BatteryStats_App) *bspb.BatteryStats_App {
 	}
 	if diff := subtractRepeatedMessage(a1.GetWakelock(), a2.GetWakelock()); !diff.IsNil() {
 		a.Wakelock = diff.Interface().([]*bspb.BatteryStats_App_Wakelock)
+		changed = true
+	}
+	if diff := subtractRepeatedMessage(a1.GetWakeupAlarm(), a2.GetWakeupAlarm()); !diff.IsNil() {
+		a.WakeupAlarm = diff.Interface().([]*bspb.BatteryStats_App_WakeupAlarm)
 		changed = true
 	}
 	if diff := subtractMessage(a1.GetWifi(), a2.GetWifi()); diff != nil {
@@ -543,7 +562,7 @@ func subtractController(c1, c2 *bspb.BatteryStats_ControllerActivity) *bspb.Batt
 		RxTimeMsec:   proto.Int64(c1.GetRxTimeMsec() - c2.GetRxTimeMsec()),
 		PowerMah:     proto.Int64(c1.GetPowerMah() - c2.GetPowerMah()),
 	}
-	changed := c1.GetIdleTimeMsec() != c2.GetIdleTimeMsec() || c1.GetRxTimeMsec() != c2.GetRxTimeMsec() || c1.GetPowerMah() != c2.GetPowerMah()
+	changed := c.GetIdleTimeMsec() != 0 || c.GetRxTimeMsec() != 0 || c.GetPowerMah() != 0
 	if diff := subtractRepeatedMessage(c1.GetTx(), c2.GetTx()); !diff.IsNil() {
 		c.Tx = diff.Interface().([]*bspb.BatteryStats_ControllerActivity_TxLevel)
 		changed = true
@@ -630,7 +649,7 @@ func subtractRepeatedMessage(list1, list2 interface{}) reflect.Value {
 		p2, ok := m2[n]
 		if !ok {
 			// In list1 but not list2.
-			out = reflect.Append(out, reflect.ValueOf(proto.Clone(p1)))
+			out = reflect.Append(out, reflect.ValueOf(p1))
 			continue
 		}
 		if diff := subtractMessage(p1, p2); diff != nil {

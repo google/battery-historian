@@ -60,6 +60,7 @@ const (
 const (
 	versionData                   = "vers"
 	uidData                       = "uid"
+	wakeupAlarmData               = "wua"
 	apkData                       = "apk"
 	processData                   = "pr"
 	cpuData                       = "cpu"
@@ -82,6 +83,7 @@ const (
 	wifiControllerData            = "wfcd"
 	wifiData                      = "wfl"
 	bluetoothControllerData       = "ble"
+	bluetoothMiscData             = "blem"
 	globalBluetoothControllerData = "gble" // Previously globalBluetoothData
 	miscData                      = "m"
 	modemControllerData           = "mcd"
@@ -136,7 +138,7 @@ var (
 		"android.media":                          "MEDIA",
 		"android.uid.bluetooth":                  "BLUETOOTH",
 		"android.uid.nfc":                        "NFC",
-		"android.uid.phone":                      "RADIO",             // Associated with UID 1001
+		"android.uid.phone":                      "RADIO",             // Associated with UID 1001.
 		"android.uid.shared":                     "CONTACTS_PROVIDER", // "com.android.providers.contacts" is a prominent member of the UID group
 		"android.uid.shell":                      "SHELL",
 		"android.uid.system":                     "ANDROID_SYSTEM",
@@ -672,6 +674,12 @@ func parseSection(c checkinutil.Counter, reportVersion, rawUID int32, section st
 			return true, "", []error{err}
 		}
 		return true, "", nil
+	case bluetoothMiscData:
+		if app.GetBluetoothMisc() == nil {
+			app.BluetoothMisc = &bspb.BatteryStats_App_BluetoothMisc{}
+		}
+		warn, errs := parseAndAccumulate(bluetoothMiscData, record, app.GetBluetoothMisc())
+		return true, warn, errs
 	case cameraData:
 		if app.GetCamera() == nil {
 			app.Camera = &bspb.BatteryStats_App_Camera{}
@@ -830,9 +838,11 @@ func parseSection(c checkinutil.Counter, reportVersion, rawUID int32, section st
 		return true, warn, errs
 	case userActivityData:
 		if packageutils.AppID(rawUID) != 0 {
-			if err := parseAppUserActivity(record, app); err != nil {
-				return true, "", []error{err}
+			warn, err := parseAppUserActivity(record, app)
+			if err != nil {
+				return true, warn, []error{err}
 			}
+			return true, warn, nil
 		}
 		return true, "", nil
 	case vibratorData:
@@ -849,6 +859,9 @@ func parseSection(c checkinutil.Counter, reportVersion, rawUID int32, section st
 		return true, warn, errs
 	case wakelockData:
 		warn, errs := parseAppWakelock(record, app)
+		return true, warn, errs
+	case wakeupAlarmData:
+		warn, errs := parseAppWakeupAlarm(record, app)
 		return true, warn, errs
 	case wakeupReasonData:
 		warn, errs := parseSystemWakeupReason(record, system)
@@ -888,7 +901,16 @@ func postProcessBatteryStats(bs *bspb.BatteryStats) {
 	if bs == nil {
 		return
 	}
-	sys := bs.System
+
+	postProcessSystem(bs.System, bs.GetReportVersion())
+
+	for _, a := range bs.GetApp() {
+		postProcessApp(a)
+	}
+}
+
+// postProcessSystem handles processing and data population of special fields in the System proto.
+func postProcessSystem(sys *bspb.BatteryStats_System, reportVersion int32) {
 	if sys == nil {
 		return
 	}
@@ -941,23 +963,25 @@ func postProcessBatteryStats(bs *bspb.BatteryStats) {
 	// This is all in one function to provide context and because there wasn't
 	// a clear line to allow breaking things into smaller functions.
 	// TODO: put things into smaller functions if there are clearer lines.
-	if bs.GetReportVersion() >= 17 {
-		if sys.GlobalWifiController != nil {
+	if reportVersion >= 17 {
+		if gwc := sys.GlobalWifiController; reportVersion >= 18 || gwc != nil {
 			// This report version is post-controller activity change.
 			// Populate incorrect/missing data in old fields.
-			gw := sys.GlobalWifi
-			if gw == nil {
-				gw = &bspb.BatteryStats_System_GlobalWifi{}
-				sys.GlobalWifi = gw
+			if gwc != nil {
+				gw := sys.GlobalWifi
+				if gw == nil {
+					gw = &bspb.BatteryStats_System_GlobalWifi{}
+					sys.GlobalWifi = gw
+				}
+				gw.WifiIdleTimeMsec = proto.Float32(float32(gwc.GetIdleTimeMsec()))
+				gw.WifiRxTimeMsec = proto.Float32(float32(gwc.GetRxTimeMsec()))
+				gw.WifiPowerMah = proto.Float32(float32(gwc.GetPowerMah()))
+				var t int64
+				for _, tx := range sys.GlobalWifiController.Tx {
+					t += tx.GetTimeMsec()
+				}
+				gw.WifiTxTimeMsec = proto.Float32(float32(t))
 			}
-			gw.WifiIdleTimeMsec = proto.Float32(float32(sys.GlobalWifiController.GetIdleTimeMsec()))
-			gw.WifiRxTimeMsec = proto.Float32(float32(sys.GlobalWifiController.GetRxTimeMsec()))
-			gw.WifiPowerMah = proto.Float32(float32(sys.GlobalWifiController.GetPowerMah()))
-			var t int64
-			for _, tx := range sys.GlobalWifiController.Tx {
-				t += tx.GetTimeMsec()
-			}
-			gw.WifiTxTimeMsec = proto.Float32(float32(t))
 
 			// Going to use the presence of GlobalWifiController to indicate that the gble data
 			// is controller activity data. Not perfect, but there's no guarantee in version 17
@@ -978,7 +1002,7 @@ func postProcessBatteryStats(bs *bspb.BatteryStats) {
 			}
 		}
 	}
-	if bs.GetReportVersion() < 17 {
+	if reportVersion < 17 {
 		// Copy values into newer protos so that analyses can rely more on the newer protos.
 		if gb := sys.GlobalBluetooth; gb != nil {
 			sys.GlobalBluetoothController = &bspb.BatteryStats_ControllerActivity{
@@ -997,7 +1021,7 @@ func postProcessBatteryStats(bs *bspb.BatteryStats) {
 		makeGWC()
 	}
 	if m := sys.Misc; m != nil {
-		if bs.GetReportVersion() >= 14 {
+		if reportVersion >= 14 {
 			// These won't have been populated through regular parsing for version 14+ so it's
 			// safe to overwrite here.
 			if gw := sys.GlobalWifi; gw != nil {
@@ -1020,6 +1044,42 @@ func postProcessBatteryStats(bs *bspb.BatteryStats) {
 			// Mobile and wifi bytes were being printed in both misc and GlobalNetwork lines for
 			// report versions 7-13 so no need to re-assign sys.GlobalNetwork.WifiBytes* and
 			// sys.GlobalNetwork.MobileBytes* here.
+		}
+	}
+}
+
+// postProcessApp handles processing and data population of special fields in an App proto.
+func postProcessApp(app *bspb.BatteryStats_App) {
+	if app == nil {
+		return
+	}
+
+	// If WifiController data exists, we can use it to populate Wifi data.
+	if wc := app.WifiController; wc != nil {
+		if app.Wifi == nil {
+			app.Wifi = &bspb.BatteryStats_App_Wifi{}
+		}
+		w := app.Wifi
+		// Populate old fields. These fields will be 0 if WifiController data exists,
+		// so it's okay to overwrite.
+		w.IdleTimeMsec = proto.Float32(float32(wc.GetIdleTimeMsec()))
+		w.RxTimeMsec = proto.Float32(float32(wc.GetRxTimeMsec()))
+		var t int64
+		for _, tx := range wc.Tx {
+			t += tx.GetTimeMsec()
+		}
+		w.TxTimeMsec = proto.Float32(float32(t))
+	} else if w := app.Wifi; w != nil {
+		// WifiController data doesn't exist, but Wifi does. Use it to populate WifiController data.
+		app.WifiController = &bspb.BatteryStats_ControllerActivity{
+			IdleTimeMsec: proto.Int64(int64(w.GetIdleTimeMsec())),
+			RxTimeMsec:   proto.Int64(int64(w.GetRxTimeMsec())),
+			Tx: []*bspb.BatteryStats_ControllerActivity_TxLevel{
+				{
+					Level:    proto.Int32(0),
+					TimeMsec: proto.Int64(int64(w.GetTxTimeMsec())),
+				},
+			},
 		}
 	}
 }
@@ -1410,21 +1470,32 @@ func parseAppProcess(record []string, app *bspb.BatteryStats_App) (string, []err
 }
 
 // parseAppUserActivity parses "ua" (USER_ACTIVITY_TYPES) in App.
-// format: 8,1000,l,ua,2,0,0
-// "other", "button", "touch" activity counts
-func parseAppUserActivity(record []string, app *bspb.BatteryStats_App) error {
-	for name, rawCount := range record {
-		Count, err := parseFloat32(rawCount)
+// format: 8,1000,l,ua,2,0,0[,3]
+// "other", "button", "touch", ["accessibility"] activity counts
+func parseAppUserActivity(record []string, app *bspb.BatteryStats_App) (string, error) {
+	m := bspb.BatteryStats_App_UserActivity_Name_name
+	warn := ""
+	if n, b := len(record), len(m); n > b {
+		warn = fmt.Sprintf("user activity now has %d additional fields", n-b)
+	}
+	for i, rawCount := range record {
+		c, err := parseFloat32(rawCount)
 		if err != nil {
-			return err
+			return warn, err
+		}
+		if len(app.UserActivity) > i {
+			// Append the count to an existing message if possible.
+			// The order is the same for all ua lines, so the indices should be the same.
+			app.GetUserActivity()[i].Count = proto.Float32(app.GetUserActivity()[i].GetCount() + c)
+			continue
 		}
 		app.UserActivity = append(app.UserActivity,
 			&bspb.BatteryStats_App_UserActivity{
-				Name:  bspb.BatteryStats_App_UserActivity_Name(name).Enum(),
-				Count: proto.Float32(Count),
+				Name:  bspb.BatteryStats_App_UserActivity_Name(i).Enum(),
+				Count: proto.Float32(c),
 			})
 	}
-	return nil
+	return warn, nil
 }
 
 // parseAppSensor parses "sr" (SENSOR_DATA) in App.
@@ -1637,6 +1708,33 @@ func parseAppWakelock(record []string, app *bspb.BatteryStats_App) (string, []er
 
 	// Wakelock wasn't found in app's list of wakelocks so add it as a new one.
 	app.Wakelock = append(app.Wakelock, w)
+	return warn, nil
+}
+
+// parseAppWakeupAlarm parses "wua" (WAKEUP_ALARM_DATA) in App.
+// If there exists a wakeup alarm with the same name, newly found values (e.g. count)
+// from parsing will be added to their corresponding fields in that wakeup alarm.
+// Otherwise, a new wakeup alarm entry will be created.
+//
+// format: 9,1000,l,wua,*walarm*:JobScheduler.delay,17
+// name, count
+func parseAppWakeupAlarm(record []string, app *bspb.BatteryStats_App) (string, []error) {
+	w := &bspb.BatteryStats_App_WakeupAlarm{}
+	warn, errs := parseLine(wakeupAlarmData, record, w)
+	if len(errs) > 0 {
+		return warn, errs
+	}
+
+	// TODO: Re-evaluate after some time to see if filtering needs to be done.
+	for _, w1 := range app.WakeupAlarm {
+		if w1.GetName() == w.GetName() {
+			w1.Count = proto.Int32(w1.GetCount() + w.GetCount())
+			return warn, nil
+		}
+	}
+
+	// Wakeup alarm wasn't found in app's current list, so add it as a new one.
+	app.WakeupAlarm = append(app.WakeupAlarm, w)
 	return warn, nil
 }
 
@@ -1934,7 +2032,7 @@ func parseSystemScreenBrightness(c checkinutil.Counter, record []string, system 
 	}
 	if len(record) != len(bspb.BatteryStats_System_ScreenBrightness_Name_name) {
 		c.Count("error-system-screen-brightness-wrong-number-of-records", 1)
-		return fmt.Errorf("wrong number of screen brightness fields. Got %d, want %d", len(record), len(bspb.BatteryStats_System_ScreenBrightness_Name_name))
+		return fmt.Errorf("wrong number of screen brightness fields: got %d, want %d", len(record), len(bspb.BatteryStats_System_ScreenBrightness_Name_name))
 	}
 	for name, rawTimeMsec := range record {
 		timeMsec, err := parseFloat32(rawTimeMsec)
@@ -2272,13 +2370,15 @@ func parseAndAccumulate(section string, record []string, p proto.Message) (strin
 	for i := 0; i < rec.Elem().NumField()-1; i++ {
 		// pointer to field i. Golang requires the temporary variables in order for the rest of this processing to work.
 		accPtr, recPtr := acc.Elem().Field(i), rec.Elem().Field(i)
+		if accPtr.IsNil() {
+			accPtr.Set(recPtr)
+			continue
+		}
 		switch recPtr.Elem().Kind() {
 		case reflect.Float32, reflect.Float64:
-			if accPtr.IsNil() {
-				accPtr.Set(recPtr)
-			} else {
-				accPtr.Elem().SetFloat(accPtr.Elem().Float() + recPtr.Elem().Float())
-			}
+			accPtr.Elem().SetFloat(accPtr.Elem().Float() + recPtr.Elem().Float())
+		case reflect.Int32, reflect.Int64:
+			accPtr.Elem().SetInt(accPtr.Elem().Int() + recPtr.Elem().Int())
 		}
 	}
 

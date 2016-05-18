@@ -17,6 +17,7 @@ package aggregated
 
 import (
 	"fmt"
+	"log"
 	"sort"
 	"time"
 
@@ -54,6 +55,7 @@ type MFloat32 struct {
 // The UID field will be pouplated (non-zero) if the activity is connected to a specific UID.
 type ActivityData struct {
 	Name          string
+	Title         string
 	UID           int32
 	Count         float32
 	CountPerHour  float32
@@ -62,6 +64,21 @@ type ActivityData struct {
 	SecondsPerHr  float32
 	DurationLevel string // Low, Medium, High
 	Level         string // The maximum of CountLevel and DurationLevel.
+}
+
+// activityData converts a WakelockInfo into an ActivityData.
+func activityData(wi *checkinparse.WakelockInfo, realtime time.Duration) ActivityData {
+	ad := ActivityData{
+		Name:     wi.Name,
+		UID:      wi.UID,
+		Count:    wi.Count,
+		Duration: wi.Duration,
+	}
+	if realtime > 0 {
+		ad.CountPerHour = wi.Count / float32(realtime.Hours())
+		ad.SecondsPerHr = float32(wi.Duration.Seconds()) / float32(realtime.Hours())
+	}
+	return ad
 }
 
 // ANRCrashData contains ANR and crash data for a single app.
@@ -269,6 +286,17 @@ type Checkin struct {
 	WifiDischargeRatePerHr      MFloat32
 	BluetoothDischargeRatePerHr MFloat32
 
+	// Aggregated across all apps/entries.
+	AggKernelWakelocks      ActivityData
+	AggSyncTasks            ActivityData
+	AggWakeupReasons        ActivityData
+	AggGPSUse               ActivityData
+	AggWifiScanActivity     ActivityData
+	AggWifiFullLockActivity ActivityData
+	AggAppWakeups           RateData
+	AggCPUUsage             CPUData
+
+	// Each element corresponds to a single entry/app.
 	UserspaceWakelocks   []ActivityData
 	KernelWakelocks      []ActivityData
 	SyncTasks            []ActivityData
@@ -285,7 +313,8 @@ type Checkin struct {
 
 	DevicePowerEstimates []PowerUseData
 
-	AppWakeups []RateData
+	AppWakeups            []RateData
+	AppWakeupsByAlarmName []RateData
 
 	ANRAndCrash []ANRCrashData
 
@@ -343,6 +372,9 @@ func ParseCheckinData(c *bspb.BatteryStats) Checkin {
 	}
 
 	realtime := time.Duration(c.System.Battery.GetBatteryRealtimeMsec()) * time.Millisecond
+	if realtime < 0 {
+		log.Printf("realtime was negative: %v\n", realtime)
+	}
 
 	out := Checkin{
 		Device:           c.Build.GetDevice(),
@@ -421,41 +453,59 @@ func ParseCheckinData(c *bspb.BatteryStats) Checkin {
 		},
 		ConnectivityChanges: c.System.Misc.GetConnectivityChanges(),
 	}
-	out.ScreenOffUptimePercentage = (float32(out.ScreenOffUptime.V) / float32(realtime)) * 100
-	out.ScreenOnTimePercentage = (float32(out.ScreenOnTime.V) / float32(realtime)) * 100
-	out.PartialWakelockTimePercentage = (float32(out.PartialWakelockTime.V) / float32(realtime)) * 100
-	out.KernelOverheadTimePercentage = (float32(out.KernelOverheadTime.V) / float32(realtime)) * 100
-	out.SignalScanningTimePercentage = (float32(out.SignalScanningTime.V) / float32(realtime)) * 100
-	out.MobileActiveTimePercentage = (float32(out.MobileActiveTime.V) / float32(realtime)) * 100
-	out.FullWakelockTimePercentage = (float32(out.FullWakelockTime.V) / float32(realtime)) * 100
-	out.PhoneCallTimePercentage = (float32(out.PhoneCallTime.V) / float32(realtime)) * 100
-	out.DeviceIdleModeEnabledTimePercentage = (float32(out.DeviceIdleModeEnabledTime.V) / float32(realtime)) * 100
-	out.DeviceIdlingTimePercentage = (float32(out.DeviceIdlingTime.V) / float32(realtime)) * 100
-	out.InteractiveTimePercentage = (float32(out.InteractiveTime.V) / float32(realtime)) * 100
+	if realtime > 0 {
+		out.ScreenOffUptimePercentage = (float32(out.ScreenOffUptime.V) / float32(realtime)) * 100
+		out.ScreenOnTimePercentage = (float32(out.ScreenOnTime.V) / float32(realtime)) * 100
+		out.PartialWakelockTimePercentage = (float32(out.PartialWakelockTime.V) / float32(realtime)) * 100
+		out.KernelOverheadTimePercentage = (float32(out.KernelOverheadTime.V) / float32(realtime)) * 100
+		out.SignalScanningTimePercentage = (float32(out.SignalScanningTime.V) / float32(realtime)) * 100
+		out.MobileActiveTimePercentage = (float32(out.MobileActiveTime.V) / float32(realtime)) * 100
+		out.FullWakelockTimePercentage = (float32(out.FullWakelockTime.V) / float32(realtime)) * 100
+		out.PhoneCallTimePercentage = (float32(out.PhoneCallTime.V) / float32(realtime)) * 100
+		out.DeviceIdleModeEnabledTimePercentage = (float32(out.DeviceIdleModeEnabledTime.V) / float32(realtime)) * 100
+		out.DeviceIdlingTimePercentage = (float32(out.DeviceIdlingTime.V) / float32(realtime)) * 100
+		out.InteractiveTimePercentage = (float32(out.InteractiveTime.V) / float32(realtime)) * 100
 
-	out.BluetoothOnTimePercentage = (float32(out.BluetoothOnTime.V) / float32(realtime)) * 100
-	out.LowPowerModeEnabledTimePercentage = (float32(out.LowPowerModeEnabledTime.V) / float32(realtime)) * 100
+		out.BluetoothOnTimePercentage = (float32(out.BluetoothOnTime.V) / float32(realtime)) * 100
+		out.LowPowerModeEnabledTimePercentage = (float32(out.LowPowerModeEnabledTime.V) / float32(realtime)) * 100
 
-	out.MobileKiloBytesPerHr = MFloat32{V: (c.System.GlobalNetwork.GetMobileBytesRx() + c.System.GlobalNetwork.GetMobileBytesTx()) / (1024 * float32(realtime.Hours()))}
-	out.WifiKiloBytesPerHr = MFloat32{V: (c.System.GlobalNetwork.GetWifiBytesRx() + c.System.GlobalNetwork.GetWifiBytesTx()) / (1024 * float32(realtime.Hours()))}
+		out.MobileKiloBytesPerHr = MFloat32{V: (c.System.GlobalNetwork.GetMobileBytesRx() + c.System.GlobalNetwork.GetMobileBytesTx()) / (1024 * float32(realtime.Hours()))}
+		out.WifiKiloBytesPerHr = MFloat32{V: (c.System.GlobalNetwork.GetWifiBytesRx() + c.System.GlobalNetwork.GetWifiBytesTx()) / (1024 * float32(realtime.Hours()))}
+	}
 
+	bCapMah := c.GetSystem().GetPowerUseSummary().GetBatteryCapacityMah()
+	if bCapMah < 0 {
+		log.Printf("battery capacity mAh was negative: %v\n", bCapMah)
+	}
 	if c.GetReportVersion() >= 14 {
 		out.WifiOnTime = MDuration{V: time.Duration(c.System.GlobalWifi.GetWifiOnTimeMsec()) * time.Millisecond}
-		out.WifiOnTimePercentage = (float32(out.WifiOnTime.V) / float32(realtime)) * 100
 		out.WifiIdleTime = MDuration{V: time.Duration(c.System.GlobalWifi.GetWifiIdleTimeMsec()) * time.Millisecond}
 		out.WifiTransmitTime = MDuration{V: time.Duration(c.System.GlobalWifi.GetWifiRxTimeMsec()+c.System.GlobalWifi.GetWifiTxTimeMsec()) * time.Millisecond}
-		out.WifiTransmitTimePercentage = (float32(out.WifiTransmitTime.V) / float32(realtime)) * 100
-		out.WifiDischargePoints = 100 * c.System.GlobalWifi.GetWifiPowerMah() / c.GetSystem().GetPowerUseSummary().GetBatteryCapacityMah()
-		out.WifiDischargeRatePerHr = MFloat32{
-			V: 100 * c.System.GlobalWifi.GetWifiPowerMah() / c.GetSystem().GetPowerUseSummary().GetBatteryCapacityMah() / float32(realtime.Hours()),
+		if realtime > 0 {
+			out.WifiOnTimePercentage = (float32(out.WifiOnTime.V) / float32(realtime)) * 100
+			out.WifiTransmitTimePercentage = (float32(out.WifiTransmitTime.V) / float32(realtime)) * 100
+		}
+		if bCapMah > 0 {
+			out.WifiDischargePoints = 100 * c.System.GlobalWifi.GetWifiPowerMah() / bCapMah
+			if realtime > 0 {
+				out.WifiDischargeRatePerHr = MFloat32{
+					V: 100 * c.System.GlobalWifi.GetWifiPowerMah() / bCapMah / float32(realtime.Hours()),
+				}
+			}
 		}
 
 		out.BluetoothIdleTime = MDuration{V: time.Duration(c.System.GlobalBluetooth.GetBluetoothIdleTimeMsec()) * time.Millisecond}
 		out.BluetoothTransmitTime = MDuration{V: time.Duration(c.System.GlobalBluetooth.GetBluetoothRxTimeMsec()+c.System.GlobalBluetooth.GetBluetoothTxTimeMsec()) * time.Millisecond}
-		out.BluetoothTransmitTimePercentage = (float32(out.BluetoothTransmitTime.V) / float32(realtime)) * 100
-		out.BluetoothDischargePoints = 100 * c.System.GlobalBluetooth.GetBluetoothPowerMah() / c.GetSystem().GetPowerUseSummary().GetBatteryCapacityMah()
-		out.BluetoothDischargeRatePerHr = MFloat32{
-			V: 100 * c.System.GlobalBluetooth.GetBluetoothPowerMah() / c.GetSystem().GetPowerUseSummary().GetBatteryCapacityMah() / float32(realtime.Hours()),
+		if realtime > 0 {
+			out.BluetoothTransmitTimePercentage = (float32(out.BluetoothTransmitTime.V) / float32(realtime)) * 100
+		}
+		if bCapMah > 0 {
+			out.BluetoothDischargePoints = 100 * c.System.GlobalBluetooth.GetBluetoothPowerMah() / bCapMah
+			if realtime > 0 {
+				out.BluetoothDischargeRatePerHr = MFloat32{
+					V: 100 * c.System.GlobalBluetooth.GetBluetoothPowerMah() / bCapMah / float32(realtime.Hours()),
+				}
+			}
 		}
 	}
 
@@ -465,31 +515,33 @@ func ParseCheckinData(c *bspb.BatteryStats) Checkin {
 	if s := c.System.Misc.GetScreenOnTimeMsec(); s > 0 {
 		out.ScreenOnDischargeRatePerHr = MFloat32{V: 60 * 60 * 1000 * c.System.BatteryDischarge.GetScreenOn() / s}
 	}
-	// Screen Brightness.
-	out.ScreenBrightness = make(map[string]float32)
-	for _, sb := range c.System.ScreenBrightness {
-		out.ScreenBrightness[sb.GetName().String()] += (sb.GetTimeMsec() / msecsInMinute) / float32(realtime.Hours())
-	}
-	// Signal Strength.
-	out.SignalStrength = make(map[string]float32)
-	for _, ss := range c.System.SignalStrength {
-		out.SignalStrength[ss.GetName().String()] += (ss.GetTimeMsec() / msecsInMinute) / float32(realtime.Hours())
-	}
-	// Wifi Signal Strength.
-	out.WifiSignalStrength = make(map[string]float32)
-	for _, ws := range c.System.WifiSignalStrength {
-		out.WifiSignalStrength[ws.GetName().String()] += (ws.GetTimeMsec() / msecsInMinute) / float32(realtime.Hours())
-	}
-	// Bluetooth States.
-	out.BluetoothState = make(map[string]float32)
-	for _, bs := range c.System.BluetoothState {
-		out.BluetoothState[bs.GetName().String()] += (bs.GetTimeMsec() / msecsInMinute) / float32(realtime.Hours())
+	if realtime > 0 {
+		// Screen Brightness.
+		out.ScreenBrightness = make(map[string]float32)
+		for _, sb := range c.System.ScreenBrightness {
+			out.ScreenBrightness[sb.GetName().String()] += (sb.GetTimeMsec() / msecsInMinute) / float32(realtime.Hours())
+		}
+		// Signal Strength.
+		out.SignalStrength = make(map[string]float32)
+		for _, ss := range c.System.SignalStrength {
+			out.SignalStrength[ss.GetName().String()] += (ss.GetTimeMsec() / msecsInMinute) / float32(realtime.Hours())
+		}
+		// Wifi Signal Strength.
+		out.WifiSignalStrength = make(map[string]float32)
+		for _, ws := range c.System.WifiSignalStrength {
+			out.WifiSignalStrength[ws.GetName().String()] += (ws.GetTimeMsec() / msecsInMinute) / float32(realtime.Hours())
+		}
+		// Bluetooth States.
+		out.BluetoothState = make(map[string]float32)
+		for _, bs := range c.System.BluetoothState {
+			out.BluetoothState[bs.GetName().String()] += (bs.GetTimeMsec() / msecsInMinute) / float32(realtime.Hours())
 
-	}
-	// DataConnection
-	out.DataConnection = make(map[string]float32)
-	for _, dc := range c.System.DataConnection {
-		out.DataConnection[dc.GetName().String()] += (dc.GetTimeMsec() / msecsInMinute) / float32(realtime.Hours())
+		}
+		// DataConnection
+		out.DataConnection = make(map[string]float32)
+		for _, dc := range c.System.DataConnection {
+			out.DataConnection[dc.GetName().String()] += (dc.GetTimeMsec() / msecsInMinute) / float32(realtime.Hours())
+		}
 	}
 	// Kernel Wakelocks.
 	var kwl []*checkinparse.WakelockInfo
@@ -502,16 +554,11 @@ func ParseCheckinData(c *bspb.BatteryStats) Checkin {
 			})
 		}
 	}
+	out.AggKernelWakelocks = sumWakelockInfo(kwl, realtime)
 	// Sorting Kernel Wakelocks by time.
 	checkinparse.SortByTime(kwl)
 	for _, kw := range kwl {
-		out.KernelWakelocks = append(out.KernelWakelocks, ActivityData{
-			Name:         kw.Name,
-			Count:        kw.Count,
-			CountPerHour: kw.Count / float32(realtime.Hours()),
-			Duration:     kw.Duration,
-			SecondsPerHr: float32(kw.Duration.Seconds()) / float32(realtime.Hours()),
-		})
+		out.KernelWakelocks = append(out.KernelWakelocks, activityData(kw, realtime))
 	}
 
 	// Wakeup Reasons.
@@ -525,17 +572,12 @@ func ParseCheckinData(c *bspb.BatteryStats) Checkin {
 			})
 		}
 	}
+	out.AggWakeupReasons = sumWakelockInfo(wrl, realtime)
 
 	// Sorting Wakeup Reasons by count.
 	checkinparse.SortByCount(wrl)
 	for _, wr := range wrl {
-		out.WakeupReasons = append(out.WakeupReasons, ActivityData{
-			Name:         wr.Name,
-			Count:        wr.Count,
-			CountPerHour: wr.Count / float32(realtime.Hours()),
-			Duration:     wr.Duration,
-			SecondsPerHr: float32(wr.Duration.Seconds()) / float32(realtime.Hours()),
-		})
+		out.WakeupReasons = append(out.WakeupReasons, activityData(wr, realtime))
 	}
 
 	// Power usage per app.
@@ -544,7 +586,8 @@ func ParseCheckinData(c *bspb.BatteryStats) Checkin {
 	var m []*checkinparse.WakelockInfo
 	var n []*NetworkTrafficData
 	// App wakeup count.
-	var wu []*RateData
+	// wubn is wakeup alarms broken down by name.
+	var wu, wubn []*RateData
 	// App ANR and crash count.
 	var ac []*ANRCrashData
 	// CPU use per app.
@@ -562,7 +605,6 @@ func ParseCheckinData(c *bspb.BatteryStats) Checkin {
 	// Flashlight use per app.
 	var fla []*checkinparse.WakelockInfo
 	au := make(map[string]int32)
-	bCapMah := c.GetSystem().GetPowerUseSummary().GetBatteryCapacityMah()
 	for _, app := range c.App {
 		if app.GetName() == "" {
 			app.Name = proto.String(fmt.Sprintf("UNKNOWN_%d", app.GetUid()))
@@ -594,25 +636,42 @@ func ParseCheckinData(c *bspb.BatteryStats) Checkin {
 		mr := app.Network.GetMobileBytesRx()
 		if wr+wt+mt+mr >= 0.01 {
 			ntd := NetworkTrafficData{
-				Name:                   app.GetName(),
-				UID:                    app.GetUid(),
-				WifiMegaBytes:          (wr + wt) / (1024 * 1024),
-				MobileMegaBytes:        (mr + mt) / (1024 * 1024),
-				WifiMegaBytesPerHour:   (wr + wt) / (1024 * 1024) / float32(realtime.Hours()),
-				MobileMegaBytesPerHour: (mr + mt) / (1024 * 1024) / float32(realtime.Hours()),
+				Name:            app.GetName(),
+				UID:             app.GetUid(),
+				WifiMegaBytes:   (wr + wt) / (1024 * 1024),
+				MobileMegaBytes: (mr + mt) / (1024 * 1024),
+			}
+			if realtime > 0 {
+				ntd.WifiMegaBytesPerHour = (wr + wt) / (1024 * 1024) / float32(realtime.Hours())
+				ntd.MobileMegaBytesPerHour = (mr + mt) / (1024 * 1024) / float32(realtime.Hours())
 			}
 			n = append(n, &ntd)
 			this.Network = ntd
 		}
 		if w := app.Apk.GetWakeups(); w > 0 {
 			rd := RateData{
-				Name:       app.GetName(),
-				UID:        app.GetUid(),
-				Count:      w,
-				CountPerHr: w / float32(realtime.Hours()),
+				Name:  app.GetName(),
+				UID:   app.GetUid(),
+				Count: w,
+			}
+			if realtime > 0 {
+				rd.CountPerHr = w / float32(realtime.Hours())
 			}
 			wu = append(wu, &rd)
 			this.Alarms = rd
+		}
+		for _, w := range app.WakeupAlarm {
+			if wc := w.GetCount(); wc > 0 {
+				rd := RateData{
+					Name:  fmt.Sprintf("%s : %s", app.GetName(), w.GetName()),
+					UID:   app.GetUid(),
+					Count: float32(wc),
+				}
+				if realtime > 0 {
+					rd.CountPerHr = float32(wc) / float32(realtime.Hours())
+				}
+				wubn = append(wubn, &rd)
+			}
 		}
 		for _, p := range app.Process {
 			if an, cr := p.GetAnrs(), p.GetCrashes(); an > 0 || cr > 0 {
@@ -626,8 +685,10 @@ func ParseCheckinData(c *bspb.BatteryStats) Checkin {
 				out.TotalAppCrashCount += int32(cr)
 			}
 		}
-		out.TotalAppANRRate = float32(out.TotalAppANRCount) / float32(realtime.Hours())
-		out.TotalAppCrashRate = float32(out.TotalAppCrashCount) / float32(realtime.Hours())
+		if realtime > 0 {
+			out.TotalAppANRRate = float32(out.TotalAppANRCount) / float32(realtime.Hours())
+			out.TotalAppCrashRate = float32(out.TotalAppCrashCount) / float32(realtime.Hours())
+		}
 
 		if ut, st := app.Cpu.GetUserTimeMs(), app.Cpu.GetSystemTimeMs(); ut > 0 || st > 0 {
 			cpud := CPUData{
@@ -635,10 +696,15 @@ func ParseCheckinData(c *bspb.BatteryStats) Checkin {
 				UID:        app.GetUid(),
 				UserTime:   time.Duration(ut) * time.Millisecond,
 				SystemTime: time.Duration(st) * time.Millisecond,
-				PowerPct:   100 * (app.Cpu.GetPowerMaMs() / (1000 * 60 * 60)) / bCapMah,
+			}
+			if bCapMah > 0 {
+				cpud.PowerPct = 100 * (app.Cpu.GetPowerMaMs() / (1000 * 60 * 60)) / bCapMah
 			}
 			cpu = append(cpu, &cpud)
 			this.CPU = cpud
+
+			out.AggCPUUsage.UserTime += time.Duration(ut) * time.Millisecond
+			out.AggCPUUsage.SystemTime += time.Duration(st) * time.Millisecond
 		}
 		if wfl := app.Wifi.GetFullWifiLockTimeMsec(); wfl > 0 {
 			wfFull = append(wfFull, &checkinparse.WakelockInfo{
@@ -657,12 +723,14 @@ func ParseCheckinData(c *bspb.BatteryStats) Checkin {
 				Count:    wsc,
 			})
 			this.WifiScan = ActivityData{
-				Name:         app.GetName(),
-				UID:          app.GetUid(),
-				Count:        wsc,
-				CountPerHour: wsc / float32(realtime.Hours()),
-				Duration:     time.Duration(wst) * time.Millisecond,
-				SecondsPerHr: float32(time.Duration(wst).Seconds()) / float32(realtime.Hours()),
+				Name:     app.GetName(),
+				UID:      app.GetUid(),
+				Count:    wsc,
+				Duration: time.Duration(wst) * time.Millisecond,
+			}
+			if realtime > 0 {
+				this.WifiScan.CountPerHour = wsc / float32(realtime.Hours())
+				this.WifiScan.SecondsPerHr = float32(time.Duration(wst).Seconds()) / float32(realtime.Hours())
 			}
 		}
 
@@ -750,14 +818,7 @@ func ParseCheckinData(c *bspb.BatteryStats) Checkin {
 
 	checkinparse.SortByTime(m)
 	for _, mad := range m {
-		out.TopMobileActiveApps = append(out.TopMobileActiveApps, ActivityData{
-			Name:         mad.Name,
-			UID:          mad.UID,
-			Count:        mad.Count,
-			CountPerHour: mad.Count / float32(realtime.Hours()),
-			Duration:     mad.Duration,
-			SecondsPerHr: float32(mad.Duration.Seconds()) / float32(realtime.Hours()),
-		})
+		out.TopMobileActiveApps = append(out.TopMobileActiveApps, activityData(mad, realtime))
 	}
 
 	sort.Sort(byMobileBytes(n))
@@ -777,7 +838,15 @@ func ParseCheckinData(c *bspb.BatteryStats) Checkin {
 	sort.Sort(byCount(wu))
 	for _, w := range wu {
 		out.AppWakeups = append(out.AppWakeups, *w)
-		out.TotalAppWakeupsPerHr += w.CountPerHr
+		out.AggAppWakeups.Count += w.Count
+	}
+	if realtime > 0 {
+		out.AggAppWakeups.CountPerHr = out.AggAppWakeups.Count / float32(realtime.Hours())
+		out.TotalAppWakeupsPerHr = out.AggAppWakeups.CountPerHr
+	}
+	sort.Sort(byCount(wubn))
+	for _, w := range wubn {
+		out.AppWakeupsByAlarmName = append(out.AppWakeupsByAlarmName, *w)
 	}
 
 	sort.Sort(byCrashThenANR(ac))
@@ -793,93 +862,56 @@ func ParseCheckinData(c *bspb.BatteryStats) Checkin {
 
 	checkinparse.SortByTime(wfScan)
 	for _, w := range wfScan {
-		out.WifiScanActivity = append(out.WifiScanActivity, ActivityData{
-			Name:         w.Name,
-			UID:          w.UID,
-			Count:        w.Count,
-			CountPerHour: w.Count / float32(realtime.Hours()),
-			Duration:     w.Duration,
-			SecondsPerHr: float32(w.Duration.Seconds()) / float32(realtime.Hours()),
-		})
+		out.WifiScanActivity = append(out.WifiScanActivity, activityData(w, realtime))
 	}
+	out.AggWifiScanActivity = sumWakelockInfo(wfScan, realtime)
 
 	checkinparse.SortByTime(wfFull)
 	for _, w := range wfFull {
-		out.WifiFullLockActivity = append(out.WifiFullLockActivity, ActivityData{
-			Name:         w.Name,
-			UID:          w.UID,
-			Duration:     w.Duration,
-			SecondsPerHr: float32(w.Duration.Seconds()) / float32(realtime.Hours()),
-		})
+		out.WifiFullLockActivity = append(out.WifiFullLockActivity, activityData(w, realtime))
 	}
+	out.AggWifiFullLockActivity = sumWakelockInfo(wfFull, realtime)
 
 	// Sorting SyncManager Tasks by time.
 	checkinparse.SortByTime(stl)
 	for _, st := range stl {
-		out.SyncTasks = append(out.SyncTasks, ActivityData{
-			Name:         st.Name,
-			UID:          st.UID,
-			Count:        st.Count,
-			CountPerHour: st.Count / float32(realtime.Hours()),
-			Duration:     st.Duration,
-			SecondsPerHr: float32(st.Duration.Seconds()) / float32(realtime.Hours()),
-		})
-		out.TotalAppSyncsPerHr += float32(st.Duration.Seconds()) / float32(realtime.Hours())
+		out.SyncTasks = append(out.SyncTasks, activityData(st, realtime))
+		if realtime > 0 {
+			out.TotalAppSyncsPerHr += float32(st.Duration.Seconds()) / float32(realtime.Hours())
+		}
 	}
+	out.AggSyncTasks = sumWakelockInfo(stl, realtime)
 
 	// Sorting Partial Wakelocks by time.
 	checkinparse.SortByTime(pwl)
 	for _, pw := range pwl {
-		out.UserspaceWakelocks = append(out.UserspaceWakelocks, ActivityData{
-			Name:         pw.Name,
-			UID:          pw.UID,
-			Count:        pw.Count,
-			CountPerHour: pw.Count / float32(realtime.Hours()),
-			Duration:     pw.Duration,
-			SecondsPerHr: float32(pw.Duration.Seconds()) / float32(realtime.Hours()),
-		})
+		out.UserspaceWakelocks = append(out.UserspaceWakelocks, activityData(pw, realtime))
 	}
 
 	// Sort GPS use by time.
 	checkinparse.SortByTime(gps)
 	for _, g := range gps {
-		out.GPSUse = append(out.GPSUse, ActivityData{
-			Name:         g.Name,
-			UID:          g.UID,
-			Count:        g.Count,
-			CountPerHour: g.Count / float32(realtime.Hours()),
-			Duration:     g.Duration,
-			SecondsPerHr: float32(g.Duration.Seconds()) / float32(realtime.Hours()),
-		})
-		out.TotalAppGPSUseTimePerHour += float32(g.Duration.Seconds()) / float32(realtime.Hours())
+		out.GPSUse = append(out.GPSUse, activityData(g, realtime))
+		if realtime > 0 {
+			out.TotalAppGPSUseTimePerHour += float32(g.Duration.Seconds()) / float32(realtime.Hours())
+		}
 	}
+	out.AggGPSUse = sumWakelockInfo(gps, realtime)
 
 	// Sort camera use by time.
 	checkinparse.SortByTime(ca)
 	for _, c := range ca {
-		out.CameraUse = append(out.CameraUse, ActivityData{
-			Name:         c.Name,
-			UID:          c.UID,
-			Count:        c.Count,
-			CountPerHour: c.Count / float32(realtime.Hours()),
-			Duration:     c.Duration,
-			SecondsPerHr: float32(c.Duration.Seconds()) / float32(realtime.Hours()),
-		})
-		out.TotalAppCameraUsePerHr += float32(c.Duration.Seconds()) / float32(realtime.Hours())
+		out.CameraUse = append(out.CameraUse, activityData(c, realtime))
+		if realtime > 0 {
+			out.TotalAppCameraUsePerHr += float32(c.Duration.Seconds()) / float32(realtime.Hours())
+		}
 	}
 
 	// Sort flashlight use by time.
 	checkinparse.SortByTime(fla)
 	for _, f := range fla {
-		out.FlashlightUse = append(out.FlashlightUse, ActivityData{
-			Name:         f.Name,
-			UID:          f.UID,
-			Count:        f.Count,
-			CountPerHour: f.Count / float32(realtime.Hours()),
-			Duration:     f.Duration,
-			SecondsPerHr: float32(f.Duration.Seconds()) / float32(realtime.Hours()),
-		})
-		out.TotalAppFlashlightUsePerHr += float32(f.Duration.Seconds()) / float32(realtime.Hours())
+		out.FlashlightUse = append(out.FlashlightUse, activityData(f, realtime))
 	}
+
 	return out
 }

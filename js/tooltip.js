@@ -27,12 +27,14 @@ goog.provide('historian.Tooltip');
  *
  * @param {!Array<string>} lines The Html contents to display in tooltip.
  * @param {!historian.State} state Global Historian state.
+ * @param {string=} opt_classes One or more space-separated classes to add.
  * @param {number=} opt_x The x coordinate of the tooltip.
  * @param {number=} opt_y The y coordinate of the tooltip.
  * @constructor
  * @struct
  */
-historian.Tooltip = function(lines, state, opt_x, opt_y) {
+historian.Tooltip = function(lines, state, opt_classes, opt_x, opt_y) {
+
   /**
    * @private {number}
    */
@@ -52,6 +54,10 @@ historian.Tooltip = function(lines, state, opt_x, opt_y) {
         left: this.x_ + historian.Tooltip.OFFSET,
         top: this.y_ + historian.Tooltip.OFFSET
       });
+
+  if (opt_classes) {
+    this.tooltip_.addClass(opt_classes);
+  }
 
   // Must append to obtain correct width.
   this.tooltip_.hide()

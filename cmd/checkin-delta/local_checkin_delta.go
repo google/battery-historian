@@ -137,7 +137,14 @@ func main() {
 		if strings.Contains(bs, "Exception occurred while dumping") {
 			log.Fatalf("Exception found in battery dump.")
 		}
-		s := &sessionpb.Checkin{Checkin: proto.String(bs)}
+		m, err := bugreportutils.ParseMetaInfo(br)
+		if err != nil {
+			log.Fatalf("Unable to get meta info: %v", err)
+		}
+		s := &sessionpb.Checkin{
+			Checkin:          proto.String(bs),
+			BuildFingerprint: proto.String(m.BuildFingerprint),
+		}
 
 		stats[i], warns, errs = checkinparse.ParseBatteryStats(&ctr, checkinparse.CreateCheckinReport(s), nil)
 

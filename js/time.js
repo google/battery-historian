@@ -79,7 +79,7 @@ historian.time.getTime = function(t, loc) {
 
 /**
  * Returns the ms duration formatted as a human readable string.
- * Format is "1h 3m 4s 30ms".
+ * Format is "1h 3m 4s 30.25ms".
  * @param {number} duration The time duration in ms.
  * @return {string} The formatted duration.
  */
@@ -127,19 +127,19 @@ historian.time.secsFromMs = function(ms) {
 
 
 /**
- * Parses a time.Duration format string into its numeric value.
+ * Parses a time.Duration format string into its numeric value in milliseconds.
  * @param   {string} s time.Duration format string.
  * @return  {number} The corresponding numeric value of the input time.
  */
 historian.time.parseTimeString = function(s) {
   // Format data for normalization.
   // The string which will be parsed can be in the format of
-  // '2h2m48.373s' or '53m26.89s' or '58.267s' or '765ms' or '0'
+  // '2h2m48.373s' or '53m26.89s' or '58.267s' or '765ms' or '5.75ms' or '0'
   // the function formats all the data into one unified unit milliseconds.
   var m = s.trim()
-      .match(/^(?:(\d+)h)?\s*(?:(\d+)m)?\s*(?:(\d+(?:\.\d+)?)s)?\s*(?:(\d+)ms)?$/);
+      .match(/^(?:(\d+)h)?\s*(?:(\d+)m)?\s*(?:(\d+(?:\.\d+)?)s)?\s*(?:(\d+(?:\.\d+)?)ms)?$/);
   return m ? ((m[1] || 0) * historian.time.MSECS_IN_HOUR +
               (m[2] || 0) * historian.time.MSECS_IN_MIN +
               (m[3] || 0) * historian.time.MSECS_IN_SEC +
-              (m[4] || 0) * 1) : 0;
+              (Number(m[4]) || 0)) : 0;
 };

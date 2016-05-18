@@ -97,6 +97,15 @@ historian.panels_ = {
     numCols: 8,
     height: 600
   },
+  powerstats: {
+    selector: '#panel-powerstats',
+    menuSelector: '#menu-powerstats',
+    toggleSelector: '#toggle-powerstats',
+    show: false,
+    resizable: false,
+    toggable: true,
+    height: 850
+  },
   tables: {
     selector: '#panel-tables',
     show: true,
@@ -145,17 +154,23 @@ historian.historianV1Requested = false;
  */
 historian.renderHistorianV2 = function(data, levelSummaryData) {
   if (!historian.historianV2_) {
+    var powerStatsContainer =
+        (historian.metrics.Csv.POWERMONITOR in data[0].nameToBarGroup) ?
+            $(historian.panels_.powerstats.selector + ' .panel-body') : null;
     historian.historianV2_ = new historian.HistorianV2(
         $(historian.panels_.historian.selector + ' .panel-body'),
-        data[0], levelSummaryData, historian.state_);
+        data[0], levelSummaryData, historian.state_,
+        powerStatsContainer);
   }
   historian.historianV2_.render();
 
   if (historian.usingComparison && data.length > 1) {
     if (!historian.historianV2Two_) {
+      // Powermonitor is not supported for comparison view, so pass in a null
+      // container.
       historian.historianV2Two_ = new historian.HistorianV2(
           $(historian.panels_.historian2.selector + ' .panel-body'),
-          data[1], levelSummaryData, historian.state_);
+          data[1], levelSummaryData, historian.state_, null);
     }
     historian.historianV2Two_.render();
   }
@@ -366,6 +381,13 @@ historian.initHistorianTabs = function(data, levelSummaryData) {
   $('#tab-historian-v2').on('shown.bs.tab', function() {
     historian.renderHistorianV2(data, levelSummaryData);
   });
+  $('#tab-historian-v2').on('hide.bs.tab', function() {
+    // If tab change has been triggered, notify Historian v2 so it will
+    // ignore mouseover events that occur in the transitioning period.
+    if (historian.historianV2_) {
+      historian.historianV2_.setDisplayed(false);
+    }
+  });
   if (!historian.usingComparison) {
     $('#tab-historian').on('shown.bs.tab', function() {
       if (!historian.historianV1Requested) {
@@ -389,22 +411,6 @@ historian.initMenu = function() {
     // Prevent default page scroll.
     event.preventDefault();
   });
-};
-
-
-/**
- * Shows the response error message in the given element.
- * @param {!jQuery} elem The Jquery element to show the error message in.
- * @param {{responseText: string, status: number}} xhr The request object.
- */
-historian.showFailedUploadMsg = function(elem, xhr) {
-  var errMsg = xhr.responseText;
-  if (xhr.status == 0) {
-    // Since the POST request failed, responseText will be empty.
-    errMsg = 'POST failed: possible causes are renaming / moving' +
-        ' the files after upload, or loss of network connection.';
-  }
-  elem.append('<br>' + errMsg).show();
 };
 
 
@@ -465,14 +471,15 @@ historian.initialize = function(json) {
   historian.usingComparison = json.usingComparison;
   historian.criticalError = json.UploadResponse[0].criticalError;
 
+  var displayPowermonitor = false;
   if (historian.usingComparison) {
     if (json.UploadResponse[1].sdkVersion < historian.sdkVersion) {
       historian.sdkVersion = json.UploadResponse[1].sdkVersion;
     }
   } else {
-    historian.displayPowermonitor = json.UploadResponse[0].displayPowermonitor;
     historian.appstats.reportVersion = json.UploadResponse[0].reportVersion;
-    if (historian.displayPowermonitor) {
+    displayPowermonitor = json.UploadResponse[0].displayPowermonitor;
+    if (displayPowermonitor) {
       levelSummaryCsv = '';
     }
   }
@@ -489,13 +496,26 @@ historian.initialize = function(json) {
   var levelSummaryData = historian.data.processLevelSummaryData(
       levelSummaryCsv);
   historian.initMenu();
-  if (historian.sdkVersion < 21 || historian.criticalError) {
+  if (historian.sdkVersion < 21) {
     historian.showOnlyHistorianV1();
   } else {
+    if (historian.criticalError) {
+      historian.note.show(historian.criticalError);
+    }
+    // Get the devices that are reporting zero battery capacity.
+    var badDevices = json.UploadResponse.reduce(function(devices, data, i) {
+      return data.deviceCapacity == 0 ? devices + i + ' ' : devices;
+    }, '');
+    if (badDevices != '') {
+      historian.note.show(
+          'Device(s) ' + badDevices + 'reported battery capacity 0.');
+    }
+
     historianV2Data = json.UploadResponse.map(function(data) {
       return historian.data.processHistorianV2Data(
           data.historianV2Csv, parseInt(data.deviceCapacity, 10),
-          data.timeToDelta, data.location, data.displayPowermonitor);
+          data.timeToDelta, data.location, data.displayPowermonitor,
+          data.groupToLogStart || {});
     });
     historian.tables.initialize();
 
@@ -504,6 +524,11 @@ historian.initialize = function(json) {
 
       historian.initAppSelector();
 
+      if (!displayPowermonitor) {
+        // If no powermonitor file was uploaded, no power stats will be
+        // generated.
+        $('#menu-powerstats').remove();
+      }
       $('.comparison').remove();
     } else {
       historian.comparison.initialize();
@@ -518,7 +543,6 @@ historian.initialize = function(json) {
     historian.renderHistorianV2(historianV2Data, levelSummaryData);
   }
   historian.initHistorianTabs(historianV2Data, levelSummaryData);
-
 
   // Visibility initialization goes after rendering.
   // Otherwise the plots would have zero size.

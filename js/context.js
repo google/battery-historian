@@ -237,16 +237,15 @@ historian.Context = function(container, xExtent, yDomain, barData, levelData,
  */
 historian.Context.MARGINS = {
   TOP: 10,
-  RIGHT: 50,
-  BOTTOM: 50,
+  RIGHT: 70,
+  BOTTOM: 55,
   LEFT: 180
 };
 
 
 /** @const {!Array<number>} */
 historian.Context.MIN_SVG_SIZE = [
-  historian.Context.MARGINS.LEFT +
-      historian.Context.MARGINS.RIGHT,
+  historian.Context.MARGINS.LEFT + historian.Context.MARGINS.RIGHT,
   300
 ];
 
@@ -263,6 +262,16 @@ historian.Context.MIN_TICK_MARGIN_PX_ = 10;
  * @private
  */
 historian.Context.TIME_ZONE_DISPLAY_PX_ = 10;
+
+
+/**
+ * Converts the screen position to the corresponding graph time.
+ * @param {number} pos Position px.
+ * @return {number} Time in unix ms.
+ */
+historian.Context.prototype.invertPosition = function(pos) {
+  return this.xScale.invert(pos);
+};
 
 
 /**

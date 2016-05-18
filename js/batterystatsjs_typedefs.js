@@ -24,6 +24,7 @@ goog.provide('batterystats.BatteryStats.App');
 goog.provide('batterystats.BatteryStats.App.Apk');
 goog.provide('batterystats.BatteryStats.App.Apk.Service');
 goog.provide('batterystats.BatteryStats.App.Audio');
+goog.provide('batterystats.BatteryStats.App.BluetoothMisc');
 goog.provide('batterystats.BatteryStats.App.Camera');
 goog.provide('batterystats.BatteryStats.App.Child');
 goog.provide('batterystats.BatteryStats.App.Cpu');
@@ -41,6 +42,7 @@ goog.provide('batterystats.BatteryStats.App.UserActivity.Name');
 goog.provide('batterystats.BatteryStats.App.Vibrator');
 goog.provide('batterystats.BatteryStats.App.Video');
 goog.provide('batterystats.BatteryStats.App.Wakelock');
+goog.provide('batterystats.BatteryStats.App.WakeupAlarm');
 goog.provide('batterystats.BatteryStats.App.Wifi');
 goog.provide('batterystats.BatteryStats.ControllerActivity');
 goog.provide('batterystats.BatteryStats.ControllerActivity.TxLevel');
@@ -137,6 +139,15 @@ batterystats.BatteryStats.App.Apk;
  * }}
  */
 batterystats.BatteryStats.App.Audio;
+
+
+/**
+ * @typedef {{
+ *   ble_scan_time_msec: (number|undefined),
+ *   ble_scan_count: (number|undefined)
+ * }}
+ */
+batterystats.BatteryStats.App.BluetoothMisc;
 
 
 /**
@@ -267,7 +278,8 @@ batterystats.BatteryStats.App.Sync;
 batterystats.BatteryStats.App.UserActivity.Name = {
   OTHER: 0,
   BUTTON: 1,
-  TOUCH: 2
+  TOUCH: 2,
+  ACCESSIBILITY: 3
 };
 
 
@@ -314,6 +326,15 @@ batterystats.BatteryStats.App.Wakelock;
 
 /**
  * @typedef {{
+ *   name: (string|undefined),
+ *   count: (number|undefined)
+ * }}
+ */
+batterystats.BatteryStats.App.WakeupAlarm;
+
+
+/**
+ * @typedef {{
  *   full_wifi_lock_time_msec: (number|undefined),
  *   scan_time_msec: (number|undefined),
  *   running_time_msec: (number|undefined),
@@ -337,6 +358,7 @@ batterystats.BatteryStats.App.Wifi;
  *   apk: (batterystats.BatteryStats.App.Apk|undefined),
  *   audio: (batterystats.BatteryStats.App.Audio|undefined),
  *   bluetooth_controller: (batterystats.BatteryStats.ControllerActivity|undefined),
+ *   bluetooth_misc: (batterystats.BatteryStats.App.BluetoothMisc|undefined),
  *   camera: (batterystats.BatteryStats.App.Camera|undefined),
  *   cpu: (batterystats.BatteryStats.App.Cpu|undefined),
  *   flashlight: (batterystats.BatteryStats.App.Flashlight|undefined),
@@ -353,6 +375,7 @@ batterystats.BatteryStats.App.Wifi;
  *   vibrator: (batterystats.BatteryStats.App.Vibrator|undefined),
  *   video: (batterystats.BatteryStats.App.Video|undefined),
  *   wakelock: Array.<batterystats.BatteryStats.App.Wakelock>,
+ *   wakeup_alarm: Array.<batterystats.BatteryStats.App.WakeupAlarm>,
  *   wifi: (batterystats.BatteryStats.App.Wifi|undefined),
  *   wifi_controller: (batterystats.BatteryStats.ControllerActivity|undefined)
  * }}

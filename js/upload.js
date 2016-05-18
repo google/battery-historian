@@ -21,6 +21,7 @@ goog.provide('historian.upload');
 
 goog.require('historian');
 goog.require('historian.constants');
+goog.require('historian.requests');
 
 
 /** @private @const {number} */
@@ -206,30 +207,12 @@ historian.upload.initialize = function() {
       bar.css('width', percentVal);
       bar.text('Uploading:' + percentVal);
       if (percentComplete === 100) {
-        setTimeout(function() { bar.text('Uploading Complete!');}, 1000);
-        setTimeout(function() { bar.text('Analyzing...');}, 3000);
+        setTimeout(function() { bar.text('Uploading Complete!'); }, 1000);
+        setTimeout(function() { bar.text('Analyzing...'); }, 3000);
       }
     },
-    complete: historian.upload.uploadComplete
+    complete: historian.requests.uploadComplete
   });
-};
-
-
-/**
- * Parses the returned xhr object from the server and initializes the page.
- * @param {!Object} xhr The xhr response returned.
- */
-historian.upload.uploadComplete = function(xhr) {
-  var json = xhr.responseJSON;
-  if (json) {
-    historian.initialize(json);
-  } else {
-    // An error occurred. The error message is saved in responseText.
-    $('#processingError').html(xhr.responseText);
-    $('#processingError').show();
-    $('form').show();
-    $('.progress').hide();
-  }
 };
 
 

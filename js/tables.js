@@ -191,6 +191,11 @@ historian.tables.makeTablesCopiable = function(tables) {
  * @param {!jQuery} table The table that should have copy functionality enabled.
  */
 historian.tables.activateTableCopy = function(table) {
+  // Some table names can change (on demand app sorting), so just get a
+  // reference to the span now. Pull out the actual table name when the copy
+  // button is pressed.
+  var tableNameSpan = $(table).parents()
+      .prev('.summary-title-inline, .summary-title').find('span');
   $('<div>Copy</div>')
       .addClass('btn btn-default btn-xs table-copy')
       .prependTo($(table).parent())
@@ -214,6 +219,9 @@ historian.tables.activateTableCopy = function(table) {
               }
               return curMax;
             }, []);
+        // Use the table name as a header, if possible.
+        var tableName = tableNameSpan && tableNameSpan.text() ?
+            tableNameSpan.text() + '\n' : '';
         var content = rows
             .map(function(curValue, index) {
               var padded = [];
@@ -237,7 +245,7 @@ historian.tables.activateTableCopy = function(table) {
             .reduce(function(allContents, padded) {
               var addition = padded ? padded.join(' | ') + '\n' : '';
               return allContents + addition;
-            }, '');
+            }, tableName);
         var textArea = $('<textarea></textarea>')
             .val(content)
             .appendTo('body')
@@ -304,6 +312,18 @@ historian.tables.initTables = function() {
   historian.tables.activateDataTable(toDataTables);
   // Add copy functionality to each table.
   historian.tables.makeTablesCopiable(toDataTables);
+
+  // Enable showing/hiding breakdown tables.
+  // Wakeup alarms by name.
+  $('#show-wakeup-breakdown').change(function() {
+    if ($(this).prop('checked')) {
+      $('#wakeup-breakdown').show();
+      $('#wakeup-no-breakdown').hide();
+    } else {
+      $('#wakeup-breakdown').hide();
+      $('#wakeup-no-breakdown').show();
+    }
+  });
 };
 
 
@@ -362,12 +382,14 @@ historian.tables.initTableSidebar = function() {
   $('#checkin .summary-title, #checkin .summary-title-inline')
       .each(function() {
         var summary = $(this);
-        var selector = '#' + summary.attr('id');
+        var id = summary.attr('id');
+        var selector = '#' + id;
         var title = summary.children('span:last').text();
         title = title.slice(0, title.length - 1); // Remove the last colon
         var li = $('<li></li>')
             .addClass('list-group-item')
             .text(/** @type {string} */(title))
+            .attr('id', historian.utils.toValidID('toc-' + id))
             .click({selector: selector}, function(event) {
               // Prevent the page from going to top by default '#'
               event.preventDefault();
@@ -376,6 +398,9 @@ historian.tables.initTableSidebar = function() {
                   historian.tables.Panes.SYSTEM, titleSelector);
             })
             .appendTo(ul);
+        if (summary.css('display') == 'none') {
+          li.hide();
+        }
         this.listItem = li;
       });
 

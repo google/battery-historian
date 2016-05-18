@@ -83,7 +83,8 @@ var testGetConfigNoData = function() {
  * Tests the battery level config is returned if display powermonitor if false.
  */
 var testBatteryLevelConfig = function() {
-  var data = historian.data.processHistorianV2Data('', 2300, {}, '', false);
+  var data =
+      historian.data.processHistorianV2Data('', 2300, {}, '', false, {});
   assertObjectEquals(historian.LevelConfigs.batteryLevelConfig_(2300),
       data.configs.getConfig(data.defaultLevelMetric));
 };
@@ -93,7 +94,8 @@ var testBatteryLevelConfig = function() {
  * Tests the powermonitor config is returned if display powermonitor if true.
  */
 var testPowermonitorConfig = function() {
-  var data = historian.data.processHistorianV2Data('', 2300, {}, '', true);
+  var data =
+      historian.data.processHistorianV2Data('', 2300, {}, '', true, {});
   assertObjectEquals(historian.LevelConfigs.powermonitorConfig_([]),
       data.configs.getConfig(data.defaultLevelMetric));
 
@@ -102,7 +104,7 @@ var testPowermonitorConfig = function() {
   data = historian.data.processHistorianV2Data(
       header + 'Powermonitor,int,1000,2000,-10,\n' +
       'Powermonitor,int,2000,3000,1001,\n',
-      2300, {}, '', true);
+      2300, {}, '', true, {});
   assertObjectEquals({min: -10, max: 1001},
       data.configs.getConfig(data.defaultLevelMetric).yDomain);
 };

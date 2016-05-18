@@ -143,6 +143,9 @@ func normalizeApp(a *bspb.BatteryStats_App, totalTimeHour float64) *bspb.Battery
 	if norm := normalizeRepeatedMessage(a.GetWakelock(), totalTimeHour).Interface(); norm != nil {
 		res.Wakelock = norm.([]*bspb.BatteryStats_App_Wakelock)
 	}
+	if norm := normalizeRepeatedMessage(a.GetWakeupAlarm(), totalTimeHour).Interface(); norm != nil {
+		res.WakeupAlarm = norm.([]*bspb.BatteryStats_App_WakeupAlarm)
+	}
 	if norm := normalizeMessage(a.GetWifi(), totalTimeHour); norm != nil {
 		res.Wifi = norm.(*bspb.BatteryStats_App_Wifi)
 	}

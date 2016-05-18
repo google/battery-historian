@@ -242,8 +242,21 @@ func mergeIntervals(intervals []interval) []interval {
 	return res
 }
 
+// addSummaryEntry adds an event spanning a time interval from suid.Start to curTime into summary map.
+func (s *ServiceUID) addSummaryEntry(curTime int64, suid *ServiceUID, summary map[string]Dist) {
+	d := summary[s.Service]
+	if duration := time.Duration(curTime-suid.Start) * time.Millisecond; duration > 0 {
+		d.TotalDuration += duration
+		if duration > d.MaxDuration {
+			d.MaxDuration = duration
+		}
+		d.Num++
+		summary[s.Service] = d
+	}
+}
+
 // Counts on negative transitions
-func (s *ServiceUID) assign(curTime int64, summaryActive bool, summaryStartTime int64, activeMap map[string]*ServiceUID, summary map[string]Dist, tr, value, desc string, csv *csv.State) error {
+func (s *ServiceUID) assign(curTime int64, summaryActive, logEvent bool, summaryStartTime int64, activeMap map[string]*ServiceUID, summary map[string]Dist, tr, value, desc string, csv *csv.State) error {
 
 	_, alreadyActive := activeMap[value]
 	appID, err := packageutils.AppIDFromString(s.UID)
@@ -273,29 +286,24 @@ func (s *ServiceUID) assign(curTime int64, summaryActive bool, summaryStartTime 
 			// already active at the beginning of the summary period.
 			s.Start = summaryStartTime
 			activeMap[value] = s
-			csv.AddEntryWithOpt(desc, s, s.Start, fmt.Sprint(appID))
-		}
-		if summaryActive {
-			d := summary[s.Service]
-			duration := time.Duration(curTime-activeMap[value].Start) * time.Millisecond
-			if duration > 0 {
-				d.TotalDuration += duration
-				if duration > d.MaxDuration {
-					d.MaxDuration = duration
-				}
-				d.Num++
-				summary[s.Service] = d
+			if logEvent {
+				csv.AddEntryWithOpt(desc, s, s.Start, fmt.Sprint(appID))
 			}
+		}
+		if summaryActive && logEvent {
+			s.addSummaryEntry(curTime, activeMap[value], summary)
 		}
 		delete(activeMap, value)
 
 	default:
 		return fmt.Errorf("unknown transition for %q:%q", desc, tr)
 	}
-	// We need to keep the raw UID so that services can be sufficiently distinguished in the csv mapping,
-	// but Battery Historian only deals with app IDs (with the user ID removed)
-	// so we have to make sure the csv prints only the app ID.
-	csv.AddEntryWithOpt(desc, s, curTime, fmt.Sprint(appID))
+	if logEvent {
+		// We need to keep the raw UID so that services can be sufficiently distinguished in the csv
+		// mapping, but Battery Historian only deals with app IDs (with the user ID removed) so we have to make
+		// sure the csv prints only the app ID.
+		csv.AddEntryWithOpt(desc, s, curTime, fmt.Sprint(appID))
+	}
 	return nil
 }
 
@@ -602,10 +610,11 @@ type DeviceState struct {
 	dpstTokenIndex     int           // To determine the token's index in Dpst
 
 	// Instanteous state
-	Temperature  tsInt
-	Voltage      tsInt
-	BatteryLevel tsInt
-	Brightness   tsInt
+	Temperature   tsInt
+	Voltage       tsInt
+	BatteryLevel  tsInt
+	Brightness    tsInt
+	CoulombCharge tsInt
 
 	PhoneState          tsString
 	DataConnection      tsString // hspa, hspap, lte
@@ -640,6 +649,9 @@ type DeviceState struct {
 	FlashlightOn    tsBool
 	ChargingOn      tsBool
 	CameraOn        tsBool
+	VideoOn         tsBool
+	AudioOn         tsBool
+	LowPowerModeOn  tsBool
 	// SyncOn       tsBool
 
 	WakeLockHolder ServiceUID
@@ -682,10 +694,7 @@ type DeviceState struct {
 	*/
 
 	// Not implemented yet
-	BluetoothOn    tsBool
-	VideoOn        tsBool
-	AudioOn        tsBool
-	LowPowerModeOn tsBool
+	BluetoothOn tsBool
 }
 
 // initStartTimeForAllStates is used when the device transitions from charging
@@ -699,6 +708,7 @@ func (state *DeviceState) initStartTimeForAllStates() {
 	state.Voltage.initStart(state.CurrentTime)
 	state.BatteryLevel.initStart(state.CurrentTime)
 	state.Brightness.initStart(state.CurrentTime)
+	state.CoulombCharge.initStart(state.CurrentTime)
 	state.PhoneSignalStrength.initStart(state.CurrentTime)
 	state.PhoneState.initStart(state.CurrentTime)
 	state.DataConnection.initStart(state.CurrentTime)
@@ -1066,7 +1076,9 @@ func concludeActiveFromState(state *DeviceState, summary *ActivitySummary, csv *
 
 	// Top application: Etp **
 	for _, suid := range state.TopApplicationMap {
-		suid.updateSummary(state.CurrentTime, summary.Active, summary.StartTimeMs, summary.TopApplicationSummary)
+		if suid.Start < state.CurrentTime {
+			suid.updateSummary(state.CurrentTime, summary.Active, summary.StartTimeMs, summary.TopApplicationSummary)
+		}
 	}
 
 	// Sync application: Esy **
@@ -1323,6 +1335,20 @@ func printDuration(b io.Writer, name string, m map[string]time.Duration) {
 	fmt.Fprintln(b)
 }
 
+func topApp(activeMap map[string]*ServiceUID) (*ServiceUID, error) {
+	switch len(activeMap) {
+	case 0: // No active app.
+		return nil, nil
+	case 1: // The expected case.
+		for _, suid := range activeMap {
+			return suid, nil
+		}
+		return nil, errors.New("unreachable code")
+	default:
+		return nil, fmt.Errorf("too many apps active simultaneously (|TopApplicationMap| = %d)", len(activeMap))
+	}
+}
+
 // updateState method interprets the events contained in the battery history string
 // according to the definitions in:
 // android//frameworks/base/core/java/android/os/BatteryStats.java
@@ -1417,6 +1443,9 @@ func updateState(b io.Writer, csv *csv.State, state *DeviceState, summary *Activ
 		return state, summary, state.Plugged.assign(state.CurrentTime,
 			summary.Active, summary.StartTimeMs,
 			&summary.PluggedInSummary, tr, "Plugged", csv)
+
+	case "Bcc": // coulomb charge (in mAh)
+		return state, summary, state.CoulombCharge.assign(state.CurrentTime, value, summary.Active, "Coulomb charge", csv)
 
 	case "r": // running
 		// Needs special handling as the wakeup reason will arrive asynchronously
@@ -1622,6 +1651,7 @@ func updateState(b io.Writer, csv *csv.State, state *DeviceState, summary *Activ
 		return state, summary, nil
 
 	case "S": // screen
+		prevVal := state.ScreenOn.Value
 		err := state.ScreenOn.assign(state.CurrentTime,
 			summary.Active, summary.StartTimeMs,
 			&summary.ScreenOnSummary, tr, "Screen", csv)
@@ -1629,7 +1659,25 @@ func updateState(b io.Writer, csv *csv.State, state *DeviceState, summary *Activ
 			// Reset data on screen off transition so we don't carry over reasons to other screen on events
 			state.ScreenOn.data = unknownScreenOnReason
 		}
-
+		if err != nil || prevVal == state.ScreenOn.Value {
+			return state, summary, err
+		}
+		// Update state for the top app.
+		topAppSuid, err := topApp(state.TopApplicationMap)
+		if err != nil || topAppSuid == nil {
+			return state, summary, err
+		}
+		appID, err := packageutils.AppIDFromString(topAppSuid.UID)
+		if err != nil {
+			return state, summary, err
+		}
+		// Update stats if needed and screen got turned off.
+		if !state.ScreenOn.Value && summary.Active {
+			topAppSuid.addSummaryEntry(state.CurrentTime, topAppSuid, summary.TopApplicationSummary)
+		}
+		// Add 'Top app' entry to the log and update the start time.
+		csv.AddEntryWithOpt("Top app", topAppSuid, state.CurrentTime, fmt.Sprint(appID))
+		topAppSuid.Start = state.CurrentTime
 		return state, summary, err
 
 	case "Sb": // brightness
@@ -1695,7 +1743,7 @@ func updateState(b io.Writer, csv *csv.State, state *DeviceState, summary *Activ
 			return state, summary, fmt.Errorf("unable to find index %q in idxMap for active process", value)
 		}
 		return state, summary, serviceUID.assign(state.CurrentTime,
-			summary.Active, summary.StartTimeMs, state.ActiveProcessMap,
+			summary.Active, true, summary.StartTimeMs, state.ActiveProcessMap,
 			summary.ActiveProcessSummary, tr, value, "Active process", csv)
 
 	case "Efg": // fg
@@ -1704,7 +1752,7 @@ func updateState(b io.Writer, csv *csv.State, state *DeviceState, summary *Activ
 			return state, summary, fmt.Errorf("unable to find index %q in idxMap for foreground process", value)
 		}
 		return state, summary, serviceUID.assign(state.CurrentTime,
-			summary.Active, summary.StartTimeMs, state.ForegroundProcessMap,
+			summary.Active, true, summary.StartTimeMs, state.ForegroundProcessMap,
 			summary.ForegroundProcessSummary, tr, value, "Foreground process", csv)
 
 	case "Etp": // top
@@ -1713,7 +1761,7 @@ func updateState(b io.Writer, csv *csv.State, state *DeviceState, summary *Activ
 			return state, summary, fmt.Errorf("unable to find index %q in idxMap for top app", value)
 		}
 		return state, summary, serviceUID.assign(state.CurrentTime,
-			summary.Active, summary.StartTimeMs, state.TopApplicationMap,
+			summary.Active, state.ScreenOn.Value, summary.StartTimeMs, state.TopApplicationMap,
 			summary.TopApplicationSummary, tr, value, "Top app", csv)
 
 	case "Esy": // sync
@@ -1736,7 +1784,7 @@ func updateState(b io.Writer, csv *csv.State, state *DeviceState, summary *Activ
 		}
 
 		return state, summary, serviceUID.assign(state.CurrentTime,
-			summary.Active, summary.StartTimeMs, state.AppSyncingMap,
+			summary.Active, true, summary.StartTimeMs, state.AppSyncingMap,
 			summary.PerAppSyncSummary, tr, value, "SyncManager", csv)
 
 	case "W": // wifi
@@ -1954,7 +2002,7 @@ func updateState(b io.Writer, csv *csv.State, state *DeviceState, summary *Activ
 			return state, summary, fmt.Errorf("unable to find index %q in idxMap for wakelock_in", value)
 		}
 		return state, summary, serviceUID.assign(state.CurrentTime,
-			summary.Active, summary.StartTimeMs, state.WakeLockMap,
+			summary.Active, true, summary.StartTimeMs, state.WakeLockMap,
 			summary.WakeLockDetailedSummary, tr, value, "Wakelock_in", csv)
 
 	case "di": // device idle mode of M
@@ -2011,7 +2059,7 @@ func updateState(b io.Writer, csv *csv.State, state *DeviceState, summary *Activ
 			return state, summary, fmt.Errorf("unable to find index %q in idxMap for job", value)
 		}
 		return state, summary, serviceUID.assign(state.CurrentTime,
-			summary.Active, summary.StartTimeMs, state.ScheduledJobMap,
+			summary.Active, true, summary.StartTimeMs, state.ScheduledJobMap,
 			summary.ScheduledJobSummary, tr, value, "JobScheduler", csv)
 
 	case "Etw": // tmpwhitelist: an application on the temporary whitelist
@@ -2021,7 +2069,7 @@ func updateState(b io.Writer, csv *csv.State, state *DeviceState, summary *Activ
 			return state, summary, fmt.Errorf("unable to find index %q in idxMap for tmpwhitelist", value)
 		}
 		return state, summary, serviceUID.assign(state.CurrentTime,
-			summary.Active, summary.StartTimeMs, state.TmpWhiteListMap,
+			summary.Active, true, summary.StartTimeMs, state.TmpWhiteListMap,
 			summary.TmpWhiteListSummary, tr, value, "Temp White List", csv)
 
 	case "Wsp": // Wifi Supplicant
@@ -2086,7 +2134,7 @@ func updateState(b io.Writer, csv *csv.State, state *DeviceState, summary *Activ
 		if !ok {
 			return state, summary, fmt.Errorf("unable to find index %q in idxMap for Alarm going off (Eal)", value)
 		}
-		err := suid.assign(state.CurrentTime, summary.Active, summary.StartTimeMs, state.AlarmMap, summary.AlarmSummary, tr, value, "Alarm", csv)
+		err := suid.assign(state.CurrentTime, summary.Active, true, summary.StartTimeMs, state.AlarmMap, summary.AlarmSummary, tr, value, "Alarm", csv)
 		return state, summary, err
 
 	case "Est": // stats
@@ -2178,6 +2226,7 @@ func updateState(b io.Writer, csv *csv.State, state *DeviceState, summary *Activ
 	// TODO:
 	case "Eur":
 	case "Euf":
+	case "state_1":
 
 	default:
 		// Handle Dpst Event

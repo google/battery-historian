@@ -20,31 +20,7 @@ goog.setTestOnly('historian.utilsTest');
 var jsunit = goog.require('goog.testing.jsunit');
 var testSuite = goog.require('goog.testing.testSuite');
 var utils = goog.require('historian.utils');
-
-
-/**
- * Creates a single entry for a series.
- * @param {!Array<number>} arr
- * @return {!historian.Entry}
- */
-var createTestEntry = function(arr) {
-  return {startTime: arr[0], endTime: arr[1], value: arr[2]};
-};
-
-
-/**
- * Creates the data for the test series, given an array of arrays,
- * each containing the start time, end time and value of an entry.
- * @param {!Array<!Array<number>>} values
- * @return {!Array<!historian.Entry>}
- */
-var createData = function(values) {
-  var processedValues = [];
-  values.forEach(function(v) {
-    processedValues.push(createTestEntry(v));
-  });
-  return processedValues;
-};
+var testUtils = goog.require('historian.testUtils');
 
 
 testSuite({
@@ -87,11 +63,184 @@ testSuite({
       }
     ];
     tests.forEach(function(t) {
-      var result = utils.calculateTotalChargeFormatted(createData(t.data));
+      var result =
+          utils.calculateTotalChargeFormatted(testUtils.createData(t.data));
       var expected = t.expected;
 
       assertEquals(t.desc + ': Expected ' + expected +
           ', got ' + result, expected, result);
+    });
+  },
+
+  /**
+   * Tests the filtering of data for the given time range.
+   */
+  testInTimeRange: function() {
+    var tests = [
+      {
+        desc: 'Start time before start of data array, end time matching ' +
+            'second entry end time.',
+        data: [
+          [1000, 2000, 100],
+          [2000, 3000, 99],
+          [3000, 4000, 98]
+        ],
+        startTime: 0,
+        endTime: 3000,
+        expected: [
+          [1000, 2000, 100],
+          [2000, 3000, 99]
+        ]
+      },
+      {
+        desc: 'Start time equal to an entry start time, end time after ' +
+            'last entry end time.',
+        data: [
+          [1000, 2000, 100],
+          [2000, 3000, 99],
+          [3000, 4000, 98]
+        ],
+        startTime: 2000,
+        endTime: 5000,
+        expected: [
+          [2000, 3000, 99],
+          [3000, 4000, 98]
+        ]
+      },
+      {
+        desc: 'Start time after an entry start time, end time between ' +
+            'entry start and end time',
+        data: [
+          [1000, 2000, 100],
+          [2000, 3000, 99],
+          [3000, 4000, 98]
+        ],
+        startTime: 2500,
+        endTime: 3500,
+        expected: [
+          [2000, 3000, 99],
+          [3000, 4000, 98]
+        ]
+      },
+      {
+        desc: 'Single data point. Start time before entry start time, ' +
+            'end time before entry end time',
+        data: [
+          [1000, 2000, 100],
+        ],
+        startTime: 500,
+        endTime: 1500,
+        expected: [
+          [1000, 2000, 100],
+        ]
+      },
+      {
+        desc: 'Start time matches entry start time, end time between entries',
+        data: [
+          [1000, 2000, 100],
+          [2000, 3000, 99],
+          [3000, 4000, 98],
+          [4000, 5000, 97]
+        ],
+        startTime: 1000,
+        endTime: 2500,
+        expected: [
+          [1000, 2000, 100],
+          [2000, 3000, 99]
+        ]
+      },
+      {
+        desc: 'Start time equals entry start time, end time equals another ' +
+            'entry end time',
+        data: [
+          [1000, 2000, 100],
+          [2000, 3000, 99],
+          [3000, 4000, 98],
+          [4000, 5000, 97]
+        ],
+        startTime: 2000,
+        endTime: 4000,
+        expected: [
+          [2000, 3000, 99],
+          [3000, 4000, 98]
+        ]
+      },
+      {
+        desc: 'Start time and entry before before first entry start time',
+        data: [
+          [10, 20, 1],
+          [20, 30, 2],
+          [30, 40, 3]
+        ],
+        startTime: 1,
+        endTime: 2,
+        expected: []
+      },
+      {
+        desc: 'Start time and end time after last end time in array',
+        data: [
+          [10, 20, 1],
+          [20, 30, 2],
+          [30, 40, 3]
+        ],
+        startTime: 100,
+        endTime: 101,
+        expected: []
+      },
+      {
+        desc: 'Times not exactly matching array times',
+        data: [
+          [10, 20, 1],
+          [20, 30, 2],
+          [30, 40, 3],
+          [40, 50, 4],
+          [50, 60, 5]
+        ],
+        startTime: 29,
+        endTime: 41,
+        expected: [
+          [20, 30, 2],
+          [30, 40, 3],
+          [40, 50, 4]
+        ]
+      },
+      {
+        desc: 'Time range starts after start time of last element and ends ' +
+            'before end time of last element',
+        data: [
+          [10, 20, 1],
+          [20, 30, 2],
+          [30, 40, 3],
+          [40, 50, 4],
+          [50, 60, 5]
+        ],
+        startTime: 55,
+        endTime: 58,
+        expected: [
+          [50, 60, 5]
+        ]
+      },
+      {
+        desc: 'Queried start time falls on the end time of an entry ' +
+            'and queried end time falls on the start time of the next entry',
+        data: [
+          [10, 20, 1],
+          [20, 30, 2],
+          [30, 40, 3]
+        ],
+        startTime: 20,
+        endTime: 20,
+        expected: []
+      }
+    ];
+    tests.forEach(function(t) {
+      var data = testUtils.createData(t.data);
+
+      var result = utils.inTimeRange(t.startTime, t.endTime, data);
+      var expected = testUtils.createData(t.expected);
+
+      assertObjectEquals(t.desc + ': Expected ' + JSON.stringify(expected) +
+          ', got ' + JSON.stringify(result), expected, result);
     });
   }
 });

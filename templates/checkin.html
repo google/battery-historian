@@ -50,9 +50,34 @@ specific language governing permissions and limitations under the License.
         <td>{{.CheckinSummary.PartialWakelockTime.V }}</td>
       </tr>
 
+      <tr data-jump="#syncmanager-syncs" class="row-clickable table-jump">
+        <td>Sync Activity</td>
+        <td>{{.CheckinSummary.AggSyncTasks.Duration}} ({{.CheckinSummary.AggSyncTasks.Count}} times)</td>
+      </tr>
+
+      <tr data-jump="#wakeups" class="row-clickable table-jump">
+        <td>App Wakeup Alarms</td>
+        <td>{{.CheckinSummary.AggAppWakeups.Count}} times</td>
+      </tr>
+
+      <tr data-jump="#cpu-use" class="row-clickable table-jump">
+        <td>CPU Usage</td>
+        <td>{{.CheckinSummary.AggCPUUsage.UserTime}} user time, {{.CheckinSummary.AggCPUUsage.SystemTime}} system time</td>
+      </tr>
+
       <tr data-jump="#kernel-wakesources" class="row-clickable table-jump">
         <td>Kernel Overhead Time</td>
         <td>{{.CheckinSummary.KernelOverheadTime.V }}</td>
+      </tr>
+
+      <tr data-jump="#kernel-wakesources" class="row-clickable table-jump">
+        <td>Kernel Wakelocks</td>
+        <td>{{.CheckinSummary.AggKernelWakelocks.Duration}} ({{.CheckinSummary.AggKernelWakelocks.Count}} times)</td>
+      </tr>
+
+      <tr data-jump="#kernel-reasons" class="row-clickable table-jump">
+        <td>Wakeup Reasons</td>
+        <td>{{.CheckinSummary.AggWakeupReasons.Duration}} ({{.CheckinSummary.AggWakeupReasons.Count}} times)</td>
       </tr>
 
       <tr data-jump="#mobile-traffic" class="row-clickable table-jump">
@@ -63,6 +88,16 @@ specific language governing permissions and limitations under the License.
       <tr data-jump="#wifi-traffic" class="row-clickable table-jump">
         <td>WiFi KBs/hr</td>
         <td>{{printf "%.2f" .CheckinSummary.WifiKiloBytesPerHr.V }}</td>
+      </tr>
+
+      <tr data-jump="#wifi-scan-activity" class="row-clickable table-jump">
+        <td>Total WiFi Scan Activity</td>
+        <td>{{.CheckinSummary.AggWifiScanActivity.Duration}} ({{.CheckinSummary.AggWifiScanActivity.Count}} times)</td>
+      </tr>
+
+      <tr data-jump="#wifi-full-activity" class="row-clickable table-jump">
+        <td>Total WiFi Full Lock Activity</td>
+        <td>{{.CheckinSummary.AggWifiFullLockActivity.Duration}}</td>
       </tr>
 
       <tr data-jump="#mobile-active" class="row-clickable table-jump">
@@ -99,6 +134,12 @@ specific language governing permissions and limitations under the License.
         <td>Device Idling Time</td>
         <td>{{.CheckinSummary.DeviceIdlingTime.V }}</td>
       </tr>
+
+      <tr data-jump="#gps-use" class="row-clickable table-jump">
+        <td>Total GPS Use</td>
+        <td>{{.CheckinSummary.AggGPSUse.Duration}} ({{.CheckinSummary.AggGPSUse.Count}} times)</td>
+      </tr>
+
       {{if ge .CheckinSummary.ReportVersion 14}}
         <tr>
           <td>Wifi On Time</td>
@@ -132,6 +173,11 @@ specific language governing permissions and limitations under the License.
     </tbody>
   </table>
 </div>
+
+<div class="summary-title-inline" id="sorted-apps-section" style="display:none">
+  <span id="sorted-apps-section-title"></span>
+</div>
+<div class="sliding" style="display:none"><div id="sorted-apps"></div></div>
 
 <div class="summary-title-inline" id="device-power-estimates">
   <span>Device's Power Estimates:</span>
@@ -588,7 +634,7 @@ specific language governing permissions and limitations under the License.
       {{range $i, $wr := .CheckinSummary.WakeupReasons}}
       <tr>
         <td>{{$i}}</td>
-        <td>{{$wr.Name}}</td>
+        <td title="{{$wr.Title}}">{{$wr.Name}}</td>
         <td class="to-norm-timeval">{{$wr.Duration}}</td>
         <td class="to-norm-val">{{$wr.Count}}</td>
         <td>{{$wr.Duration}}</td>
@@ -605,32 +651,72 @@ specific language governing permissions and limitations under the License.
   <span>App Wakeup Alarms:</span>
 </div>
 <div class="summary-content sliding">
-  <table class="to-datatable">
-    <colgroup>
-      <col span="1" style="width: 5%;">
-      <col span="1" style="width: 55%;">
-      <col span="1" style="width: 20%;">
-      <col span="1" style="width: 20%;">
-    </colgroup>
-    <thead>
-      <tr>
-        <th>Ranking</th>
-        <th>Name</th>
-        <th>Frequency (count/hr)</th>
-        <th>Count</th>
-      </tr>
-    </thead>
-    <tbody>
-      {{range $i, $aw := .CheckinSummary.AppWakeups}}
-      <tr>
-        <td>{{$i}}</td>
-        <td>{{$aw.Name}}</td>
-        <td>{{printf "%.2f" $aw.CountPerHr}}</td>
-        <td>{{$aw.Count}}</td>
-      </tr>
-      {{end}}
-    </tbody>
-  </table>
+  {{if .CheckinSummary.AppWakeupsByAlarmName}}
+  <input type="checkbox" id="show-wakeup-breakdown">Break down wakeup alarms by alarm name<br>
+  <div id="wakeup-breakdown" style="display:none">
+    <table class="to-datatable">
+      <colgroup>
+        <col span="1" style="width: 7%;">
+        <col span="1" style="width: 60%;">
+        <col span="1" style="width: 8%;">
+        <col span="1" style="width: 15%;">
+        <col span="1" style="width: 10%;">
+      </colgroup>
+      <thead>
+        <tr>
+          <th>Ranking</th>
+          <th>Name</th>
+          <td>Uid</td>
+          <th>Frequency (count/hr)</th>
+          <th>Count</th>
+        </tr>
+      </thead>
+      <tbody>
+        {{range $i, $aw := .CheckinSummary.AppWakeupsByAlarmName}}
+        <tr>
+          <td>{{$i}}</td>
+          <td>{{$aw.Name}}</td>
+          <td>{{$aw.UID}}</td>
+          <td>{{printf "%.2f" $aw.CountPerHr}}</td>
+          <td>{{$aw.Count}}</td>
+        </tr>
+        {{end}}
+      </tbody>
+    </table>
+  </div>
+  {{end}}
+
+  <div id="wakeup-no-breakdown">
+    <table class="to-datatable">
+      <colgroup>
+        <col span="1" style="width: 7%;">
+        <col span="1" style="width: 55%;">
+        <col span="1" style="width: 8%;">
+        <col span="1" style="width: 20%;">
+        <col span="1" style="width: 10%;">
+      </colgroup>
+      <thead>
+        <tr>
+          <th>Ranking</th>
+          <th>Name</th>
+          <td>Uid</td>
+          <th>Frequency (count/hr)</th>
+          <th>Count</th>
+        </tr>
+      </thead>
+      <tbody>
+          {{range $i, $aw := .CheckinSummary.AppWakeups}}
+          <tr>
+            <td>{{$i}}</td>
+            <td>{{$aw.Name}}</td>
+            <td>{{$aw.UID}}</td>
+            <td>{{printf "%.2f" $aw.CountPerHr}}</td>
+            <td>{{$aw.Count}}</td>
+          </tr>
+          {{end}}
+      </tbody>
+    </table>
+  </div>
 </div>
 {{end}}
 

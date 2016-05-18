@@ -24,6 +24,9 @@ goog.require('historian.LevelLine');
 goog.require('historian.SeriesLevel');
 goog.require('historian.color');
 goog.require('historian.metrics');
+goog.require('historian.metrics.Csv');
+goog.require('historian.power.Estimator');
+goog.require('historian.power.Overlay');
 
 
 
@@ -33,10 +36,13 @@ goog.require('historian.metrics');
  * @param {!historian.HistorianV2Data} data The data for rendering Historian V2.
  * @param {!historian.LevelSummaryData} levelSummaryData
  * @param {!historian.State} state Global Historian state.
+ * @param {?jQuery} powerStatsContainer The panel body container for the power
+ *     statistics.
  * @constructor
  * @struct
  */
-historian.HistorianV2 = function(container, data, levelSummaryData, state) {
+historian.HistorianV2 =
+    function(container, data, levelSummaryData, state, powerStatsContainer) {
   /** @private @const {!jQuery} */
   this.container_ = container;
 
@@ -72,12 +78,21 @@ historian.HistorianV2 = function(container, data, levelSummaryData, state) {
       this.data_.location
       );
 
+  var running = this.data_.nameToBarGroup[historian.metrics.Csv.CPU_RUNNING];
+  var powermonitor =
+      this.data_.nameToBarGroup[historian.metrics.Csv.POWERMONITOR];
+  var powerEstimator = new historian.power.Estimator(
+      running ? running.series[0].values : [],
+      powermonitor ? powermonitor.series[0].values : [],
+      powerStatsContainer);
+
   /** @private {!historian.Bars} */
   this.bars_ = new historian.Bars(this.context_, barData,
                                   this.levelData_,
                                   this.data_.serviceMapper,
                                   this.data_.timeToDelta,
-                                  this.state_);
+                                  this.state_,
+                                  powerEstimator);
   /** @private {!historian.LevelLine} */
   this.levelLine_ = new historian.LevelLine(
       this.context_, this.levelData_, this.levelSummaryData_);
@@ -85,6 +100,17 @@ historian.HistorianV2 = function(container, data, levelSummaryData, state) {
   /** @private {!historian.SeriesLevel} */
   this.seriesLevel_ = new historian.SeriesLevel(
       this.context_, barData, this.levelSummaryData_, this.state_);
+
+  /** @private {!historian.power.Overlay} */
+  this.powerOverlay_ = new historian.power.Overlay(
+      this.context_, this.levelData_, powerEstimator);
+
+  /**
+   * Whether Historian v2 is currently being displayed.
+   * If false, new mouse events will be ignored.
+   * @private {boolean}
+  */
+  this.displayed_ = true;
 
   this.handleResize_();
   this.handleMouse_();
@@ -102,6 +128,15 @@ historian.HistorianV2.prototype.onLevelSeriesChange = function() {
   this.levelLine_.clear();
   this.levelLine_ = new historian.LevelLine(
       this.context_, this.levelData_, this.levelSummaryData_);
+};
+
+
+/**
+ * Sets whether Historian v2 is currently being displayed.
+ * @param {boolean} displayed
+ */
+historian.HistorianV2.prototype.setDisplayed = function(displayed) {
+  this.displayed_ = displayed;
 };
 
 
@@ -132,9 +167,11 @@ historian.HistorianV2.prototype.handleDataUpdate_ = function() {
  * Renders everything under historian.
  */
 historian.HistorianV2.prototype.render = function() {
+  this.setDisplayed(true);
   this.bars_.render();
   this.levelLine_.render();
   this.seriesLevel_.render();
+  this.powerOverlay_.render();
 };
 
 
@@ -147,6 +184,7 @@ historian.HistorianV2.prototype.resize_ = function() {
   this.bars_.update();
   this.levelLine_.update();
   this.seriesLevel_.update();
+  this.powerOverlay_.render();
 };
 
 
@@ -160,6 +198,7 @@ historian.HistorianV2.prototype.zoomHandler_ = function() {
   this.bars_.update();
   this.levelLine_.update();
   this.seriesLevel_.update();
+  this.powerOverlay_.render();
 };
 
 
@@ -170,6 +209,9 @@ historian.HistorianV2.prototype.zoomHandler_ = function() {
 historian.HistorianV2.prototype.handleMouse_ = function() {
   this.context_.svg
       .on('mousemove', function() {
+        if (!this.displayed_) {
+          return;
+        }
         this.seriesLevel_.showSummary();
         this.bars_.showSeriesInfo();
         this.levelLine_.renderTimeInfo();

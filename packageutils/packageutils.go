@@ -28,13 +28,14 @@ import (
 )
 
 const (
-	// Range of uids allocated for a user. Defined in frameworks/base/core/java/android/os/UserHandle.java.
+	// perUserRange gives the range of uids allocated for an individual user.
+	// Defined in frameworks/base/core/java/android/os/UserHandle.java.
 	perUserRange = 100000
 
 	// Defines the start of a range of UIDs (and GIDs), going from this number to LAST_APPLICATION_UID
 	// (which is 19999) that are reserved for assigning to applications. Both constants are defined in
 	// frameworks/base/core/java/android/os/Process.java.
-	firstApplicationUID = 10000
+	FirstApplicationUID = 10000
 	// First uid used for fully isolated sandboxed processes (with no permissions of their own).
 	// Defined in frameworks/base/core/java/android/os/Process.java.
 	firstIsolatedUID = 99000
@@ -168,7 +169,7 @@ func AppID(uid int32) int32 {
 	u := uid % perUserRange
 	// Application GID to appID parsing defined in frameworks/base/core/java/android/os/UserHandle.java
 	if firstSharedApplicationGID <= u && u <= lastSharedApplicationGID {
-		return u + firstApplicationUID - firstSharedApplicationGID
+		return u + FirstApplicationUID - firstSharedApplicationGID
 	}
 	return u
 }
@@ -190,8 +191,8 @@ func AppIDFromString(uid string) (int32, error) {
 		switch result["aidType"] {
 		case "i": // Isolated UID
 			return int32(i) + firstIsolatedUID, nil
-		case "a": // appId >= firstApplicationUID
-			return int32(i) + firstApplicationUID, nil
+		case "a": // appId >= FirstApplicationUID
+			return int32(i) + FirstApplicationUID, nil
 		case "s": // Unmodified appID
 			return int32(i), nil
 		default:

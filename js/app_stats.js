@@ -26,6 +26,8 @@ goog.provide('historian.appstats');
 goog.require('goog.array');
 goog.require('goog.string');
 goog.require('historian.tables');
+goog.require('historian.time');
+goog.require('historian.utils');
 
 goog.forwardDeclare('batterystats.BatteryStats');
 goog.forwardDeclare('batterystats.BatteryStats.App');
@@ -37,6 +39,7 @@ goog.forwardDeclare('batterystats.BatteryStats.App.ScheduledJob');
 goog.forwardDeclare('batterystats.BatteryStats.App.StateTime');
 goog.forwardDeclare('batterystats.BatteryStats.App.Sync');
 goog.forwardDeclare('batterystats.BatteryStats.App.Wakelock');
+goog.forwardDeclare('batterystats.BatteryStats.App.WakeupAlarm');
 goog.forwardDeclare('batterystats.BatteryStats.App.Wifi');
 
 
@@ -78,6 +81,14 @@ historian.SensorInfo;
  * }}
  */
 historian.UserActivity;
+
+
+/** @private @const {string} */
+historian.appstats.APP_SORTER_ID_ = '#appSorter';
+
+
+/** @private @const {string} */
+historian.appstats.APP_SELECTOR_ID_ = '#appSelector';
 
 
 /**
@@ -129,7 +140,6 @@ historian.appstats.displayAppApk = function(apk) {
   var section = $('#appApkSection');
   if (apk) {
     section.show();
-    $('#appWakeups').text(apk.wakeups);
     $('#appServices').empty();
 
     if (apk.service && apk.service.length > 0) {
@@ -674,6 +684,44 @@ historian.appstats.displayAppWakelock = function(wakelocks) {
 
 
 /**
+ * Displays or hides the section detailing wakeup alarms fired the app.
+ *
+ * @param
+ * {!Array<batterystats.BatteryStats.App.WakeupAlarm>}
+ *     alarms the list of WakeupAlarm info in the app proto
+ */
+historian.appstats.displayAppWakeupAlarm = function(alarms) {
+  var section = $('#appWakeupAlarmSection');
+  if (alarms && alarms.length > 0) {
+    section.show();
+
+    // Pre-sort in decreasing order of count.
+    alarms.sort(function(a, b) {
+      return b.count - a.count;
+    });
+
+    var headRow = [
+      'Wakeup Alarm Name',
+      {
+        value: 'Count',
+        title: 'Number of times the wakeup alarm fired'
+      }
+    ];
+    var bodyRows = goog.array.map(alarms, function(alarm) {
+      return [alarm.name, alarm.count];
+    });
+    var table = historian.tables.createTable(headRow, bodyRows);
+    $('#appWakeupAlarm').empty().append(table);
+    historian.tables.activateDataTable(table);
+    historian.tables.activateTableCopy(table);
+  } else {
+    section.hide();
+    section.next('.sliding').hide();
+  }
+};
+
+
+/**
  * Displays info about the desired app.
  *
  * @param {number|string} appUid the uid of the app to display information about
@@ -725,6 +773,9 @@ historian.appstats.displayApp = function(appUid) {
       'Device estimated power use due to CPU usage',
       goog.string.subs('%s%', app.CPUPowerPrediction.toFixed(2))
     ]);
+  }
+  if (app.RawStats.apk) {
+    bodyRows.push(['Total number of wakeup alarms', app.RawStats.apk.wakeups]);
   }
   if (app.RawStats.audio) {
     bodyRows.push([
@@ -787,6 +838,8 @@ historian.appstats.displayApp = function(appUid) {
   historian.appstats.displayAppUserActivity(app.UserActivity);
 
   historian.appstats.displayAppWakelock(app.RawStats.wakelock);
+
+  historian.appstats.displayAppWakeupAlarm(app.RawStats.wakeup_alarm);
 };
 
 
@@ -800,21 +853,193 @@ historian.appstats.showNoSelection = function() {
 
 
 /**
+ * Gets the value of a specified field. Will assume the field is part of
+ * RawStats unless the field starts with a period.
+ *
+ * @private
+ * @param {!historian.AppStat} stat AppStat to get the value from.
+ * @param {string} field Full path to the field (eg. flashlight.total_time_msec)
+ * @return {string|number|undefined} The value of the field, or undefined if it
+ * was not accessible.
+ */
+historian.appstats.getValue_ = function(stat, field) {
+  var parts = field.split('.');
+  var ret;
+  var start;
+  if (parts.length > 0 && parts[0] !== '') {
+    // The first field will be an empty string if the value started with .
+    ret = stat.RawStats;
+    start = 0;
+  } else {
+    ret = stat;
+    start = 1;
+  }
+  for (var i = start; i < parts.length; i++) {
+    var f = parts[i];
+    if (f in ret) {
+      ret = ret[f];
+    } else {
+      // The rest of the parts are undefined meaning there's nothing to get
+      // ...early return.
+      return;
+    }
+  }
+  return ret;
+};
+
+
+/**
+ * Sorts the list of apps in the app selector based on the user's preferences.
+ * @private
+ */
+historian.appstats.sortAppSelector_ = function() {
+  var selection = $(historian.appstats.APP_SORTER_ID_).val();
+  // Keep track of the currently selected option.
+  var selected = $(historian.appstats.APP_SELECTOR_ID_).val();
+
+  historian.appstats.appOptions.sort(function(a, b) {
+    var x = historian.appstats.getValue_(
+        a.stat, /** @type {string} */(selection));
+    var y = historian.appstats.getValue_(
+        b.stat, /** @type {string} */(selection));
+
+    if (!x && !y) {
+      return 0;
+    }
+    // If one of them is undefined, the other takes precedence.
+    // App name is the only string we allow sorting with. Apps will be sorted in
+    // ascending order. Numeric values are sorted in descending order.
+    if (!y) {
+      return typeof(x) === 'string' ? 1 : -1;
+    } else if (!x) {
+      return typeof(y) === 'string' ? -1 : 1;
+    }
+
+    if (typeof(x) === 'string') {
+      if (x === y) {
+        return 0;
+      }
+      // Only sorting by app name. Default to ascending order.
+      return x > y ? 1 : -1;
+    }
+
+    // Default order for sorting metrics is descending order.
+    return y - x;
+  });
+
+  // Append empty option to allow clearing app selection.
+  $(historian.appstats.APP_SELECTOR_ID_).empty().append('<option></option>');
+  for (var i = 0; i < historian.appstats.appOptions.length; i++) {
+    $(historian.appstats.APP_SELECTOR_ID_)
+        .append(historian.appstats.appOptions[i].option);
+  }
+  if (selected) {
+    // Preserve the original selection.
+    $(historian.appstats.APP_SELECTOR_ID_)
+        .val(/** @type {string} */ (selected));
+  }
+};
+
+
+/**
+ * Shows a table specific to and showing only the metric that the user sorted
+ * apps by.
+ * @private
+ */
+historian.appstats.showSortedAppTable_ = function() {
+  var selectedOp = $(historian.appstats.APP_SORTER_ID_ + ' :selected');
+  var selection = selectedOp.val();
+  var displayName = selectedOp.text();
+  var section = $('#sorted-apps-section');
+  var tocID = '#' + historian.utils.toValidID('toc-sorted-apps-section');
+
+  if (displayName === 'Name') {
+    section.hide();
+    section.next('.sliding').hide();
+    $(tocID).hide();
+    return;
+  }
+
+  section.show();
+  $('#sorted-apps-section-title').text('Sorted by ' + displayName + ':');
+  var statClass = selectedOp.data('type');
+  var headRow = ['Name', 'Uid', {value: displayName, classes: statClass}];
+  var bodyRows = [];
+
+  for (var i = 0; i < historian.appstats.appOptions.length; i++) {
+    var appOption = historian.appstats.appOptions[i];
+    var raw = appOption.stat.RawStats;
+    var val = historian.appstats.getValue_(appOption.stat,
+        /** @type {string} */(selection));
+    if (!val) {
+      // Don't add it to the table if there's no data.
+      continue;
+    }
+    switch (statClass) {
+      case 'duration':
+        val = historian.time.formatDuration(/** @type {number} */(val));
+        break;
+      case 'percentage':
+        val = goog.string.subs('%s%', val.toFixed(2));
+        break;
+    }
+
+    bodyRows.push([raw.name, raw.uid, val]);
+  }
+
+  $('#sorted-apps').empty();
+  if (bodyRows.length === 0) {
+    $('#sorted-apps').append('<p>No data found</p>');
+  } else {
+    var table = historian.tables.createTable(headRow, bodyRows);
+    $('#sorted-apps').append(table);
+    historian.tables.activateDataTable(table);
+    historian.tables.activateTableCopy(table);
+  }
+
+  // Show navigation item in table sidebar.
+  $(tocID).show();
+  $(tocID).text('Sorted by ' + displayName);
+
+  // Jump to the table
+  historian.tables.jumpToTable(
+      historian.tables.Panes.SYSTEM, '#sorted-apps-section', true);
+};
+
+
+/**
  * Fetches data, and creates event listeners once the page is loaded.
- * @param {!historian.AppStat} stats AppStat received from the server.
+ * @param {!Array<!historian.AppStat>} stats AppStat received from the server.
  */
 historian.appstats.initialize = function(stats) {
   // Convert appStats to a map with app.uid as key.
   var appStats = {};
+  var appOptions = [];
   for (var i = 0; i < stats.length; i++) {
-    appStats[stats[i].RawStats.uid] = stats[i];
+    // Parsed apps all have UIDs.
+    var uid = /** @type {number} */(stats[i].RawStats.uid);
+    appStats[uid] = stats[i];
+    appOptions.push({
+      stat: stats[i],
+      option: $('<option></option>')
+          .val(uid.toString())
+          .html(stats[i].RawStats.name + ' (Uid: ' + uid + ')')
+    });
   }
   historian.appstats.appStats = appStats;
+  historian.appstats.appOptions = appOptions;
 
-  $('#appSelector').select2({
+  $(historian.appstats.APP_SELECTOR_ID_).select2({
     placeholder: 'Choose an application',
     allowClear: true,
     dropdownAutoWidth: true
+  });
+  $(historian.appstats.APP_SORTER_ID_).select2({
+    dropdownAutoWidth: true
+  });
+  $(historian.appstats.APP_SORTER_ID_).change(function(event) {
+    historian.appstats.sortAppSelector_();
+    historian.appstats.showSortedAppTable_();
   });
   historian.displaySelectedApp();
 };
