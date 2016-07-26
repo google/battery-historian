@@ -67,7 +67,7 @@ var (
 	TimeZoneRE = regexp.MustCompile(`^\[persist.sys.timezone\]:\s+\[` + `(?P<timezone>\S+)\]`)
 
 	// DumpstateRE is a regular expression that matches the time information from the dumpstate line at the start of a bug report.
-	DumpstateRE = regexp.MustCompile(`==\sdumpstate:\s(?P<timestamp>\d+-\d+-\d+\s\d+:\d+:\d+)`)
+	DumpstateRE = regexp.MustCompile(`==\sdumpstate(\swith MTK)?:\s(?P<timestamp>\d+-\d+-\d+\s\d+:\d+:\d+)`)
 )
 
 // Contents returns a map of the contents of each file from the given bytes slice, with the key being the file name.
