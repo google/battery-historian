@@ -73,7 +73,7 @@ func main() {
 	}
 
 	var ctr checkinutil.IntCounter
-	stats, warns, errs := checkinparse.ParseBatteryStats(&ctr, checkinparse.CreateCheckinReport(s), pkgs)
+	stats, warns, errs := checkinparse.ParseBatteryStats(&ctr, checkinparse.CreateBatteryReport(s), pkgs)
 	if len(warns) > 0 {
 		log.Printf("Encountered unexpected warnings: %v\n", warns)
 	}

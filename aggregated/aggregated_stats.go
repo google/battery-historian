@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"log"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/golang/protobuf/proto"
@@ -31,6 +32,18 @@ const (
 	// msecsInMinute is the converter from msec to minute
 	msecsInMinute = 60000
 )
+
+// PkgAndSub splits up a string into the separate pkg name and metric sub name.
+// If the two values are present in the string, then they must be delineated by a colon.
+func PkgAndSub(t string) (string, string) {
+	s := strings.SplitN(t, ":", 2)
+	pkg := strings.TrimSpace(s[0])
+	sub := ""
+	if len(s) > 1 {
+		sub = strings.TrimSpace(s[1])
+	}
+	return pkg, sub
+}
 
 func abs(x float32) float32 {
 	if x < 0 {
@@ -113,12 +126,12 @@ type CPUData struct {
 	Level           string // The maximum of UserTimeLevel and SystemTimeLevel.
 }
 
-// byPower sorts CPUData by the power usage in descending order.
-type byPower []*CPUData
+// ByPower sorts CPUData by the power usage in descending order.
+type ByPower []CPUData
 
-func (a byPower) Len() int      { return len(a) }
-func (a byPower) Swap(i, j int) { a[i], a[j] = a[j], a[i] }
-func (a byPower) Less(i, j int) bool {
+func (a ByPower) Len() int      { return len(a) }
+func (a ByPower) Swap(i, j int) { a[i], a[j] = a[j], a[i] }
+func (a ByPower) Less(i, j int) bool {
 	if abs(a[j].PowerPct-a[i].PowerPct) < 0.01 {
 		// Sort by time if power drain is equal.
 		if a[j].UserTime == a[i].UserTime {
@@ -187,25 +200,25 @@ type NetworkTrafficData struct {
 	Level                  string // The maximum of WifiLevel and MobileLevel.
 }
 
-// byMobileBytes sorts NetworkTrafficData by the amount of bytes transferred over mobile.
-type byMobileBytes []*NetworkTrafficData
+// ByMobileBytes sorts NetworkTrafficData by the amount of bytes transferred over mobile.
+type ByMobileBytes []NetworkTrafficData
 
-func (n byMobileBytes) Len() int      { return len(n) }
-func (n byMobileBytes) Swap(i, j int) { n[i], n[j] = n[j], n[i] }
+func (n ByMobileBytes) Len() int      { return len(n) }
+func (n ByMobileBytes) Swap(i, j int) { n[i], n[j] = n[j], n[i] }
 
 // Less sorts in decreasing order.
-func (n byMobileBytes) Less(i, j int) bool {
+func (n ByMobileBytes) Less(i, j int) bool {
 	return n[i].MobileMegaBytes > n[j].MobileMegaBytes
 }
 
-// byWifiBytes sorts NetworkTrafficData by the amount of bytes transferred over mobile.
-type byWifiBytes []*NetworkTrafficData
+// ByWifiBytes sorts NetworkTrafficData by the amount of bytes transferred over mobile.
+type ByWifiBytes []NetworkTrafficData
 
-func (n byWifiBytes) Len() int      { return len(n) }
-func (n byWifiBytes) Swap(i, j int) { n[i], n[j] = n[j], n[i] }
+func (n ByWifiBytes) Len() int      { return len(n) }
+func (n ByWifiBytes) Swap(i, j int) { n[i], n[j] = n[j], n[i] }
 
 // Less sorts in decreasing order.
-func (n byWifiBytes) Less(i, j int) bool {
+func (n ByWifiBytes) Less(i, j int) bool {
 	return n[i].WifiMegaBytes > n[j].WifiMegaBytes
 }
 
@@ -223,10 +236,49 @@ type AppData struct {
 	Alarms           RateData
 	CPU              CPUData
 	GPSUse           ActivityData
+	ScheduledJobs    ActivityData
 	Network          NetworkTrafficData
 	PartialWakelocks ActivityData
 	Syncs            ActivityData
 	WifiScan         ActivityData
+}
+
+// stateData contains information about the different state levels an app can be in.
+type stateData struct {
+	Name              string
+	UID               int32
+	Background        MDuration
+	Cached            MDuration
+	Foreground        MDuration
+	ForegroundService MDuration
+	Top               MDuration
+	TopSleeping       MDuration
+}
+
+// byState sorts stateData in descending order of state duration, in order of state precedence
+// (ie. top > foreground service > top sleeping > foreground > background > cached).
+type byState []stateData
+
+func (s byState) Len() int      { return len(s) }
+func (s byState) Swap(i, j int) { s[i], s[j] = s[j], s[i] }
+func (s byState) Less(i, j int) bool {
+	sI, sJ := s[i], s[j]
+	if sI.Top.V != sJ.Top.V {
+		return sI.Top.V > sJ.Top.V
+	}
+	if sI.ForegroundService.V != sJ.ForegroundService.V {
+		return sI.ForegroundService.V > sJ.ForegroundService.V
+	}
+	if sI.TopSleeping.V != sJ.TopSleeping.V {
+		return sI.TopSleeping.V > sJ.TopSleeping.V
+	}
+	if sI.Foreground.V != sJ.Foreground.V {
+		return sI.Foreground.V > sJ.Foreground.V
+	}
+	if sI.Background.V != sJ.Background.V {
+		return sI.Background.V > sJ.Background.V
+	}
+	return sI.Cached.V > sJ.Cached.V
 }
 
 // Checkin contains the aggregated batterystats data for a bugreport.
@@ -242,6 +294,7 @@ type Checkin struct {
 	EstimatedDischarge       float32 // mAh
 	WifiDischargePoints      float32
 	BluetoothDischargePoints float32
+	ModemDischargePoints     float32
 
 	Realtime          time.Duration
 	ScreenOffRealtime time.Duration
@@ -262,11 +315,14 @@ type Checkin struct {
 	WifiOnTime                      MDuration
 	WifiOnTimePercentage            float32
 	WifiIdleTime                    MDuration
-	WifiTransmitTime                MDuration // tx + rx
-	WifiTransmitTimePercentage      float32
+	WifiTransferTime                MDuration // tx + rx
+	WifiTransferTimePercentage      float32
 	BluetoothIdleTime               MDuration
-	BluetoothTransmitTime           MDuration // tx + rx
-	BluetoothTransmitTimePercentage float32
+	BluetoothTransferTime           MDuration // tx + rx
+	BluetoothTransferTimePercentage float32
+	ModemIdleTime                   MDuration
+	ModemTransferTime               MDuration // tx + rx
+	ModemTransferTimePercentage     float32
 
 	PhoneCallTime                       MDuration
 	PhoneCallTimePercentage             float32
@@ -285,12 +341,16 @@ type Checkin struct {
 	WifiKiloBytesPerHr          MFloat32
 	WifiDischargeRatePerHr      MFloat32
 	BluetoothDischargeRatePerHr MFloat32
+	ModemDischargeRatePerHr     MFloat32
 
 	// Aggregated across all apps/entries.
+	AggCameraUse            ActivityData
+	AggFlashlightUse        ActivityData
+	AggGPSUse               ActivityData
 	AggKernelWakelocks      ActivityData
+	AggScheduledJobs        ActivityData
 	AggSyncTasks            ActivityData
 	AggWakeupReasons        ActivityData
-	AggGPSUse               ActivityData
 	AggWifiScanActivity     ActivityData
 	AggWifiFullLockActivity ActivityData
 	AggAppWakeups           RateData
@@ -299,6 +359,7 @@ type Checkin struct {
 	// Each element corresponds to a single entry/app.
 	UserspaceWakelocks   []ActivityData
 	KernelWakelocks      []ActivityData
+	ScheduledJobs        []ActivityData
 	SyncTasks            []ActivityData
 	WakeupReasons        []ActivityData
 	GPSUse               []ActivityData
@@ -320,6 +381,8 @@ type Checkin struct {
 
 	CPUUsage []CPUData
 
+	AppStates []stateData
+
 	AggregatedApps []AppData
 
 	TotalAppGPSUseTimePerHour         float32
@@ -332,6 +395,7 @@ type Checkin struct {
 	TotalAppANRRate                   float32
 	TotalAppCrashCount                int32
 	TotalAppCrashRate                 float32
+	TotalAppScheduledJobsPerHr        float32
 	TotalAppSyncsPerHr                float32
 	TotalAppWakeupsPerHr              float32
 	TotalAppFlashlightUsePerHr        float32
@@ -343,11 +407,6 @@ type Checkin struct {
 	WifiSignalStrength map[string]float32
 	BluetoothState     map[string]float32
 	DataConnection     map[string]float32
-
-	// TODO: These fields need different handling by using
-	// different query and different functions comparing to above ones.
-	WifiScanTime MDuration
-	GPSOnTime    MDuration
 }
 
 // sumWakelockInfo sums the Count and Duration fields of the given WakelockInfos.
@@ -480,30 +539,74 @@ func ParseCheckinData(c *bspb.BatteryStats) Checkin {
 	if c.GetReportVersion() >= 14 {
 		out.WifiOnTime = MDuration{V: time.Duration(c.System.GlobalWifi.GetWifiOnTimeMsec()) * time.Millisecond}
 		out.WifiIdleTime = MDuration{V: time.Duration(c.System.GlobalWifi.GetWifiIdleTimeMsec()) * time.Millisecond}
-		out.WifiTransmitTime = MDuration{V: time.Duration(c.System.GlobalWifi.GetWifiRxTimeMsec()+c.System.GlobalWifi.GetWifiTxTimeMsec()) * time.Millisecond}
+		out.WifiTransferTime = MDuration{V: time.Duration(c.System.GlobalWifi.GetWifiRxTimeMsec()+c.System.GlobalWifi.GetWifiTxTimeMsec()) * time.Millisecond}
 		if realtime > 0 {
 			out.WifiOnTimePercentage = (float32(out.WifiOnTime.V) / float32(realtime)) * 100
-			out.WifiTransmitTimePercentage = (float32(out.WifiTransmitTime.V) / float32(realtime)) * 100
+			out.WifiTransferTimePercentage = (float32(out.WifiTransferTime.V) / float32(realtime)) * 100
 		}
 		if bCapMah > 0 {
 			out.WifiDischargePoints = 100 * c.System.GlobalWifi.GetWifiPowerMah() / bCapMah
 			if realtime > 0 {
 				out.WifiDischargeRatePerHr = MFloat32{
-					V: 100 * c.System.GlobalWifi.GetWifiPowerMah() / bCapMah / float32(realtime.Hours()),
+					V: out.WifiDischargePoints / float32(realtime.Hours()),
 				}
 			}
 		}
 
 		out.BluetoothIdleTime = MDuration{V: time.Duration(c.System.GlobalBluetooth.GetBluetoothIdleTimeMsec()) * time.Millisecond}
-		out.BluetoothTransmitTime = MDuration{V: time.Duration(c.System.GlobalBluetooth.GetBluetoothRxTimeMsec()+c.System.GlobalBluetooth.GetBluetoothTxTimeMsec()) * time.Millisecond}
+		out.BluetoothTransferTime = MDuration{V: time.Duration(c.System.GlobalBluetooth.GetBluetoothRxTimeMsec()+c.System.GlobalBluetooth.GetBluetoothTxTimeMsec()) * time.Millisecond}
 		if realtime > 0 {
-			out.BluetoothTransmitTimePercentage = (float32(out.BluetoothTransmitTime.V) / float32(realtime)) * 100
+			out.BluetoothTransferTimePercentage = (float32(out.BluetoothTransferTime.V) / float32(realtime)) * 100
 		}
 		if bCapMah > 0 {
 			out.BluetoothDischargePoints = 100 * c.System.GlobalBluetooth.GetBluetoothPowerMah() / bCapMah
 			if realtime > 0 {
 				out.BluetoothDischargeRatePerHr = MFloat32{
-					V: 100 * c.System.GlobalBluetooth.GetBluetoothPowerMah() / bCapMah / float32(realtime.Hours()),
+					V: out.BluetoothDischargePoints / float32(realtime.Hours()),
+				}
+			}
+		}
+	}
+	if c.GetReportVersion() >= 17 {
+		sumCtrlrTransferTime := func(ctrlr *bspb.BatteryStats_ControllerActivity) time.Duration {
+			if ctrlr == nil {
+				return 0
+			}
+			sum := ctrlr.GetRxTimeMsec()
+			for _, tx := range ctrlr.Tx {
+				sum += tx.GetTimeMsec()
+			}
+			return time.Duration(sum) * time.Millisecond
+		}
+
+		out.BluetoothIdleTime = MDuration{V: time.Duration(c.System.GlobalBluetoothController.GetIdleTimeMsec()) * time.Millisecond}
+		out.ModemIdleTime = MDuration{V: time.Duration(c.System.GlobalModemController.GetIdleTimeMsec()) * time.Millisecond}
+		out.WifiIdleTime = MDuration{V: time.Duration(c.System.GlobalWifiController.GetIdleTimeMsec()) * time.Millisecond}
+
+		out.BluetoothTransferTime = MDuration{V: sumCtrlrTransferTime(c.System.GlobalBluetoothController)}
+		out.ModemTransferTime = MDuration{V: sumCtrlrTransferTime(c.System.GlobalModemController)}
+		out.WifiTransferTime = MDuration{V: sumCtrlrTransferTime(c.System.GlobalWifiController)}
+
+		if realtime > 0 {
+			out.BluetoothTransferTimePercentage = (float32(out.BluetoothTransferTime.V) / float32(realtime)) * 100
+			out.ModemTransferTimePercentage = (float32(out.ModemTransferTime.V) / float32(realtime)) * 100
+			out.WifiTransferTimePercentage = (float32(out.WifiTransferTime.V) / float32(realtime)) * 100
+		}
+		if bCapMah > 0 {
+			out.BluetoothDischargePoints = 100 * float32(c.System.GlobalBluetoothController.GetPowerMah()) / bCapMah
+			out.ModemDischargePoints = 100 * float32(c.System.GlobalModemController.GetPowerMah()) / bCapMah
+			out.WifiDischargePoints = 100 * float32(c.System.GlobalWifiController.GetPowerMah()) / bCapMah
+			if realtime > 0 {
+				out.BluetoothDischargeRatePerHr = MFloat32{
+					V: out.BluetoothDischargePoints / float32(realtime.Hours()),
+				}
+
+				out.ModemDischargeRatePerHr = MFloat32{
+					V: out.ModemDischargePoints / float32(realtime.Hours()),
+				}
+
+				out.WifiDischargeRatePerHr = MFloat32{
+					V: out.WifiDischargePoints / float32(realtime.Hours()),
 				}
 			}
 		}
@@ -595,6 +698,8 @@ func ParseCheckinData(c *bspb.BatteryStats) Checkin {
 	// Wifi activity per app.
 	var wfScan []*checkinparse.WakelockInfo
 	var wfFull []*checkinparse.WakelockInfo
+	// Scheduled Jobs (JobScheduler Jobs).
+	var sj []*checkinparse.WakelockInfo
 	// SyncManager Tasks.
 	var stl []*checkinparse.WakelockInfo
 	// Userspace Partial Wakelocks and GPS use.
@@ -705,6 +810,7 @@ func ParseCheckinData(c *bspb.BatteryStats) Checkin {
 
 			out.AggCPUUsage.UserTime += time.Duration(ut) * time.Millisecond
 			out.AggCPUUsage.SystemTime += time.Duration(st) * time.Millisecond
+			out.AggCPUUsage.PowerPct += cpud.PowerPct
 		}
 		if wfl := app.Wifi.GetFullWifiLockTimeMsec(); wfl > 0 {
 			wfFull = append(wfFull, &checkinparse.WakelockInfo{
@@ -733,6 +839,20 @@ func ParseCheckinData(c *bspb.BatteryStats) Checkin {
 				this.WifiScan.SecondsPerHr = float32(time.Duration(wst).Seconds()) / float32(realtime.Hours())
 			}
 		}
+
+		var sjt []*checkinparse.WakelockInfo
+		for _, jst := range app.ScheduledJob {
+			sjt = append(sjt, &checkinparse.WakelockInfo{
+				Name:     fmt.Sprintf("%s : %s", app.GetName(), jst.GetName()),
+				UID:      app.GetUid(),
+				Duration: time.Duration(jst.GetTotalTimeMsec()) * time.Millisecond,
+				Count:    jst.GetCount(),
+			})
+		}
+		sj = append(sj, sjt...)
+		this.ScheduledJobs = sumWakelockInfo(sjt, realtime)
+		this.ScheduledJobs.Name = app.GetName()
+		this.ScheduledJobs.UID = app.GetUid()
 
 		var stlt []*checkinparse.WakelockInfo
 		for _, st := range app.Sync {
@@ -796,6 +916,28 @@ func ParseCheckinData(c *bspb.BatteryStats) Checkin {
 			})
 		}
 
+		if c.GetReportVersion() >= 17 {
+			// The data is only valid in v17+.
+			bkg := app.GetStateTime().GetBackgroundTimeMsec()
+			cch := app.GetStateTime().GetCachedTimeMsec()
+			fre := app.GetStateTime().GetForegroundTimeMsec()
+			frs := app.GetStateTime().GetForegroundServiceTimeMsec()
+			top := app.GetStateTime().GetTopTimeMsec()
+			tps := app.GetStateTime().GetTopSleepingTimeMsec()
+			if bkg > 0 || cch > 0 || fre > 0 || frs > 0 || top > 0 || tps > 0 {
+				out.AppStates = append(out.AppStates, stateData{
+					Name:              app.GetName(),
+					UID:               app.GetUid(),
+					Background:        MDuration{V: time.Duration(bkg) * time.Millisecond},
+					Cached:            MDuration{V: time.Duration(cch) * time.Millisecond},
+					Foreground:        MDuration{V: time.Duration(fre) * time.Millisecond},
+					ForegroundService: MDuration{V: time.Duration(frs) * time.Millisecond},
+					Top:               MDuration{V: time.Duration(top) * time.Millisecond},
+					TopSleeping:       MDuration{V: time.Duration(tps) * time.Millisecond},
+				})
+			}
+		}
+
 		out.AggregatedApps = append(out.AggregatedApps, this)
 	}
 	for _, pwi := range c.System.PowerUseItem {
@@ -821,19 +963,19 @@ func ParseCheckinData(c *bspb.BatteryStats) Checkin {
 		out.TopMobileActiveApps = append(out.TopMobileActiveApps, activityData(mad, realtime))
 	}
 
-	sort.Sort(byMobileBytes(n))
 	for _, ntd := range n {
 		if ntd.MobileMegaBytes >= 0.01 {
 			out.TopMobileTrafficApps = append(out.TopMobileTrafficApps, *ntd)
 		}
 	}
+	sort.Sort(ByMobileBytes(out.TopMobileTrafficApps))
 
-	sort.Sort(byWifiBytes(n))
 	for _, ntd := range n {
 		if ntd.WifiMegaBytes >= 0.01 {
 			out.TopWifiTrafficApps = append(out.TopWifiTrafficApps, *ntd)
 		}
 	}
+	sort.Sort(ByWifiBytes(out.TopWifiTrafficApps))
 
 	sort.Sort(byCount(wu))
 	for _, w := range wu {
@@ -854,11 +996,11 @@ func ParseCheckinData(c *bspb.BatteryStats) Checkin {
 		out.ANRAndCrash = append(out.ANRAndCrash, *x)
 	}
 
-	sort.Sort(byPower(cpu))
 	for _, cp := range cpu {
 		out.CPUUsage = append(out.CPUUsage, *cp)
 		out.TotalAppCPUPowerPct += cp.PowerPct
 	}
+	sort.Sort(ByPower(out.CPUUsage))
 
 	checkinparse.SortByTime(wfScan)
 	for _, w := range wfScan {
@@ -871,6 +1013,16 @@ func ParseCheckinData(c *bspb.BatteryStats) Checkin {
 		out.WifiFullLockActivity = append(out.WifiFullLockActivity, activityData(w, realtime))
 	}
 	out.AggWifiFullLockActivity = sumWakelockInfo(wfFull, realtime)
+
+	// Sorting JobScheduler Jobs by time.
+	checkinparse.SortByTime(sj)
+	for _, jst := range sj {
+		out.ScheduledJobs = append(out.ScheduledJobs, activityData(jst, realtime))
+		if realtime > 0 {
+			out.TotalAppScheduledJobsPerHr += float32(jst.Duration.Seconds()) / float32(realtime.Hours())
+		}
+	}
+	out.AggScheduledJobs = sumWakelockInfo(sj, realtime)
 
 	// Sorting SyncManager Tasks by time.
 	checkinparse.SortByTime(stl)
@@ -906,12 +1058,16 @@ func ParseCheckinData(c *bspb.BatteryStats) Checkin {
 			out.TotalAppCameraUsePerHr += float32(c.Duration.Seconds()) / float32(realtime.Hours())
 		}
 	}
+	out.AggCameraUse = sumWakelockInfo(ca, realtime)
 
 	// Sort flashlight use by time.
 	checkinparse.SortByTime(fla)
 	for _, f := range fla {
 		out.FlashlightUse = append(out.FlashlightUse, activityData(f, realtime))
 	}
+	out.AggFlashlightUse = sumWakelockInfo(fla, realtime)
+
+	sort.Sort(byState(out.AppStates))
 
 	return out
 }

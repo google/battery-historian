@@ -72,9 +72,9 @@ func TestEcnParse(t *testing.T) {
 			},
 			strings.Join([]string{
 				csv.FileHeader,
-				`Network connectivity,service,1422620452417,1422620454417,TYPE_WIFI:"CONNECTED",`,
-				`Network connectivity,service,1422620457417,1422620458417,TYPE_MOBILE:"CONNECTED",`,
-				`Network connectivity,service,1422620459417,1422620460417,TYPE_WIFI:"CONNECTED",`,
+				`Network connectivity,service,1422620452417,1422620454417,"TYPE_WIFI:""CONNECTED""",`,
+				`Network connectivity,service,1422620457417,1422620458417,"TYPE_MOBILE:""CONNECTED""",`,
+				`Network connectivity,service,1422620459417,1422620460417,"TYPE_WIFI:""CONNECTED""",`,
 			}, "\n"),
 		},
 		{
@@ -97,8 +97,8 @@ func TestEcnParse(t *testing.T) {
 			},
 			strings.Join([]string{
 				csv.FileHeader,
-				`Network connectivity,service,1422620451417,1422620453417,TYPE_WIFI:"CONNECTED",`,
-				`Network connectivity,service,1422620454417,1422620455417,TYPE_WIFI:"CONNECTED",`,
+				`Network connectivity,service,1422620451417,1422620453417,"TYPE_WIFI:""CONNECTED""",`,
+				`Network connectivity,service,1422620454417,1422620455417,"TYPE_WIFI:""CONNECTED""",`,
 			}, "\n"),
 		},
 		{
@@ -174,20 +174,20 @@ func TestEcnParse(t *testing.T) {
 			},
 			strings.Join([]string{
 				csv.FileHeader,
-				`Network connectivity,service,1422620452507,1422620453575,TYPE_WIFI:"CONNECTED",`,
-				`Network connectivity,service,1422620470918,1422620474611,TYPE_MOBILE_HIPRI:"CONNECTED",`,
-				`Network connectivity,service,1422620470798,1422620475971,TYPE_MOBILE:"CONNECTED",`,
-				`Network connectivity,service,1422620475980,1422620478131,TYPE_WIFI:"CONNECTED",`,
-				`Network connectivity,service,1422620481886,1422620483925,TYPE_MOBILE:"CONNECTED",`,
-				`Network connectivity,service,1422620483935,1422620487149,TYPE_WIFI:"CONNECTED",`,
-				`Network connectivity,service,1422620492300,1422620492638,TYPE_MOBILE_SUPL:"CONNECTED",`,
-				`Network connectivity,service,1422620493874,1422620494123,TYPE_MOBILE_SUPL:"CONNECTED",`,
-				`Network connectivity,service,1422620497458,1422620499641,TYPE_MOBILE_SUPL:"CONNECTED",`,
-				`Network connectivity,service,1422620491121,1422620499837,TYPE_MOBILE:"CONNECTED",`,
-				`Network connectivity,service,1422620502466,1422620503186,TYPE_MOBILE_SUPL:"CONNECTED",`,
-				`Network connectivity,service,1422620500322,1422620503368,TYPE_WIFI:"CONNECTED",`,
-				`Network connectivity,service,1422620504000,1422620504043,TYPE_MOBILE:"CONNECTED",`,
-				`Network connectivity,service,1422620504050,1422620504051,TYPE_WIFI:"CONNECTED",`,
+				`Network connectivity,service,1422620452507,1422620453575,"TYPE_WIFI:""CONNECTED""",`,
+				`Network connectivity,service,1422620470918,1422620474611,"TYPE_MOBILE_HIPRI:""CONNECTED""",`,
+				`Network connectivity,service,1422620470798,1422620475971,"TYPE_MOBILE:""CONNECTED""",`,
+				`Network connectivity,service,1422620475980,1422620478131,"TYPE_WIFI:""CONNECTED""",`,
+				`Network connectivity,service,1422620481886,1422620483925,"TYPE_MOBILE:""CONNECTED""",`,
+				`Network connectivity,service,1422620483935,1422620487149,"TYPE_WIFI:""CONNECTED""",`,
+				`Network connectivity,service,1422620492300,1422620492638,"TYPE_MOBILE_SUPL:""CONNECTED""",`,
+				`Network connectivity,service,1422620493874,1422620494123,"TYPE_MOBILE_SUPL:""CONNECTED""",`,
+				`Network connectivity,service,1422620497458,1422620499641,"TYPE_MOBILE_SUPL:""CONNECTED""",`,
+				`Network connectivity,service,1422620491121,1422620499837,"TYPE_MOBILE:""CONNECTED""",`,
+				`Network connectivity,service,1422620502466,1422620503186,"TYPE_MOBILE_SUPL:""CONNECTED""",`,
+				`Network connectivity,service,1422620500322,1422620503368,"TYPE_WIFI:""CONNECTED""",`,
+				`Network connectivity,service,1422620504000,1422620504043,"TYPE_MOBILE:""CONNECTED""",`,
+				`Network connectivity,service,1422620504050,1422620504051,"TYPE_WIFI:""CONNECTED""",`,
 				"Wifi full lock,bool,1422620504051,1422620504051,true,",
 			}, "\n"),
 		},
@@ -254,15 +254,15 @@ func TestEcnParse(t *testing.T) {
 			},
 			strings.Join([]string{
 				csv.FileHeader,
-				`Network connectivity,service,1422620501000,1422620503000,TYPE_MOBILE_SUPL:"CONNECTED",`,
-				`Network connectivity,service,1422620500000,1422620504000,TYPE_WIFI:"CONNECTED",`,
-				`Network connectivity,service,1422620507000,1422620509000,TYPE_MOBILE_SUPL:"CONNECTED",`,
-				`Network connectivity,service,1422620505000,1422620513000,TYPE_MOBILE:"CONNECTED",`,
-				`Network connectivity,service,1422620500000,1422620515000,TYPE_MOBILE_HIPRI:"CONNECTED",`,
-				`Network connectivity,service,1422620513000,1422620517000,TYPE_MOBILE:"SUSPENDED",`,
-				`Network connectivity,service,1422620515000,1422620519000,TYPE_MOBILE_HIPRI:"SUSPENDED",`,
-				`Network connectivity,service,1422620517000,1422620521000,TYPE_MOBILE:"CONNECTED",`,
-				`Network connectivity,service,1422620521000,1422620521000,TYPE_MOBILE:"SUSPENDED",`,
+				`Network connectivity,service,1422620501000,1422620503000,"TYPE_MOBILE_SUPL:""CONNECTED""",`,
+				`Network connectivity,service,1422620500000,1422620504000,"TYPE_WIFI:""CONNECTED""",`,
+				`Network connectivity,service,1422620507000,1422620509000,"TYPE_MOBILE_SUPL:""CONNECTED""",`,
+				`Network connectivity,service,1422620505000,1422620513000,"TYPE_MOBILE:""CONNECTED""",`,
+				`Network connectivity,service,1422620500000,1422620515000,"TYPE_MOBILE_HIPRI:""CONNECTED""",`,
+				`Network connectivity,service,1422620513000,1422620517000,"TYPE_MOBILE:""SUSPENDED""",`,
+				`Network connectivity,service,1422620515000,1422620519000,"TYPE_MOBILE_HIPRI:""SUSPENDED""",`,
+				`Network connectivity,service,1422620517000,1422620521000,"TYPE_MOBILE:""CONNECTED""",`,
+				`Network connectivity,service,1422620521000,1422620521000,"TYPE_MOBILE:""SUSPENDED""",`,
 			}, "\n"),
 		},
 	}
@@ -755,107 +755,6 @@ func TestFixTimeline(t *testing.T) {
 	}
 }
 
-// TestMergeIntervals test merging intervals functionality for sync durations
-func TestMergeIntervals(t *testing.T) {
-	tests := []struct {
-		input []interval
-		want  []interval
-	}{
-		// Test case 1: intervals are not overlapped
-		{
-			[]interval{
-				{0, 1},
-				{2, 3},
-				{4, 5},
-				{8, 10},
-			},
-			[]interval{
-				{0, 1},
-				{2, 3},
-				{4, 5},
-				{8, 10},
-			},
-		},
-		// Test case 2: intervals are included in one big interval
-		{
-			[]interval{
-				{0, 10},
-				{0, 2},
-				{4, 5},
-				{7, 12},
-				{1, 3},
-			},
-			[]interval{
-				{0, 12},
-			},
-		},
-		// Test case 3: intervals are partially overlaped, second interval is overlapped with first interval's right part
-		{
-			[]interval{
-				{0, 5},
-				{3, 8},
-			},
-			[]interval{
-				{0, 8},
-			},
-		},
-		// Test case 4: intervals are partially overlaped, second interval is overlapped with first interval's left part
-		{
-			[]interval{
-				{4, 8},
-				{2, 5},
-			},
-			[]interval{
-				{2, 8},
-			},
-		},
-		// Test case 5: intervals are not overlaped but connected by edges
-		{
-			[]interval{
-				{1, 4},
-				{4, 8},
-				{8, 10},
-			},
-			[]interval{
-				{1, 10},
-			},
-		},
-		// Test case 6: random intervals contain all above situations
-		{
-			[]interval{
-				{0, 1},
-				{3, 4},
-				{5, 10},
-				{6, 8},
-				{7, 9},
-				{12, 16},
-				{11, 15},
-				{16, 18},
-				{20, 22},
-				{26, 29},
-				{25, 27},
-				{30, 33},
-			},
-			[]interval{
-				{0, 1},
-				{3, 4},
-				{5, 10},
-				{11, 18},
-				{20, 22},
-				{25, 29},
-				{30, 33},
-			},
-		},
-	}
-	var output []interval
-	for _, test := range tests {
-		output = mergeIntervals(test.input)
-		if !reflect.DeepEqual(test.want, output) {
-			t.Errorf("mergeIntervals(%v) = %v, want %v", test.input, output, test.want)
-		}
-	}
-}
-
 // TestTotalSyncTime test the summarizing of total sync time and num in a history log
 func TestTotalSyncTime(t *testing.T) {
 	input := strings.Join([]string{
@@ -1067,10 +966,10 @@ func TestWakeLockParse(t *testing.T) {
 	}
 	wantCSV := strings.Join([]string{
 		csv.FileHeader,
-		`Partial wakelock,service,1422620452417,1422620462417,"com.google.android.apps.docs.editors.punch/com.google/XXX@google.com",`,
-		`Partial wakelock,error,1422620464417,1422620464417,"missing corresponding +w",`,
-		`Partial wakelock,service,1422620465417,1422620465420,"com.google.android.apps.docs.editors.punch/com.google/XXX@google.com",`,
-		`CPU running,string,1422620465420,1422620465420,"1422620465420~Unknown wakeup reason",`,
+		`Partial wakelock,service,1422620452417,1422620462417,com.google.android.apps.docs.editors.punch/com.google/XXX@google.com,`,
+		`Partial wakelock,error,1422620464417,1422620464417,missing corresponding +w,`,
+		`Partial wakelock,service,1422620465417,1422620465420,com.google.android.apps.docs.editors.punch/com.google/XXX@google.com,`,
+		`CPU running,string,1422620465420,1422620465420,1422620465420~Unknown wakeup reason,`,
 	}, "\n")
 
 	var b bytes.Buffer
@@ -1221,7 +1120,7 @@ func TestUIDAndPackageNameMapping(t *testing.T) {
 	}
 
 	want := PackageUIDMapping{
-		UIDToPackage: map[int32]string{
+		uidToPackage: map[int32]string{
 			1001:    "com.android.phone;com.android.stk",
 			10005:   "com.android.providers.calendar",
 			10007:   "com.google.android.videos",
@@ -1233,7 +1132,7 @@ func TestUIDAndPackageNameMapping(t *testing.T) {
 			1010456: "com.google.android.apps.photos",
 			1010789: "com.google.android.play.games",
 		},
-		PackageToUID: map[string]int32{
+		packageToUID: map[string]int32{
 			"com.android.phone":              1001,
 			"com.android.stk":                1001,
 			"com.android.providers.calendar": 10005,
@@ -1247,11 +1146,11 @@ func TestUIDAndPackageNameMapping(t *testing.T) {
 			"com.google.android.apps.photos": 10456,
 			"com.google.android.play.games":  10789,
 		},
-		SharedUIDName: map[int32]string{
+		sharedUIDName: map[int32]string{
 			10014: "GOOGLE_SERVICES",
 			10025: "SharedUserID(com.random.uid.shared)",
 		},
-		PkgList: inputList,
+		pkgList: inputList,
 	}
 
 	got, errs := UIDAndPackageNameMapping(inputCheckin, inputList)
@@ -1311,6 +1210,61 @@ func TestEjbParsing(t *testing.T) {
 
 	if !reflect.DeepEqual(want.ScheduledJobSummary, s.ScheduledJobSummary) {
 		t.Errorf("AnalyzeHistory(%s,...).Summaries[0].ScheduledJobSummary = %v, want %v", input, s.ScheduledJobSummary, want.ScheduledJobSummary)
+	}
+}
+
+// TestElwParsing tests the parsing of longwake (Elw) entries in a history log.
+func TestElwParsing(t *testing.T) {
+	input := strings.Join([]string{
+		`9,0,i,vers,11,116,LMY06B,LMY06B`,
+		`9,hsp,57,10017,"*net_scheduler*"`,
+		`9,hsp,64,10191,"hgn"`,
+		`9,hsp,363,10017,"*sync*/com.google.android.gms.fitness/com.google/noogle@google.com"`,
+		`9,h,0:RESET:TIME:1469130000000`,
+		`9,h,60000,-Elw=57`,  // no +Elw=57
+		`9,h,31000,+Elw=64`,  // wl 64 was acquired one minute before this statement
+		`9,h,32000,+Elw=363`, // wl 363 was acquired one minute before this statement
+		`9,h,33000,-Elw=64`,
+		`9,h,34000,-Elw=363`,
+		`9,h,60000,+Elw=57`, // no -Elw=57, wl 57 was acquired one minute before this statement
+	}, "\n")
+
+	wantSummary := map[string]Dist{
+		`"*net_scheduler*"`: {
+			Num:           2,
+			TotalDuration: 60000 * time.Millisecond,
+			MaxDuration:   60000 * time.Millisecond,
+		},
+		`"hgn"`: {
+			Num:           1,
+			TotalDuration: 65000 * time.Millisecond,
+			MaxDuration:   65000 * time.Millisecond,
+		},
+		`"*sync*/com.google.android.gms.fitness/com.google/XXX@google.com"`: {
+			Num:           1,
+			TotalDuration: 67000 * time.Millisecond,
+			MaxDuration:   67000 * time.Millisecond,
+		},
+	}
+	wantCSV := normalizeCSV(strings.Join([]string{
+		csv.FileHeader,
+		`Long Wakelocks,service,1469130000000,1469130060000,*net_scheduler*,10017`,
+		`Long Wakelocks,service,1469130091000,1469130156000,hgn,10191`,
+		`Long Wakelocks,service,1469130123000,1469130190000,*sync*/com.google.android.gms.fitness/com.google/XXX@google.com,10017`,
+		`Long Wakelocks,service,1469130250000,1469130250000,*net_scheduler*,10017`,
+	}, "\n"))
+
+	var b bytes.Buffer
+	result := AnalyzeHistory(&b, input, FormatTotalTime, emptyUIDPackageMapping, true)
+	validateHistory(input, t, result, 0, 1)
+	s := result.Summaries[0]
+
+	if !reflect.DeepEqual(wantSummary, s.LongWakelockSummary) {
+		t.Errorf("Invalid LongWakelock Summary:\n  got:  %v\n  want: %v", s.LongWakelockSummary, wantSummary)
+	}
+	gotCSV := normalizeCSV(b.String())
+	if !reflect.DeepEqual(gotCSV, wantCSV) {
+		t.Errorf("Parsing generated incorrect csv:\n  got:  %s\n  want: %s", gotCSV, wantCSV)
 	}
 }
 
@@ -1562,7 +1516,6 @@ func TestIdleModeParsing(t *testing.T) {
 		if !reflect.DeepEqual(gotCSV, wantCSV) {
 			t.Errorf("%v: AnalyzeHistory(%v) generated incorrect csv:\n  got: %s\n  want: %s", test.desc, test.input, gotCSV, wantCSV)
 		}
-
 	}
 }
 
@@ -1861,9 +1814,9 @@ func TestCSVServiceEntry(t *testing.T) {
 			"Overlapping wakelock entries",
 			strings.Join([]string{
 				`9,h,0:RESET:TIME:1422620451417`,
-				`9,hsp,17,1010054,"com.google.android.apps.docs.editors.punch/com.google/noogler@google.com"`,
-				`9,hsp,18,1010051,"com.google.android.apps.docs/com.google/noogler@google.com"`,
-				`9,hsp,22,1010052,"com.google.android.apps.docs.editors.kix/com.google/noogler@google.com"`,
+				`9,hsp,17,1010054,com.google.android.apps.docs.editors.punch/com.google/noogler@google.com`,
+				`9,hsp,18,1010051,com.google.android.apps.docs/com.google/noogler@google.com`,
+				`9,hsp,22,1010052,com.google.android.apps.docs.editors.kix/com.google/noogler@google.com`,
 				`9,h,1000,+Ewl=17`,
 				`9,h,2000,+Ewl=22`,
 				`9,h,3000,-Ewl=17`,
@@ -1873,18 +1826,18 @@ func TestCSVServiceEntry(t *testing.T) {
 			1,
 			strings.Join([]string{
 				csv.FileHeader,
-				`Wakelock_in,service,1422620452417,1422620457417,"com.google.android.apps.docs.editors.punch/com.google/noogler@google.com",10054`,
-				`Wakelock_in,service,1422620454417,1422620464417,"com.google.android.apps.docs.editors.kix/com.google/noogler@google.com",10052`,
-				`Wakelock_in,service,1422620459417,1422620464417,"com.google.android.apps.docs/com.google/noogler@google.com",10051`,
+				`Wakelock_in,service,1422620452417,1422620457417,com.google.android.apps.docs.editors.punch/com.google/noogler@google.com,10054`,
+				`Wakelock_in,service,1422620454417,1422620464417,com.google.android.apps.docs.editors.kix/com.google/noogler@google.com,10052`,
+				`Wakelock_in,service,1422620459417,1422620464417,com.google.android.apps.docs/com.google/noogler@google.com,10051`,
 			}, "\n"),
 		},
 		{
 			"Nesting wakelock entries",
 			strings.Join([]string{
 				`9,h,0:RESET:TIME:1422620451417`,
-				`9,hsp,17,1010054,"com.google.android.apps.docs.editors.punch/com.google/noogler@google.com"`,
-				`9,hsp,18,1010051,"com.google.android.apps.docs/com.google/noogler@google.com"`,
-				`9,hsp,22,1010052,"com.google.android.apps.docs.editors.kix/com.google/noogler@google.com"`,
+				`9,hsp,17,1010054,com.google.android.apps.docs.editors.punch/com.google/noogler@google.com`,
+				`9,hsp,18,1010051,com.google.android.apps.docs/com.google/noogler@google.com`,
+				`9,hsp,22,1010052,com.google.android.apps.docs.editors.kix/com.google/noogler@google.com`,
 				`9,h,1000,+Ewl=17`,
 				`9,h,2000,+Ewl=22`,
 				`9,h,2000,+Ewl=18`,
@@ -1895,30 +1848,30 @@ func TestCSVServiceEntry(t *testing.T) {
 			1,
 			strings.Join([]string{
 				csv.FileHeader,
-				`Wakelock_in,service,1422620456417,1422620458417,"com.google.android.apps.docs/com.google/noogler@google.com",10051`,
-				`Wakelock_in,service,1422620454417,1422620463417,"com.google.android.apps.docs.editors.kix/com.google/noogler@google.com",10052`,
-				`Wakelock_in,service,1422620452417,1422620466417,"com.google.android.apps.docs.editors.punch/com.google/noogler@google.com",10054`,
+				`Wakelock_in,service,1422620456417,1422620458417,com.google.android.apps.docs/com.google/noogler@google.com,10051`,
+				`Wakelock_in,service,1422620454417,1422620463417,com.google.android.apps.docs.editors.kix/com.google/noogler@google.com,10052`,
+				`Wakelock_in,service,1422620452417,1422620466417,com.google.android.apps.docs.editors.punch/com.google/noogler@google.com,10054`,
 			}, "\n"),
 		},
 		{
 			"First wakelock entry is a negative transition",
 			strings.Join([]string{
 				`9,h,0:RESET:TIME:1422620451417`,
-				`9,hsp,17,1010054,"com.google.android.apps.docs.editors.punch/com.google/noogler@google.com"`,
+				`9,hsp,17,1010054,com.google.android.apps.docs.editors.punch/com.google/noogler@google.com`,
 				`9,h,2000,-Ewl=17`,
 			}, "\n"),
 			1,
 			strings.Join([]string{
 				csv.FileHeader,
-				`Wakelock_in,service,1422620451417,1422620453417,"com.google.android.apps.docs.editors.punch/com.google/noogler@google.com",10054`,
+				`Wakelock_in,service,1422620451417,1422620453417,com.google.android.apps.docs.editors.punch/com.google/noogler@google.com,10054`,
 			}, "\n"),
 		},
 		{
 			"Last Wakelock entry has no corresponding negative transition before shutdown",
 			strings.Join([]string{
 				`9,h,0:RESET:TIME:1422620451417`,
-				`9,hsp,17,1010054,"com.google.android.apps.docs.editors.punch/com.google/noogler@google.com"`,
-				`9,hsp,18,1010051,"com.google.android.apps.docs/com.google/noogler@google.com"`,
+				`9,hsp,17,1010054,com.google.android.apps.docs.editors.punch/com.google/noogler@google.com`,
+				`9,hsp,18,1010051,com.google.android.apps.docs/com.google/noogler@google.com`,
 				`9,h,1000,+Ewl=17`,
 				`9,h,2000,+Ewl=18`,
 				`9,h,2000,-Ewl=18`,
@@ -1929,8 +1882,8 @@ func TestCSVServiceEntry(t *testing.T) {
 			1,
 			strings.Join([]string{
 				csv.FileHeader,
-				`Wakelock_in,service,1422620454417,1422620456417,"com.google.android.apps.docs/com.google/noogler@google.com",10051`,
-				`Wakelock_in,service,1422620452417,1422620456917,"com.google.android.apps.docs.editors.punch/com.google/noogler@google.com",10054`,
+				`Wakelock_in,service,1422620454417,1422620456417,com.google.android.apps.docs/com.google/noogler@google.com,10051`,
+				`Wakelock_in,service,1422620452417,1422620456917,com.google.android.apps.docs.editors.punch/com.google/noogler@google.com,10054`,
 				`Reboot,bool,1422620456917,1430000000000,true,`,
 			}, "\n"),
 		},
@@ -1970,8 +1923,8 @@ func TestCSVSyncEntry(t *testing.T) {
 			1,
 			strings.Join([]string{
 				csv.FileHeader,
-				`SyncManager,service,1422620452417,1422620457417,"com.google.android.gms.people/com.google/test@google.com",10011`,
-				`SyncManager,service,1422620454417,1422620459417,"com.google.android.gms.games/com.google/test@google.com",10011`,
+				`SyncManager,service,1422620452417,1422620457417,com.google.android.gms.people/com.google/test@google.com,10011`,
+				`SyncManager,service,1422620454417,1422620459417,com.google.android.gms.games/com.google/test@google.com,10011`,
 			}, "\n"),
 		},
 		{
@@ -1991,9 +1944,9 @@ func TestCSVSyncEntry(t *testing.T) {
 			1,
 			strings.Join([]string{
 				csv.FileHeader,
-				`SyncManager,service,1422620450300,1422620450500,"com.google.android.gms.games/com.google/noogler@gmail.com",10007`,
-				`SyncManager,service,1422620450800,1422620451000,"com.google.android.gms.games/com.google/test@google.com",10007`,
-				`SyncManager,service,1422620450100,1422620451500,"com.google.android.gms.games/com.google/test@google.com",10007`,
+				`SyncManager,service,1422620450300,1422620450500,com.google.android.gms.games/com.google/noogler@gmail.com,10007`,
+				`SyncManager,service,1422620450800,1422620451000,com.google.android.gms.games/com.google/test@google.com,10007`,
+				`SyncManager,service,1422620450100,1422620451500,com.google.android.gms.games/com.google/test@google.com,10007`,
 			}, "\n"),
 		},
 	}
@@ -2051,7 +2004,7 @@ func TestCSVRunningEntry(t *testing.T) {
 			wantCSV: strings.Join([]string{
 				csv.FileHeader,
 				`Level,int,1432132601233,1432132605233,100,`,
-				`CPU running,string,1432132601233,1432132602233,"1432132602233~` + csv.UnknownWakeup + `",`,
+				`CPU running,string,1432132601233,1432132602233,1432132602233~` + csv.UnknownWakeup + `,`,
 				`CPU running,string,1432132604233,1432132605233,"1432132604233~57:qcom,smd-modem:200:qcom,smd-rpm",`,
 			}, "\n"),
 		},
@@ -2097,8 +2050,8 @@ func TestCSVRunningEntry(t *testing.T) {
 			wantNumSummaries: 1,
 			wantCSV: strings.Join([]string{
 				csv.FileHeader,
-				`CPU running,string,1422620451417,1422620452417,"1422620452417~` + csv.UnknownWakeup + `",`,
-				`CPU running,string,1422620453417,1422620454917,"1422620454917~` + csv.UnknownWakeup + `",`,
+				`CPU running,string,1422620451417,1422620452417,1422620452417~` + csv.UnknownWakeup + `,`,
+				`CPU running,string,1422620453417,1422620454917,1422620454917~` + csv.UnknownWakeup + `,`,
 			}, "\n"),
 		},
 		{
@@ -2118,7 +2071,7 @@ func TestCSVRunningEntry(t *testing.T) {
 			wantCSV: strings.Join([]string{
 				csv.FileHeader,
 				`CPU running,string,1422620451417,1422620453417,"1422620451417~57:qcom,smd-modem:200:qcom,smd-rpm|1422620452417~Abort:Some devices failed to suspend",`,
-				`CPU running,string,1422620454417,1422620455917,"1422620455917~` + csv.UnknownWakeup + `",`,
+				`CPU running,string,1422620454417,1422620455917,1422620455917~` + csv.UnknownWakeup + `,`,
 			}, "\n"),
 		},
 		{
@@ -2135,8 +2088,8 @@ func TestCSVRunningEntry(t *testing.T) {
 			wantCSV: strings.Join([]string{
 				csv.FileHeader,
 				`Level,int,1432132601233,1432132605233,100,`,
-				`CPU running,string,1432132601233,1432132602233,"1432132602233~` + csv.UnknownWakeup + `",`,
-				`CPU running,string,1432132604233,1432132605233,"1432132605233~` + csv.UnknownWakeup + `",`,
+				`CPU running,string,1432132601233,1432132602233,1432132602233~` + csv.UnknownWakeup + `,`,
+				`CPU running,string,1432132604233,1432132605233,1432132605233~` + csv.UnknownWakeup + `,`,
 			}, "\n"),
 		},
 		{
@@ -2151,7 +2104,7 @@ func TestCSVRunningEntry(t *testing.T) {
 			wantCSV: strings.Join([]string{
 				csv.FileHeader,
 				`Level,int,1432132601233,1432132602233,100,`,
-				`CPU running,string,1432132602233,1432132602233,"1432132602233~` + csv.UnknownWakeup + `",`,
+				`CPU running,string,1432132602233,1432132602233,1432132602233~` + csv.UnknownWakeup + `,`,
 			}, "\n"),
 		},
 		{
@@ -2180,7 +2133,7 @@ func TestCSVRunningEntry(t *testing.T) {
 			wantNumSummaries: 1,
 			wantCSV: strings.Join([]string{
 				csv.FileHeader,
-				`CPU running,string,1432132602233,1432132603233,"1432132603233~` + csv.UnknownWakeup + `",`,
+				`CPU running,string,1432132602233,1432132603233,1432132603233~` + csv.UnknownWakeup + `,`,
 			}, "\n"),
 			wantErrs: []error{
 				errors.New("** Error in 9,h,1000,+r with +r : consecutive +r events"),
@@ -2198,7 +2151,7 @@ func TestCSVRunningEntry(t *testing.T) {
 			wantNumSummaries: 1,
 			wantCSV: strings.Join([]string{
 				csv.FileHeader,
-				`CPU running,string,1432132602233,1432132603233,"1432132603233~` + csv.UnknownWakeup + `",`,
+				`CPU running,string,1432132602233,1432132603233,1432132603233~` + csv.UnknownWakeup + `,`,
 			}, "\n"),
 			wantErrs: []error{
 				errors.New("** Error in 9,h,1000,-r with -r : -r received without a corresponding +r"),
@@ -2219,7 +2172,7 @@ func TestCSVRunningEntry(t *testing.T) {
 			wantCSV: strings.Join([]string{
 				csv.FileHeader,
 				`CPU running,string,1422620451917,1422620452417,"1422620451917~57:qcom,smd-modem:200:qcom,smd-rpm",`,
-				`CPU running,string,1422620453417,1422620454417,"1422620453417~*walarm*:ALARM_WAKEUP_LOCATOR",`,
+				`CPU running,string,1422620453417,1422620454417,1422620453417~*walarm*:ALARM_WAKEUP_LOCATOR,`,
 			}, "\n"),
 		},
 		{
@@ -2237,7 +2190,7 @@ func TestCSVRunningEntry(t *testing.T) {
 			wantCSV: strings.Join([]string{
 				csv.FileHeader,
 				`CPU running,string,1422620451917,1422620452417,"1422620451917~57:qcom,smd-modem:200:qcom,smd-rpm",`,
-				`CPU running,string,1422620453417,1422620454417,"1422620454417~*walarm*:ALARM_WAKEUP_LOCATOR",`,
+				`CPU running,string,1422620453417,1422620454417,1422620454417~*walarm*:ALARM_WAKEUP_LOCATOR,`,
 			}, "\n"),
 		},
 		{
@@ -2260,7 +2213,7 @@ func TestCSVRunningEntry(t *testing.T) {
 			wantNumSummaries: 1,
 			wantCSV: strings.Join([]string{
 				csv.FileHeader,
-				`CPU running,string,1000,4600,"2000~Abort:Pending Wakeup Sources: ipc00000177_FLP Service Cal |2500~Abort:Pending Wakeup Sources: sh2ap_wakelock |3500~Abort:Some devices failed to suspend|4500~Abort:Pending Wakeup Sources: sh2ap_wakelock ",`,
+				`CPU running,string,1000,4600,2000~Abort:Pending Wakeup Sources: ipc00000177_FLP Service Cal |2500~Abort:Pending Wakeup Sources: sh2ap_wakelock |3500~Abort:Some devices failed to suspend|4500~Abort:Pending Wakeup Sources: sh2ap_wakelock ,`,
 				`CPU running,string,9500,10500,"9500~200:qcom,smd-rpm:222:fc4cf000.qcom,spmi",`,
 			}, "\n"),
 		},
@@ -2281,8 +2234,8 @@ func TestCSVRunningEntry(t *testing.T) {
 			wantCSV: strings.Join([]string{
 				csv.FileHeader,
 				// fixTimeline will change the timestamps based on the latest seen TIME values.
-				`CPU running,string,19000,19000,"19000~` + csv.UnknownWakeup + `",`,
-				`CPU running,string,21000,27000,"22000~Abort:Last active Wakeup Source: eventpoll|27000~Abort:Pending Wakeup Sources: sh2ap_wakelock ",`,
+				`CPU running,string,19000,19000,19000~` + csv.UnknownWakeup + `,`,
+				`CPU running,string,21000,27000,22000~Abort:Last active Wakeup Source: eventpoll|27000~Abort:Pending Wakeup Sources: sh2ap_wakelock ,`,
 			}, "\n"),
 		},
 	}
@@ -2471,7 +2424,7 @@ func TestServicePackageMatching(t *testing.T) {
 	}
 }
 
-// TestInstantAppEventParsing tests the parsing of 'Eaa', 'Eai', 'Epi', and 'Epu' entries in a history log
+// TestInstantAppEventParsing tests the parsing of 'Eaa', 'Eai', 'Epi', 'Epu', and 'Ewa' entries in a history log
 func TestInstantAppEventParsing(t *testing.T) {
 	tests := []struct {
 		desc         string
@@ -2488,11 +2441,13 @@ func TestInstantAppEventParsing(t *testing.T) {
 				`9,hsp,4,10139,"com.google.android.apps.interactiveevents"`,
 				`9,hsp,6,1234,"com.google.android.apps.chromecast.app"`, // The "UID" section for Epi is actually just the version code of the app.
 				`9,hsp,7,81,"com.google.android.apps.blogger"`,          // The "UID" section for Epu is actually just the version code of the app.
+				`9,hsp,8,10070,""`,                                      // The log won't include the application name, just the UID.
 				`9,h,0:RESET:TIME:1432964300000`,
 				`9,h,1000,Eaa=3`,
 				`9,h,2000,Eai=4`,
 				`9,h,3000,Epi=6`,
 				`9,h,4000,Epu=7`,
+				`9,h,5000,Ewa=8`,
 			}, "\n"),
 			inputCheckin: `9,10061,l,apk,1,com.google.android.apps.chromecast.app,...`, // Test that epi=6 outputs the proper UID via checkin output matching.
 			pkgList: []*usagepb.PackageInfo{ // Test that Epu=7 outputs the proper UID via pkg list matching.
@@ -2504,10 +2459,11 @@ func TestInstantAppEventParsing(t *testing.T) {
 			},
 			wantCSV: strings.Join([]string{
 				csv.FileHeader,
-				`Package active,service,1432964301000,1432964301000,"com.googlecode.eyesfree.brailleback",10028`,
-				`Package inactive,service,1432964303000,1432964303000,"com.google.android.apps.interactiveevents",10139`,
-				`Package install,service,1432964306000,1432964306000,"com.google.android.apps.chromecast.app",10061`,
-				`Package uninstall,service,1432964310000,1432964310000,"com.google.android.apps.blogger",10070`,
+				`Package active,service,1432964301000,1432964301000,com.googlecode.eyesfree.brailleback,10028`,
+				`Package inactive,service,1432964303000,1432964303000,com.google.android.apps.interactiveevents,10139`,
+				`Package install,service,1432964306000,1432964306000,com.google.android.apps.chromecast.app,10061`,
+				`Package uninstall,service,1432964310000,1432964310000,com.google.android.apps.blogger,10070`,
+				`App Processor wakeup,service,1432964315000,1432964315000,com.google.android.apps.blogger,10070`,
 			}, "\n"),
 		},
 		{
@@ -2977,10 +2933,10 @@ func TestAlarmParse(t *testing.T) {
 		},
 		strings.Join([]string{
 			csv.FileHeader,
-			`Alarm,service,1432964302076,1432964303076,"com.whatsapp",10105`,
-			`Alarm,service,1432964301076,1432964304076,"PhoneWindowManager.mPowerKeyWakeLock",1000`,
-			`Alarm,service,1432964305076,1432964306076,"flipboard.app",10116`,
-			`Alarm,service,1432964307076,1432964307076,"com.whatsapp",10105`,
+			`Alarm,service,1432964302076,1432964303076,com.whatsapp,10105`,
+			`Alarm,service,1432964301076,1432964304076,PhoneWindowManager.mPowerKeyWakeLock,1000`,
+			`Alarm,service,1432964305076,1432964306076,flipboard.app,10116`,
+			`Alarm,service,1432964307076,1432964307076,com.whatsapp,10105`,
 		}, "\n"),
 	}
 
@@ -3775,12 +3731,12 @@ func TestPackageInstallParse(t *testing.T) {
 			}, "\n"),
 			strings.Join([]string{
 				csv.FileHeader,
-				`Package install,service,1432964316671,1432964316671,"com.googlecode.eyesfree.brailleback",28`,
-				`Package install,service,1432964322730,1432964322730,"com.google.android.apps.interactiveevents",239`,
-				`Package install,service,1432964344800,1432964344800,"com.google.android.apps.chromecast.app",10061`,
-				`Package install,service,1432964362191,1432964362191,"com.google.android.apps.blogger",81`,
-				`Package install,service,1432964372153,1432964372153,"com.google.android.apps.giant",119`,
-				`Package install,service,1432964373018,1432964373018,"com.google.android.apps.vega",3900`,
+				`Package install,service,1432964316671,1432964316671,com.googlecode.eyesfree.brailleback,28`,
+				`Package install,service,1432964322730,1432964322730,com.google.android.apps.interactiveevents,239`,
+				`Package install,service,1432964344800,1432964344800,com.google.android.apps.chromecast.app,10061`,
+				`Package install,service,1432964362191,1432964362191,com.google.android.apps.blogger,81`,
+				`Package install,service,1432964372153,1432964372153,com.google.android.apps.giant,119`,
+				`Package install,service,1432964373018,1432964373018,com.google.android.apps.vega,3900`,
 			}, "\n"),
 			nil,
 		},
@@ -3794,7 +3750,7 @@ func TestPackageInstallParse(t *testing.T) {
 			}, "\n"),
 			strings.Join([]string{
 				csv.FileHeader,
-				`Package install,service,1432964316671,1432964316671,"com.googlecode.eyesfree.brailleback",28`,
+				`Package install,service,1432964316671,1432964316671,com.googlecode.eyesfree.brailleback,28`,
 			}, "\n"),
 			[]error{errors.New(`** Error in 9,h,22070,Epi=6 with Epi=6 : unable to find index "6" in idxMap for "Package install"`)},
 		},
@@ -3843,12 +3799,12 @@ func TestPackageUninstallParse(t *testing.T) {
 			}, "\n"),
 			strings.Join([]string{
 				csv.FileHeader,
-				`Package uninstall,service,1432964316671,1432964316671,"com.googlecode.eyesfree.brailleback",28`,
-				`Package uninstall,service,1432964322730,1432964322730,"com.google.android.apps.interactiveevents",239`,
-				`Package uninstall,service,1432964344800,1432964344800,"com.google.android.apps.chromecast.app",10061`,
-				`Package uninstall,service,1432964362191,1432964362191,"com.google.android.apps.blogger",81`,
-				`Package uninstall,service,1432964372153,1432964372153,"com.google.android.apps.giant",119`,
-				`Package uninstall,service,1432964373018,1432964373018,"com.google.android.apps.vega",3900`,
+				`Package uninstall,service,1432964316671,1432964316671,com.googlecode.eyesfree.brailleback,28`,
+				`Package uninstall,service,1432964322730,1432964322730,com.google.android.apps.interactiveevents,239`,
+				`Package uninstall,service,1432964344800,1432964344800,com.google.android.apps.chromecast.app,10061`,
+				`Package uninstall,service,1432964362191,1432964362191,com.google.android.apps.blogger,81`,
+				`Package uninstall,service,1432964372153,1432964372153,com.google.android.apps.giant,119`,
+				`Package uninstall,service,1432964373018,1432964373018,com.google.android.apps.vega,3900`,
 			}, "\n"),
 			nil,
 		},
@@ -3862,7 +3818,7 @@ func TestPackageUninstallParse(t *testing.T) {
 			}, "\n"),
 			strings.Join([]string{
 				csv.FileHeader,
-				`Package uninstall,service,1432964316671,1432964316671,"com.googlecode.eyesfree.brailleback",28`,
+				`Package uninstall,service,1432964316671,1432964316671,com.googlecode.eyesfree.brailleback,28`,
 			}, "\n"),
 			[]error{fmt.Errorf(`** Error in 9,h,22070,Epu=6 with Epu=6 : unable to find index "6" in idxMap for "Package uninstall"`)},
 		},
@@ -3904,7 +3860,7 @@ func TestScreenWakeReasonParsing(t *testing.T) {
 			wantNumSummaries: 1,
 			wantCSV: strings.Join([]string{
 				csv.FileHeader,
-				`Screen,bool,1437433550500,1437433551250,true,"android.server.wm:TURN_ON"`,
+				`Screen,bool,1437433550500,1437433551250,true,android.server.wm:TURN_ON`,
 			}, "\n"),
 		},
 		{
@@ -3921,8 +3877,8 @@ func TestScreenWakeReasonParsing(t *testing.T) {
 			wantNumSummaries: 1,
 			wantCSV: strings.Join([]string{
 				csv.FileHeader,
-				`Screen,bool,1437433550500,1437433551250,true,"android.server.wm:TURN_ON"`,
-				`Screen,bool,1437433561250,1437433561550,true,"android.policy:POWER"`,
+				`Screen,bool,1437433550500,1437433551250,true,android.server.wm:TURN_ON`,
+				`Screen,bool,1437433561250,1437433561550,true,android.policy:POWER`,
 			}, "\n"),
 		},
 		{
@@ -3951,7 +3907,7 @@ func TestScreenWakeReasonParsing(t *testing.T) {
 			wantNumSummaries: 1,
 			wantCSV: strings.Join([]string{
 				csv.FileHeader,
-				`Screen,bool,1437433550500,1437433551300,true,"android.server.wm:TURN_ON"`,
+				`Screen,bool,1437433550500,1437433551300,true,android.server.wm:TURN_ON`,
 			}, "\n"),
 		},
 		{
@@ -3978,7 +3934,7 @@ func TestScreenWakeReasonParsing(t *testing.T) {
 			wantNumSummaries: 1,
 			wantCSV: strings.Join([]string{
 				csv.FileHeader,
-				`Screen,bool,1437433550500,1437433551000,true,"android.server.wm:TURN_ON"`,
+				`Screen,bool,1437433550500,1437433551000,true,android.server.wm:TURN_ON`,
 				`Reboot,bool,1437433551000,1437433551000,true,`,
 			}, "\n"),
 		},
@@ -3998,9 +3954,9 @@ func TestScreenWakeReasonParsing(t *testing.T) {
 			wantNumSummaries: 2,
 			wantCSV: strings.Join([]string{
 				csv.FileHeader,
-				`Screen,bool,1437433550500,1437433551000,true,"android.server.wm:TURN_ON"`,
+				`Screen,bool,1437433550500,1437433551000,true,android.server.wm:TURN_ON`,
 				`Reboot,bool,1437433551000,1437433551500,true,`,
-				`Screen,bool,1437433561500,1437433562500,true,"android.policy:POWER"`,
+				`Screen,bool,1437433561500,1437433562500,true,android.policy:POWER`,
 			}, "\n"),
 		},
 		{
@@ -4031,7 +3987,7 @@ func TestScreenWakeReasonParsing(t *testing.T) {
 			wantNumSummaries: 1,
 			wantCSV: strings.Join([]string{
 				csv.FileHeader,
-				`Screen,bool,1437433551000,1437433551300,true,"android.policy:POWER"`,
+				`Screen,bool,1437433551000,1437433551300,true,android.policy:POWER`,
 			}, "\n"),
 		},
 		{
@@ -4047,7 +4003,7 @@ func TestScreenWakeReasonParsing(t *testing.T) {
 			wantNumSummaries: 1,
 			wantCSV: strings.Join([]string{
 				csv.FileHeader,
-				`Screen,bool,1437433560000,1437433561300,true,"android.policy:POWER"`,
+				`Screen,bool,1437433560000,1437433561300,true,android.policy:POWER`,
 			}, "\n"),
 			wantErrs: []error{errors.New(`** Error in 9,h,1000,Esw=9 with Esw=9 : encountered multiple Esw events between a single pair of +S/-S events`)},
 		},
@@ -4068,7 +4024,7 @@ func TestScreenWakeReasonParsing(t *testing.T) {
 			wantCSV: strings.Join([]string{
 				csv.FileHeader,
 				`Screen,bool,1437433551000,1437433552000,true,unknown screen on reason`,
-				`Screen,bool,1437433553150,1437433553450,true,"android.server.wm:TURN_ON"`,
+				`Screen,bool,1437433553150,1437433553450,true,android.server.wm:TURN_ON`,
 			}, "\n"),
 			wantErrs: []error{errors.New(`** Error in 9,h,100,Esw=9 with Esw=9 : encountered multiple Esw events ("android.policy:POWER" and "android.server.wm:TURN_ON") outside of +S/-S events`)},
 		},
@@ -4094,29 +4050,18 @@ func TestScreenWakeReasonParsing(t *testing.T) {
 func TestDPSTDCPUParse(t *testing.T) {
 	input := strings.Join([]string{
 		`9,0,i,vers,11,116,LMY06B,LMY06B`,
-		`9,hsp,17,1010054,"com.google.android.apps.docs.editors.punch/com.google/noogler@google.com"`,
-		`9,hsp,19,10008,"com.android.providers.downloads/.DownloadIdleService"`,
-		`9,hsp,20,1010054,"*net_scheduler*"`,
 		`9,h,0:RESET:TIME:1422620451417`,
-		`9,h,0,Bl=100,Bs=d`,
-		`9,h,1000,Bl=99,Bt=312,Bv=8581`,
+		`9,h,0,Bl=100`,
+		`9,h,1000,Bl=99`,
 		`9,h,0,Dcpu=112830:66390/1000:32930:19830/0:9850:23180/10019:21720:5570`,
 		`9,h,0,Dpst=176140,62360,14690,20,2920,242170`,
-		`9,h,1000,+w=17`,
-		`9,h,1000,-w`,
-		`9,h,1000,Bl=98,Bt=260,Bv=8391`,
-		`9,h,0,Dcpu=27650:50140/1000:9865:28630/0:5070:15025/10010:5357:3200`,
+		`9,h,3000,Bl=98`,
+		`9,h,0,Dcpu=27650:50140/1000:9865:28630/0:5070:15025/10010:357:3200`,
 		`9,h,0,Dpst=29130,47690,4900,0,990,342030`,
-		`9,h,1000,+w=19`,
-		`9,h,1000,-w`,
-		`9,h,1000,+r,wr=20`,
-		`9,h,1000,-r`,
-		`9,h,1000,Bl=97,Bt=282`,
+		`9,h,5000,Bl=97`,
 		`9,h,0,Dcpu=0:0`,
 		`9,h,0,Dpst=0,0,0,0,0,0`,
 		`9,h,1000,+S`,
-		`9,h,1000,+r,+w=17,wr=20`,
-		`9,h,1000,-w`,
 	}, "\n")
 
 	want := newActivitySummary(FormatTotalTime)
@@ -4129,16 +4074,22 @@ func TestDPSTDCPUParse(t *testing.T) {
 			SystemTime:   66390 * time.Millisecond,
 			CPUUtilizers: []AppCPUUsage{
 				{
+					start:      1422620451417,
+					pkgName:    "ANDROID_SYSTEM",
 					UID:        "1000",
 					UserTime:   32930 * time.Millisecond,
 					SystemTime: 19830 * time.Millisecond,
 				},
 				{
+					start:      1422620451417,
+					pkgName:    "ROOT",
 					UID:        "0",
 					UserTime:   9850 * time.Millisecond,
 					SystemTime: 23180 * time.Millisecond,
 				},
 				{
+					start:      1422620451417,
+					pkgName:    "com.google.android.keep",
 					UID:        "10019",
 					UserTime:   21720 * time.Millisecond,
 					SystemTime: 5570 * time.Millisecond,
@@ -4153,18 +4104,24 @@ func TestDPSTDCPUParse(t *testing.T) {
 			SystemTime:   50140 * time.Millisecond,
 			CPUUtilizers: []AppCPUUsage{
 				{
+					start:      1422620452417,
+					pkgName:    "ANDROID_SYSTEM",
 					UID:        "1000",
 					UserTime:   9865 * time.Millisecond,
 					SystemTime: 28630 * time.Millisecond,
 				},
 				{
+					start:      1422620452417,
+					pkgName:    "ROOT",
 					UID:        "0",
 					UserTime:   5070 * time.Millisecond,
 					SystemTime: 15025 * time.Millisecond,
 				},
 				{
+					start: 1422620452417,
+					// No package name in mapping.
 					UID:        "10010",
-					UserTime:   5357 * time.Millisecond,
+					UserTime:   357 * time.Millisecond,
 					SystemTime: 3200 * time.Millisecond,
 				},
 			},
@@ -4182,7 +4139,7 @@ func TestDPSTDCPUParse(t *testing.T) {
 		"1000":  91255 * time.Millisecond,
 		"0":     53125 * time.Millisecond,
 		"10019": 27290 * time.Millisecond,
-		"10010": 8557 * time.Millisecond,
+		"10010": 3557 * time.Millisecond,
 	}
 	want.DpstStatsSummary = []DPST{
 		{
@@ -4227,7 +4184,40 @@ func TestDPSTDCPUParse(t *testing.T) {
 		"sirq": 3910 * time.Millisecond,
 		"idle": 584200 * time.Millisecond,
 	}
-	result := AnalyzeHistory(ioutil.Discard, input, FormatTotalTime, emptyUIDPackageMapping, true)
+	pum := PackageUIDMapping{
+		uidToPackage: map[int32]string{
+			10019: "com.google.android.keep",
+		},
+		packageToUID: map[string]int32{
+			"com.google.android.keep": 10019,
+		},
+		pkgList: []*usagepb.PackageInfo{
+			{
+				PkgName: proto.String("com.google.android.keep"),
+				Uid:     proto.Int32(10019),
+			},
+		},
+	}
+	wantCSV := strings.Join([]string{
+		csv.FileHeader,
+		`Level,int,1422620451417,1422620452417,100,`,
+		`Level,int,1422620452417,1422620455417,99,`,
+		// 100->99 drop.
+		`Highest App CPU Usage,summary,1422620451417,1422620452417,ANDROID_SYSTEM~32.93s~19.83s,1000`,
+		`Highest App CPU Usage,summary,1422620451417,1422620452417,ROOT~9.85s~23.18s,0`,
+		`Highest App CPU Usage,summary,1422620451417,1422620452417,com.google.android.keep~21.72s~5.57s,10019`,
+		`Level,int,1422620455417,1422620460417,98,`,
+		// 99->98 drop.
+		`Highest App CPU Usage,summary,1422620452417,1422620455417,ANDROID_SYSTEM~9.865s~28.63s,1000`,
+		`Highest App CPU Usage,summary,1422620452417,1422620455417,ROOT~5.07s~15.025s,0`,
+		`Highest App CPU Usage,summary,1422620452417,1422620455417,UID 10010~357ms~3.2s,10010`,
+		`Level,int,1422620460417,1422620461417,97,`,
+		// None for the 98->97 drop.
+		`Screen,bool,1422620461417,1422620461417,true,unknown screen on reason`,
+	}, "\n")
+
+	var b bytes.Buffer
+	result := AnalyzeHistory(&b, input, FormatTotalTime, pum, true)
 	validateHistory(input, t, result, 0, 1)
 	s := result.Summaries[0]
 
@@ -4242,6 +4232,485 @@ func TestDPSTDCPUParse(t *testing.T) {
 	}
 	if !reflect.DeepEqual(want.DcpuOverallSummary, s.DcpuOverallSummary) {
 		t.Errorf("AnalyzeHistory(%s,...).Summaries[0].DcpuOverallSummary = %v, want %v", input, s.DcpuOverallSummary, want.DcpuOverallSummary)
+	}
+	gCSV := normalizeCSV(b.String())
+	wCSV := normalizeCSV(wantCSV)
+	if !reflect.DeepEqual(gCSV, wCSV) {
+		t.Errorf("AnalyzeHistory(%s,...).Summaries[0] generated incorrect csv:\n  got: %v\n  want: %v", input, gCSV, wCSV)
+	}
+}
+
+// TestParsePowerStates tests the parsing of power states lines.
+func TestParsePowerStates(t *testing.T) {
+	tests := []struct {
+		name       string
+		input      string
+		wantStates []*PowerState
+		wantErr    error
+	}{
+		{
+			name:  "state 1 with voters, state 2 without voters",
+			input: `state_1 name=XO_shutdown time=0 count=0 voter_1 name=APSS time=4000 count=4 voter_2 name=MPSS time=5000 count=5 voter_3 name=LPASS time=6000 count=6  state_2 name=VMIN time=3500 count=10`,
+			wantStates: []*PowerState{
+				{
+					Level: 1,
+					Name:  `XO_shutdown`,
+					Time:  0,
+					Count: 0,
+					Voters: []Voter{
+						{
+							Name:  `APSS`,
+							Time:  4 * time.Second,
+							Count: 4,
+						},
+						{
+							Name:  `MPSS`,
+							Time:  5 * time.Second,
+							Count: 5,
+						},
+						{
+							Name:  `LPASS`,
+							Time:  6 * time.Second,
+							Count: 6,
+						},
+					},
+				},
+				{
+					Level: 2,
+					Name:  `VMIN`,
+					Time:  3500 * time.Millisecond,
+					Count: 10,
+				},
+			},
+		},
+		{
+			name:  "state 1 and 2 with voters",
+			input: `state_1 name=XO_shutdown time=0 count=0 voter_1 name=APSS time=5000 count=6 voter_2 name=MPSS time=7000 count=8 voter_3 name=LPASS time=9000 count=10  state_2 name=VMIN time=9500 count=25 voter_1 name=V1 time=123 count=456 voter_2 name=V2 time=468 count=864`,
+			wantStates: []*PowerState{
+				{
+					Level: 1,
+					Name:  `XO_shutdown`,
+					Time:  0,
+					Count: 0,
+					Voters: []Voter{
+						{
+							Name:  `APSS`,
+							Time:  5 * time.Second,
+							Count: 6,
+						},
+						{
+							Name:  `MPSS`,
+							Time:  7 * time.Second,
+							Count: 8,
+						},
+						{
+							Name:  `LPASS`,
+							Time:  9 * time.Second,
+							Count: 10,
+						},
+					},
+				},
+				{
+					Level: 2,
+					Name:  `VMIN`,
+					Time:  9500 * time.Millisecond,
+					Count: 25,
+					Voters: []Voter{
+						{
+							Name:  `V1`,
+							Time:  123 * time.Millisecond,
+							Count: 456,
+						},
+						{
+							Name:  `V2`,
+							Time:  468 * time.Millisecond,
+							Count: 864,
+						},
+					},
+				},
+			},
+		},
+		{
+			name:    "invalid input",
+			input:   `9,h,1000,-w`,
+			wantErr: errors.New(`invalid power_state line: "9,h,1000,-w"`),
+		},
+	}
+
+	for _, test := range tests {
+		d := fmt.Sprintf("[%s] parsePowerStates(%s)", test.name, test.input)
+		ps, err := parsePowerStates(test.input)
+		if err != nil {
+			if test.wantErr == nil {
+				t.Errorf(`%s generated unexpected error "%v"`, d, err)
+			} else if test.wantErr.Error() != err.Error() {
+				t.Errorf(`%s generated unexpected error. Got "%v", want "%v"`, d, err, test.wantErr)
+			}
+			continue
+		}
+		if test.wantErr != nil {
+			t.Errorf(`%s didn't generate expected error`, d)
+			continue
+		}
+		if len(ps) != len(test.wantStates) {
+			t.Errorf(`%s didn't parse correct number of states. Got %d states, want %d:\n  got %v\n  want %v`, d, len(ps), len(test.wantStates), ps, test.wantStates)
+			continue
+		}
+		for i, p := range ps {
+			pw := test.wantStates[i]
+			if !reflect.DeepEqual(p, pw) {
+				t.Errorf("%s parsed state #%d incorrect:\n  got %v\n  want %v", d, i, p, pw)
+			}
+		}
+	}
+}
+
+// TestPowerStateParsing tests the parsing of low power state data.
+func TestPowerStateParsing(t *testing.T) {
+	zeroDuration := time.Duration(0).String()
+
+	// Summary of states per activity summary
+	type states struct {
+		detailed []PowerState
+		overall  map[string]PowerState
+	}
+	tests := []struct {
+		name  string
+		input string
+		// A different slice of states for each expected summary.
+		wantStatesTT []states
+		wantStatesBL []states
+		wantCSV      string
+	}{
+		{
+			name: "single discharge",
+			input: strings.Join([]string{
+				`9,0,i,vers,17,144,NRD32,NRD41`,
+				`9,h,0:RESET:TIME:1422620000000`,
+				`9,h,0,Bl=100`,
+				`9,h,1000,Bl=99`,
+				`9,h,0,Dpst=262180,124520,4950,8110,6200,181080,state_1 name=XO_shutdown time=0 count=0 voter_1 name=APSS time=100 count=50 voter_2 name=MPSS time=200 count=100 voter_3 name=LPASS time=300 count=150 state_2 name=VMIN time=150 count=75`,
+				`9,h,1000,Bl=98`,
+				`9,h,0,Dpst=262180,124520,4950,8110,6200,181080,state_1 name=XO_shutdown time=0 count=0 voter_1 name=APSS time=150 count=90 voter_2 name=MPSS time=260 count=140 voter_3 name=LPASS time=330 count=160 state_2 name=VMIN time=170 count=95`,
+				`9,h,1000,Bl=97`,
+				`9,h,0,Dpst=262180,124520,4950,8110,6200,181080,state_1 name=XO_shutdown time=0 count=0 voter_1 name=APSS time=250 count=100 voter_2 name=MPSS time=300 count=200 voter_3 name=LPASS time=400 count=200 state_2 name=VMIN time=200 count=100`,
+			}, "\n"),
+			wantStatesTT: []states{
+				{
+					detailed: []PowerState{
+						// There won't be a log for the 100->99 discharge since the log started at 100.
+						{
+							batteryLevel: 99, // 99->98 step
+							start:        1422620001000,
+							Level:        1,
+							Name:         `XO_shutdown`,
+							Time:         0,
+							Count:        0,
+							Voters: []Voter{
+								{
+									Name:  `APSS`,
+									Time:  50 * time.Millisecond,
+									Count: 40,
+								},
+								{
+									Name:  `LPASS`,
+									Time:  30 * time.Millisecond,
+									Count: 10,
+								},
+								{
+									Name:  `MPSS`,
+									Time:  60 * time.Millisecond,
+									Count: 40,
+								},
+							},
+						},
+						{
+							batteryLevel: 99, // 99->98 step
+							start:        1422620001000,
+							Level:        2,
+							Name:         `VMIN`,
+							Time:         20 * time.Millisecond,
+							Count:        20,
+						},
+						{
+							batteryLevel: 98, // 98->97 step
+							start:        1422620002000,
+							Level:        1,
+							Name:         `XO_shutdown`,
+							Time:         0,
+							Count:        0,
+							Voters: []Voter{
+								{
+									Name:  `APSS`,
+									Time:  100 * time.Millisecond,
+									Count: 10,
+								},
+								{
+									Name:  `LPASS`,
+									Time:  70 * time.Millisecond,
+									Count: 40,
+								},
+								{
+									Name:  `MPSS`,
+									Time:  40 * time.Millisecond,
+									Count: 60,
+								},
+							},
+						},
+						{
+							batteryLevel: 98, // 98->97 step
+							start:        1422620002000,
+							Level:        2,
+							Name:         `VMIN`,
+							Time:         30 * time.Millisecond,
+							Count:        5,
+						},
+					},
+					overall: map[string]PowerState{
+						`XO_shutdown`: {
+							Level: 1,
+							Name:  `XO_shutdown`,
+							Time:  0,
+							Count: 0,
+							Voters: []Voter{
+								{
+									Name:  `APSS`,
+									Time:  150 * time.Millisecond,
+									Count: 50,
+								},
+								{
+									Name:  `LPASS`,
+									Time:  100 * time.Millisecond,
+									Count: 50,
+								},
+								{
+									Name:  `MPSS`,
+									Time:  100 * time.Millisecond,
+									Count: 100,
+								},
+							},
+						},
+						`VMIN`: {
+							Level: 2,
+							Name:  `VMIN`,
+							Time:  50 * time.Millisecond,
+							Count: 25,
+						},
+					},
+				},
+			},
+			wantStatesBL: []states{
+				{
+					// There won't be any power states saved for the 100->99 discharge since the log started at 100.
+					detailed: []PowerState{},
+				},
+				{
+					detailed: []PowerState{
+						{
+							batteryLevel: 99, // 99->98 step
+							start:        1422620001000,
+							Level:        1,
+							Name:         `XO_shutdown`,
+							Time:         0,
+							Count:        0,
+							Voters: []Voter{
+								{
+									Name:  `APSS`,
+									Time:  50 * time.Millisecond,
+									Count: 40,
+								},
+								{
+									Name:  `LPASS`,
+									Time:  30 * time.Millisecond,
+									Count: 10,
+								},
+								{
+									Name:  `MPSS`,
+									Time:  60 * time.Millisecond,
+									Count: 40,
+								},
+							},
+						},
+						{
+							batteryLevel: 99, // 99->98 step
+							start:        1422620001000,
+							Level:        2,
+							Name:         `VMIN`,
+							Time:         20 * time.Millisecond,
+							Count:        20,
+						},
+					},
+					overall: map[string]PowerState{
+						`XO_shutdown`: {
+							batteryLevel: 99, // 99->98 step
+							start:        1422620001000,
+							Level:        1,
+							Name:         `XO_shutdown`,
+							Time:         0,
+							Count:        0,
+							Voters: []Voter{
+								{
+									Name:  `APSS`,
+									Time:  50 * time.Millisecond,
+									Count: 40,
+								},
+								{
+									Name:  `LPASS`,
+									Time:  30 * time.Millisecond,
+									Count: 10,
+								},
+								{
+									Name:  `MPSS`,
+									Time:  60 * time.Millisecond,
+									Count: 40,
+								},
+							},
+						},
+						`VMIN`: {
+							batteryLevel: 99, // 99->98 step
+							start:        1422620001000,
+							Level:        2,
+							Name:         `VMIN`,
+							Time:         20 * time.Millisecond,
+							Count:        20,
+						},
+					},
+				},
+				{
+					detailed: []PowerState{
+						{
+							batteryLevel: 98, // 98->97 step
+							start:        1422620002000,
+							Level:        1,
+							Name:         `XO_shutdown`,
+							Time:         0,
+							Count:        0,
+							Voters: []Voter{
+								{
+									Name:  `APSS`,
+									Time:  100 * time.Millisecond,
+									Count: 10,
+								},
+								{
+									Name:  `LPASS`,
+									Time:  70 * time.Millisecond,
+									Count: 40,
+								},
+								{
+									Name:  `MPSS`,
+									Time:  40 * time.Millisecond,
+									Count: 60,
+								},
+							},
+						},
+						{
+							batteryLevel: 98, // 98->97 step
+							start:        1422620002000,
+							Level:        2,
+							Name:         `VMIN`,
+							Time:         30 * time.Millisecond,
+							Count:        5,
+						},
+					},
+					overall: map[string]PowerState{
+						`XO_shutdown`: {
+							batteryLevel: 98, // 98->97 step
+							start:        1422620002000,
+							Level:        1,
+							Name:         `XO_shutdown`,
+							Time:         0,
+							Count:        0,
+							Voters: []Voter{
+								{
+									Name:  `APSS`,
+									Time:  100 * time.Millisecond,
+									Count: 10,
+								},
+								{
+									Name:  `LPASS`,
+									Time:  70 * time.Millisecond,
+									Count: 40,
+								},
+								{
+									Name:  `MPSS`,
+									Time:  40 * time.Millisecond,
+									Count: 60,
+								},
+							},
+						},
+						`VMIN`: {
+							batteryLevel: 98, // 98->97 step
+							start:        1422620002000,
+							Level:        2,
+							Name:         `VMIN`,
+							Time:         30 * time.Millisecond,
+							Count:        5,
+						},
+					},
+				},
+			},
+			wantCSV: strings.Join([]string{
+				csv.FileHeader,
+				`Level,int,1422620000000,1422620001000,100,`,
+				`Level,int,1422620001000,1422620002000,99,`,
+				`Low Power State,summary,1422620001000,1422620002000,XO_shutdown~` + zeroDuration + `~0,`,
+				`Low Power State,summary,1422620001000,1422620002000,VMIN~20ms~20,`,
+				`Level,int,1422620002000,1422620003000,98,`,
+				`Low Power State,summary,1422620002000,1422620003000,XO_shutdown~` + zeroDuration + `~0,`,
+				`Low Power State,summary,1422620002000,1422620003000,VMIN~30ms~5,`,
+				`Level,int,1422620003000,1422620003000,97,`,
+			}, "\n"),
+		},
+		// TODO: add test for two discharge sessions
+		// TODO: add test for reboot case
+	}
+
+	var b bytes.Buffer
+	for _, test := range tests {
+		// FormatTotalTime
+		result := AnalyzeHistory(&b, test.input, FormatTotalTime, emptyUIDPackageMapping, true)
+		validateHistory(test.name, t, result, 0, len(test.wantStatesTT))
+		if len(result.Summaries) != len(test.wantStatesTT) {
+			t.Errorf("%s got incorrect number of total summaries. Got %d, want %d", test.name, len(result.Summaries), len(test.wantStatesTT))
+		} else {
+			for i, want := range test.wantStatesTT {
+				gotD := result.Summaries[i].PowerStateSummary
+				if !reflect.DeepEqual(gotD, want.detailed) {
+					t.Errorf("%s[total] got incorrect detailed states for summary #%d.\n  Got %v\n  Want %v", test.name, i, gotD, want.detailed)
+				}
+				gotO := result.Summaries[i].PowerStateOverallSummary
+				if !reflect.DeepEqual(gotO, want.overall) {
+					t.Errorf("%s[total] got incorrect overall states for summary #%d.\n  Got %v\n  Want %v", test.name, i, gotO, want.overall)
+				}
+			}
+			gotCSV := normalizeCSV(b.String())
+			wantCSV := normalizeCSV(test.wantCSV)
+			if !reflect.DeepEqual(gotCSV, wantCSV) {
+				t.Errorf("%s[total] generated incorrect csv:\n  Got: %q\n  Want: %q", test.name, gotCSV, wantCSV)
+			}
+		}
+
+		// FormatBatteryLevel
+		result = AnalyzeHistory(ioutil.Discard, test.input, FormatBatteryLevel, emptyUIDPackageMapping, true)
+		validateHistory(test.name, t, result, 0, len(test.wantStatesBL))
+		if len(result.Summaries) != len(test.wantStatesBL) {
+			t.Errorf("%s got incorrect number of battery level summaries. Got %d, want %d", test.name, len(result.Summaries), len(test.wantStatesBL))
+		} else {
+			for i, want := range test.wantStatesBL {
+				gotD := result.Summaries[i].PowerStateSummary
+				if len(gotD) == 0 && len(want.detailed) == 0 {
+					// The initial level will be in this case.
+					continue
+				}
+				if !reflect.DeepEqual(gotD, want.detailed) {
+					t.Errorf("%s[level] got detailed incorrect states for summary #%d.\n  Got %v\n  Want %v", test.name, i, gotD, want.detailed)
+				}
+				gotO := result.Summaries[i].PowerStateOverallSummary
+				if !reflect.DeepEqual(gotO, want.overall) {
+					t.Errorf("%s[level] got incorrect overall states for summary #%d.\n  Got %v\n  Want %v", test.name, i, gotO, want.overall)
+				}
+			}
+		}
 	}
 }
 
@@ -4442,7 +4911,7 @@ func TestMultipleResetsParse(t *testing.T) {
 // TestPackageUIDMapping tests mapping of packages and matching with ServiceUIDs.
 func TestPackageUIDMapping(t *testing.T) {
 	upm := PackageUIDMapping{
-		UIDToPackage: map[int32]string{
+		uidToPackage: map[int32]string{
 			1001:    "com.android.phone;com.android.stk",
 			10003:   "com.android.providers.contacts;com.android.contacts",
 			10005:   "com.android.providers.calendar",
@@ -4454,7 +4923,7 @@ func TestPackageUIDMapping(t *testing.T) {
 			1010005: "com.android.providers.calendar",
 			1010036: "com.google.android.apps.photos",
 		},
-		PackageToUID: map[string]int32{
+		packageToUID: map[string]int32{
 			"com.android.phone":              1001,
 			"com.android.stk":                1001,
 			"com.android.contacts":           10003,
@@ -4469,11 +4938,11 @@ func TestPackageUIDMapping(t *testing.T) {
 			"com.random.app.pro":             10049,
 			"com.some.other.app":             10056,
 		},
-		SharedUIDName: map[int32]string{
+		sharedUIDName: map[int32]string{
 			10014: "GOOGLE_SERVICES",
 			10049: "SharedUserID(com.random.uid.shared)",
 		},
-		PkgList: []*usagepb.PackageInfo{
+		pkgList: []*usagepb.PackageInfo{
 			{
 				// Package with shared UID. Predefined group name.
 				PkgName:      proto.String("com.google.android.gms"),
@@ -4505,12 +4974,12 @@ func TestPackageUIDMapping(t *testing.T) {
 				SharedUserId: proto.String("com.random.uid.shared"),
 			},
 			{
-				// Package with shared UID. SharedUserId not uploaded.
+				// Package with shared UID. SharedUserId not in log.
 				PkgName: proto.String("com.android.providers.contacts"),
 				Uid:     proto.Int32(10003),
 			},
 			{
-				// Package with shared UID. SharedUserId not uploaded.
+				// Package with shared UID. SharedUserId not in log.
 				PkgName: proto.String("com.android.contacts"),
 				Uid:     proto.Int32(10003),
 			},
@@ -4731,12 +5200,12 @@ func TestUIDAndPackageNameMappingAndMatching(t *testing.T) {
 			SharedUserId: proto.String("com.random.uid.shared"),
 		},
 		{
-			// Package with shared UID. SharedUserId not uploaded.
+			// Package with shared UID. SharedUserId not in log.
 			PkgName: proto.String("com.android.providers.contacts"),
 			Uid:     proto.Int32(10036),
 		},
 		{
-			// Package with shared UID. SharedUserId not uploaded.
+			// Package with shared UID. SharedUserId not in log.
 			PkgName: proto.String("com.android.contacts"),
 			Uid:     proto.Int32(10036),
 		},
@@ -4905,11 +5374,11 @@ func TestTopAppSummary(t *testing.T) {
 
 	wantCSV := strings.Join([]string{
 		csv.FileHeader,
-		`Top app,service,1456809000000,1456809003000,"com.google.android.googlequicksearchbox",10031`,
-		`Top app,service,1456809003000,1456809008000,"com.google.android.apps.messaging",10066`,
+		`Top app,service,1456809000000,1456809003000,com.google.android.googlequicksearchbox,10031`,
+		`Top app,service,1456809003000,1456809008000,com.google.android.apps.messaging,10066`,
 		`Screen,bool,1456809000000,1456809008000,true,unknown screen on reason`,
-		`Top app,service,1456809015500,1456809015900,"com.android.calendar/com.google/XXX@google.com",10038`,
-		`Top app,service,1456809015900,1456809015950,"com.google.android.apps.messaging",10066`,
+		`Top app,service,1456809015500,1456809015900,com.android.calendar/com.google/XXX@google.com,10038`,
+		`Top app,service,1456809015900,1456809015950,com.google.android.apps.messaging,10066`,
 		`Screen,bool,1456809015500,1456809015950,true,unknown screen on reason`,
 	}, "\n")
 
@@ -4969,7 +5438,7 @@ func TestTopAppMultipleSummaries(t *testing.T) {
 		csv.FileHeader,
 		`Charging status,string,1456809001000,1456809003000,c,`,
 		`Charging status,string,1456809003000,1456809008000,d,`,
-		`Top app,service,1456809000000,1456809008000,"com.google.android.googlequicksearchbox",10031`,
+		`Top app,service,1456809000000,1456809008000,com.google.android.googlequicksearchbox,10031`,
 		`Screen,bool,1456809000000,1456809008000,true,unknown screen on reason`,
 	}, "\n")
 

@@ -37,10 +37,7 @@ specific language governing permissions and limitations under the License.
           {{end}}
         </div>
         {{if .Overflow}}
-        <div id="dialog-message" data-toggle="tooltip" title="Overflow detected">
-         Battery history log overflow has been detected for the uploaded bugreport.
-         Please note analysis should not be entirely trusted due to overflow.
-        </div>
+          {{template "overflow_message" .}}
         {{end}}
       </div>
     </div>
@@ -68,7 +65,7 @@ specific language governing permissions and limitations under the License.
         <div class="tab-content">
           <!-- historian v2 -->
           <div id="historian-v2" class="tab-pane fade in active" >
-            <div class="graph"></div>
+            {{template "historianv2" .}}
              <div id="power-selector-container">
                <select id="power-selector" class="btn btn-default" data-toggle="tooltip">
                  <br></br>

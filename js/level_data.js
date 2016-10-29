@@ -18,13 +18,7 @@ goog.provide('historian.LevelData');
 goog.provide('historian.LevelData.Listener');
 
 goog.require('goog.asserts');
-
-
-/**
- * Function that is called on level data change.
- * @typedef {function()}
- */
-historian.LevelData.Listener;
+goog.require('historian.utils');
 
 
 
@@ -35,10 +29,13 @@ historian.LevelData.Listener;
  * @param {!Object<!historian.SeriesGroup>} groups All the series groups.
  * @param {string} defaultLevelMetric The level metric to display as default.
  * @param {!historian.LevelConfigs} levelConfigs The level configs.
+ * @param {jQuery=} opt_container The graph container this bar data is
+ *     rendered in.
  * @constructor
  * @struct
  */
-historian.LevelData = function(groups, defaultLevelMetric, levelConfigs) {
+historian.LevelData = function(
+    groups, defaultLevelMetric, levelConfigs, opt_container) {
   /** @private {!Array<!historian.LevelData.Listener>} */
   this.listeners_ = [];
 
@@ -50,6 +47,44 @@ historian.LevelData = function(groups, defaultLevelMetric, levelConfigs) {
 
   /** @private {!historian.LevelConfigs} */
   this.levelConfigs_ = levelConfigs;
+
+  /**
+   * Map from group name to rateOfChange data.
+   * Generated and cached on request.
+   * @private {!Object<!Array<!historian.Entry>>}
+   */
+  this.rateOfChangeData_ = {};
+
+  /** @private {boolean} */
+  this.showRateOfChange_ = false;
+  if (opt_container) {
+    opt_container.find('.show-rate-of-change').change(function(event) {
+      this.showRateOfChange_ = $(event.target).is(':checked');
+      this.callListeners_();
+    }.bind(this));
+  }
+};
+
+
+/**
+ * Function that is called on level data change.
+ * @typedef {function()}
+ */
+historian.LevelData.Listener;
+
+
+/**
+ * Returns the rate of change data for the currently displayed level metric.
+ * If the rate of change data doesn't exist, it is generated and cached.
+ * @return {!Array<!historian.Entry>}
+ * @private
+ */
+historian.LevelData.prototype.getRateOfChangeData_ = function() {
+  if (!(this.levelMetric_ in this.rateOfChangeData_)) {
+    this.rateOfChangeData_[this.levelMetric_] =
+        historian.utils.generateDerivative(this.getOriginalData_());
+  }
+  return this.rateOfChangeData_[this.levelMetric_];
 };
 
 
@@ -69,8 +104,9 @@ historian.LevelData.prototype.setLevel = function(name) {
 /**
  * Returns the data for the currently set level metric.
  * @return {!Array<!historian.Entry>}
+ * @private
  */
-historian.LevelData.prototype.getData = function() {
+historian.LevelData.prototype.getOriginalData_ = function() {
   if (!(this.levelMetric_ in this.groups_)) {
     // It's possible the selected level metric does not have corresponding data.
     // e.g. by default the battery level metric is displayed regardless of
@@ -84,11 +120,27 @@ historian.LevelData.prototype.getData = function() {
 
 
 /**
+ * Returns the data for the currently set level metric, or the rate of
+ * change data if the show rate of change checkbox is currently checked.
+ * @return {!Array<!historian.Entry>}
+ */
+historian.LevelData.prototype.getData = function() {
+  return this.showRateOfChange_ ? this.getRateOfChangeData_() :
+      this.getOriginalData_();
+};
+
+
+/**
  * Returns the config for the currently set level metric.
  * @return {!historian.LevelConfiguration}
  */
 historian.LevelData.prototype.getConfig = function() {
-  return this.levelConfigs_.getConfig(this.levelMetric_, this.getData());
+  var name = this.levelMetric_;
+  if (this.showRateOfChange_) {
+    name += ' (Rate of change)';
+  }
+  return this.levelConfigs_.getConfig(
+      name, this.showRateOfChange_, this.getData());
 };
 
 

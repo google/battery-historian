@@ -20,6 +20,7 @@ goog.setTestOnly('historian.dataTest');
 var Csv = goog.require('historian.metrics.Csv');
 goog.require('goog.testing.jsunit');
 var data = goog.require('historian.data');
+var historianV2Logs = goog.require('historian.historianV2Logs');
 var metrics = goog.require('historian.metrics');
 var testSuite = goog.require('goog.testing.testSuite');
 var testUtils = goog.require('historian.testUtils');
@@ -58,42 +59,6 @@ var createTestSeries = function(values, cluster, opt_name, opt_type) {
     type: opt_type || 'service',
     cluster: cluster
   };
-};
-
-
-/**
- * Creates the aggregated series given an array of arrays of values.
- * @param {!Array<!Array<number|!historian.AggregatedEntryValue>>} values
- * @return {!Array<!historian.AggregatedEntry>}
- */
-var createAggregatedValues = function(values) {
-  return values.map(function(v) {
-    var entry = testUtils.createTestEntry(v);
-    entry['services'] = v[3];
-    return entry;
-  });
-};
-
-
-/**
- * Creates the expected values for a cluster.
- * @param {!Array<!Array<number|string|!Object>>} clusterValues Each array
- *     contains details for a value in the cluster: count, duration, key,
- *     value, ids.
- * @return {!Object<!ClusterEntryValue>} Values for the cluster.
- */
-var createExpectedClusteredValues = function(clusterValues) {
-  var clustered = {};
-  clusterValues.forEach(function(value) {
-    clustered[data.ClusterEntry.key_(value[2])] = {
-      'count': value[0],
-      'duration': value[1],
-      'value': value[2],
-      'ids': value[3],
-      'extra': []
-    };
-  });
-  return clustered;
 };
 
 
@@ -164,11 +129,11 @@ testSuite({
           [0, 100, 'service1']
         ],
         expected: [
-          [0, 100, 1,
-            [
-              data.createAggregatedValue_(0, 'service1')
-            ]
-          ]
+          {
+            startTime: 0,
+            endTime: 100,
+            services: [{startTime: 0, endTime: 100, value: 'service1', id: 0}]
+          }
         ]
       },
       {
@@ -178,12 +143,14 @@ testSuite({
           [0, 100, 'service2']
         ],
         expected: [
-          [0, 100, 2,
-            [
-              data.createAggregatedValue_(0, 'service1'),
-              data.createAggregatedValue_(1, 'service2')
+          {
+            startTime: 0,
+            endTime: 100,
+            services: [
+              {startTime: 0, endTime: 100, value: 'service1', id: 0},
+              {startTime: 0, endTime: 100, value: 'service2', id: 1}
             ]
-          ]
+          }
         ]
       },
       {
@@ -193,16 +160,16 @@ testSuite({
           [110, 200, 'service2']
         ],
         expected: [
-          [0, 100, 1,
-            [
-             data.createAggregatedValue_(0, 'service1')
-            ]
-          ],
-          [110, 200, 1,
-            [
-             data.createAggregatedValue_(1, 'service2')
-            ]
-          ]
+          {
+            startTime: 0,
+            endTime: 100,
+            services: [{startTime: 0, endTime: 100, value: 'service1', id: 0}]
+          },
+          {
+            startTime: 110,
+            endTime: 200,
+            services: [{startTime: 110, endTime: 200, value: 'service2', id: 1}]
+          }
         ]
       },
       {
@@ -212,16 +179,16 @@ testSuite({
           [100, 200, 'service2']
         ],
         expected: [
-          [0, 100, 1,
-            [
-             data.createAggregatedValue_(0, 'service1')
-            ]
-          ],
-          [100, 200, 1,
-            [
-             data.createAggregatedValue_(1, 'service2')
-            ]
-          ]
+          {
+            startTime: 0,
+            endTime: 100,
+            services: [{startTime: 0, endTime: 100, value: 'service1', id: 0}]
+          },
+          {
+            startTime: 100,
+            endTime: 200,
+            services: [{startTime: 100, endTime: 200, value: 'service2', id: 1}]
+          }
         ]
       },
       {
@@ -231,17 +198,19 @@ testSuite({
           [0, 50, 'service2']
         ],
         expected: [
-          [0, 50, 2,
-            [
-             data.createAggregatedValue_(0, 'service1'),
-             data.createAggregatedValue_(1, 'service2')
+          {
+            startTime: 0,
+            endTime: 50,
+            services: [
+              {startTime: 0, endTime: 100, value: 'service1', id: 0},
+              {startTime: 0, endTime: 50, value: 'service2', id: 1}
             ]
-          ],
-          [50, 100, 1,
-            [
-             data.createAggregatedValue_(0, 'service1')
-            ]
-          ]
+          },
+          {
+            startTime: 50,
+            endTime: 100,
+            services: [{startTime: 0, endTime: 100, value: 'service1', id: 0}]
+          }
         ],
       },
       {
@@ -251,17 +220,19 @@ testSuite({
           [0, 150, 'service2']
         ],
         expected: [
-          [0, 100, 2,
-            [
-             data.createAggregatedValue_(0, 'service1'),
-             data.createAggregatedValue_(1, 'service2')
+          {
+            startTime: 0,
+            endTime: 100,
+            services: [
+              {startTime: 0, endTime: 100, value: 'service1', id: 0},
+              {startTime: 0, endTime: 150, value: 'service2', id: 1}
             ]
-          ],
-          [100, 150, 1,
-            [
-             data.createAggregatedValue_(0, 'service2')
-            ]
-          ]
+          },
+          {
+            startTime: 100,
+            endTime: 150,
+            services: [{startTime: 0, endTime: 150, value: 'service2', id: 1}]
+          }
         ]
       },
       {
@@ -271,22 +242,24 @@ testSuite({
           [25, 50, 'service2']
         ],
         expected: [
-          [0, 25, 1,
-            [
-             data.createAggregatedValue_(0, 'service1')
+          {
+            startTime: 0,
+            endTime: 25,
+            services: [{startTime: 0, endTime: 100, value: 'service1', id: 0}]
+          },
+          {
+            startTime: 25,
+            endTime: 50,
+            services: [
+              {startTime: 0, endTime: 100, value: 'service1', id: 0},
+              {startTime: 25, endTime: 50, value: 'service2', id: 1}
             ]
-          ],
-          [25, 50, 2,
-            [
-             data.createAggregatedValue_(0, 'service1'),
-             data.createAggregatedValue_(1, 'service2')
-            ]
-          ],
-          [50, 100, 1,
-            [
-             data.createAggregatedValue_(0, 'service1')
-            ]
-          ]
+          },
+          {
+            startTime: 50,
+            endTime: 100,
+            services: [{startTime: 0, endTime: 100, value: 'service1', id: 0}]
+          }
         ]
       },
       {
@@ -296,16 +269,19 @@ testSuite({
           [25, 100, 'service2']
         ],
         expected: [
-          [0, 25, 1,
-            [
-             data.createAggregatedValue_(0, 'service1')
+          {
+            startTime: 0,
+            endTime: 25,
+            services: [{startTime: 0, endTime: 100, value: 'service1', id: 0}]
+          },
+          {
+            startTime: 25,
+            endTime: 100,
+            services: [
+              {startTime: 0, endTime: 100, value: 'service1', id: 0},
+              {startTime: 25, endTime: 100, value: 'service2', id: 1}
             ]
-          ],
-          [25, 100, 2,
-            [
-             data.createAggregatedValue_(1, 'service2')
-            ]
-          ]
+          }
         ]
       },
       {
@@ -315,22 +291,24 @@ testSuite({
           [25, 150, 'service2']
         ],
         expected: [
-          [0, 25, 1,
-            [
-             data.createAggregatedValue_(0, 'service1')
+          {
+            startTime: 0,
+            endTime: 25,
+            services: [{startTime: 0, endTime: 100, value: 'service1', id: 0}]
+          },
+          {
+            startTime: 25,
+            endTime: 100,
+            services: [
+              {startTime: 0, endTime: 100, value: 'service1', id: 0},
+              {startTime: 25, endTime: 150, value: 'service2', id: 1}
             ]
-          ],
-          [25, 100, 2,
-            [
-             data.createAggregatedValue_(0, 'service1'),
-             data.createAggregatedValue_(1, 'service2')
-            ]
-          ],
-          [100, 150, 1,
-            [
-             data.createAggregatedValue_(1, 'service2')
-            ]
-          ]
+          },
+          {
+            startTime: 100,
+            endTime: 150,
+            services: [{startTime: 25, endTime: 150, value: 'service2', id: 1}]
+          }
         ]
       },
       {
@@ -341,35 +319,41 @@ testSuite({
           [40, 60, 'service3']
         ],
         expected: [
-          [0, 20, 1,
-            [
-             data.createAggregatedValue_(0, 'service1')
+          {
+            startTime: 0,
+            endTime: 20,
+            services: [{startTime: 0, endTime: 100, value: 'service1', id: 0}]
+          },
+          {
+            startTime: 20,
+            endTime: 40,
+            services: [
+              {startTime: 0, endTime: 100, value: 'service1', id: 0},
+              {startTime: 20, endTime: 80, value: 'service2', id: 1}
             ]
-          ],
-          [20, 40, 2,
-            [
-             data.createAggregatedValue_(0, 'service1'),
-             data.createAggregatedValue_(1, 'service2')
+          },
+          {
+            startTime: 40,
+            endTime: 60,
+            services: [
+              {startTime: 0, endTime: 100, value: 'service1', id: 0},
+              {startTime: 20, endTime: 80, value: 'service2', id: 1},
+              {startTime: 40, endTime: 60, value: 'service3', id: 2}
             ]
-          ],
-          [40, 60, 3,
-            [
-             data.createAggregatedValue_(0, 'service1'),
-             data.createAggregatedValue_(1, 'service2'),
-             data.createAggregatedValue_(3, 'service3')
+          },
+          {
+            startTime: 60,
+            endTime: 80,
+            services: [
+              {startTime: 0, endTime: 100, value: 'service1', id: 0},
+              {startTime: 20, endTime: 80, value: 'service2', id: 1}
             ]
-          ],
-          [60, 80, 2,
-            [
-             data.createAggregatedValue_(0, 'service1'),
-             data.createAggregatedValue_(1, 'service2')
-           ]
-          ],
-          [80, 100, 1,
-            [
-             data.createAggregatedValue_(0, 'service1')
-            ]
-          ]
+          },
+          {
+            startTime: 80,
+            endTime: 100,
+            services: [{startTime: 0, endTime: 100, value: 'service1', id: 0}]
+          }
         ]
       },
       {
@@ -380,44 +364,49 @@ testSuite({
           [120, 170, 'service1']
         ],
         expected: [
-          [0, 75, 1,
-            [
-             data.createAggregatedValue_(0, 'service1')
+          {
+            startTime: 0,
+            endTime: 75,
+            services: [{startTime: 0, endTime: 100, value: 'service1', id: 0}]
+          },
+          {
+            startTime: 75,
+            endTime: 100,
+            services: [
+              {startTime: 0, endTime: 100, value: 'service1', id: 0},
+              {startTime: 75, endTime: 150, value: 'service2', id: 1}
             ]
-          ],
-          [75, 100, 2,
-            [
-             data.createAggregatedValue_(0, 'service1'),
-             data.createAggregatedValue_(1, 'service2')
+          },
+          {
+            startTime: 100,
+            endTime: 120,
+            services: [{startTime: 75, endTime: 150, value: 'service2', id: 1}]
+          },
+          {
+            startTime: 120,
+            endTime: 150,
+            services: [
+              {startTime: 75, endTime: 150, value: 'service2', id: 1},
+              {startTime: 120, endTime: 170, value: 'service1', id: 2}
             ]
-          ],
-          [100, 120, 1,
-            [
-             data.createAggregatedValue_(1, 'service2'),
+          },
+          {
+            startTime: 150,
+            endTime: 170,
+            services: [
+              {startTime: 120, endTime: 170, value: 'service1', id: 2}
             ]
-          ],
-          [120, 150, 2,
-            [
-             data.createAggregatedValue_(1, 'service2'),
-             data.createAggregatedValue_(2, 'service1')
-           ]
-          ],
-          [150, 170, 1,
-            [
-             data.createAggregatedValue_(2, 'service1')
-            ]
-          ]
+          }
         ]
       },
     ];
 
     tests.forEach(function(t) {
       var output = data.aggregateData_(testUtils.createData(t.series));
-      var expectedSeries = createAggregatedValues(t.expected);
-      var expectedValues = expectedSeries.sort(compareEntries);
+      var expectedValues = t.expected.sort(compareEntries);
 
       assertEquals(output.length, expectedValues.length);
-      output.every(function(element, index) {
+      output.forEach(function(element, index) {
         var msg = t.desc + ': Expected ' + JSON.stringify(expectedValues) +
             ', got ' + JSON.stringify(output);
         assertObjectEquals(msg, expectedValues[index], element);
@@ -432,44 +421,54 @@ testSuite({
       {
         desc: 'Simple cluster',
         values: [
-          [0, 100, 'service1'],
-          [110, 200, 'service2'],
-          [3000, 10000, 'service2'],
-          [20000, 30000, 'service2'],
-          [30100, 30200, 'service3'],
-          [101000, 102000, 'service1']
+          [0, 100, 's1'],
+          [110, 200, 's2'],
+          [3000, 10000, 's2'],
+          [20000, 30000, 's2'],
+          [30100, 30200, 's3'],
+          [101000, 102000, 's1']
         ],
         expected: [
           {
-            'startTime': 0,
-            'endTime': 10000,
-            'clusteredCount': 3,
-            'activeDuration': 7190,
-            'clusteredValues': createExpectedClusteredValues([
-              [1, 100, 'service1', {}],
-              [2, 7090, 'service2', {}]
-            ])
+            startTime: 0,
+            endTime: 10000,
+            clusteredCount: 3,
+            activeDuration: 7190,
+            clusteredValues: {
+              [JSON.stringify('s1')]: {
+                count: 1, duration: 100, value: 's1', ids: {}, extra: []
+              },
+              [JSON.stringify('s2')]: {
+                count: 2, duration: 7090, value: 's2', ids: {}, extra: []
+              }
+            }
           },
           // New cluster as entry and previous cluster duration is greater
           // than minDuration
           {
-            'startTime': 20000,
-            'endTime': 30200,
-            'clusteredCount': 2,
-            'activeDuration': 10100,
-            'clusteredValues': createExpectedClusteredValues([
-              [1, 10000, 'service2', {}],
-              [1, 100, 'service3', {}],
-            ])
+            startTime: 20000,
+            endTime: 30200,
+            clusteredCount: 2,
+            activeDuration: 10100,
+            clusteredValues: {
+              [JSON.stringify('s2')]: {
+                count: 1, duration: 10000, value: 's2', ids: {}, extra: []
+              },
+              [JSON.stringify('s3')]: {
+                count: 1, duration: 100, value: 's3', ids: {}, extra: []
+              }
+            }
           },
           {
-            'startTime': 101000,
-            'endTime': 102000,
-            'clusteredCount': 1,
-            'activeDuration': 1000,
-            'clusteredValues': createExpectedClusteredValues([
-              [1, 1000, 'service1', {}],
-            ])
+            startTime: 101000,
+            endTime: 102000,
+            clusteredCount: 1,
+            activeDuration: 1000,
+            clusteredValues: {
+              [JSON.stringify('s1')]: {
+                count: 1, duration: 1000, value: 's1', ids: {}, extra: []
+              }
+            }
           }
         ],
         cluster: true
@@ -477,57 +476,67 @@ testSuite({
       {
         desc: 'Clustering disabled',
         values: [
-          [0, 100, 'service1'],
-          [110, 200, 'service2'],
-          [3000, 10000, 'service2'],
-          [20000, 30000, 'service2'],
-          [30100, 30200, 'service3']
+          [0, 100, 's1'],
+          [110, 200, 's2'],
+          [3000, 10000, 's2'],
+          [20000, 30000, 's2'],
+          [30100, 30200, 's3']
         ],
         expected: [
           {
-            'startTime': 0,
-            'endTime': 100,
-            'clusteredCount': 1,
-            'activeDuration': 100,
-            'clusteredValues': createExpectedClusteredValues([
-              [1, 100, 'service1', {}]
-            ])
+            startTime: 0,
+            endTime: 100,
+            clusteredCount: 1,
+            activeDuration: 100,
+            clusteredValues: {
+              [JSON.stringify('s1')]: {
+                count: 1, duration: 100, value: 's1', ids: {}, extra: []
+              }
+            }
           },
           {
-            'startTime': 110,
-            'endTime': 200,
-            'clusteredCount': 1,
-            'activeDuration': 90,
-            'clusteredValues': createExpectedClusteredValues([
-              [1, 90, 'service2', {}]
-            ])
+            startTime: 110,
+            endTime: 200,
+            clusteredCount: 1,
+            activeDuration: 90,
+            clusteredValues: {
+              [JSON.stringify('s2')]: {
+                count: 1, duration: 90, value: 's2', ids: {}, extra: []
+              }
+            }
           },
           {
-            'startTime': 3000,
-            'endTime': 10000,
-            'clusteredCount': 1,
-            'activeDuration': 7000,
-            'clusteredValues': createExpectedClusteredValues([
-              [1, 7000, 'service2', {}]
-            ])
+            startTime: 3000,
+            endTime: 10000,
+            clusteredCount: 1,
+            activeDuration: 7000,
+            clusteredValues: {
+              [JSON.stringify('s2')]: {
+                count: 1, duration: 7000, value: 's2', ids: {}, extra: []
+              }
+            }
           },
           {
-            'startTime': 20000,
-            'endTime': 30000,
-            'clusteredCount': 1,
-            'activeDuration': 10000,
-            'clusteredValues': createExpectedClusteredValues([
-              [1, 10000, 'service2', {}]
-            ])
+            startTime: 20000,
+            endTime: 30000,
+            clusteredCount: 1,
+            activeDuration: 10000,
+            clusteredValues: {
+              [JSON.stringify('s2')]: {
+                count: 1, duration: 10000, value: 's2', ids: {}, extra: []
+              }
+            }
           },
           {
-            'startTime': 30100,
-            'endTime': 30200,
-            'clusteredCount': 1,
-            'activeDuration': 100,
-            'clusteredValues': createExpectedClusteredValues([
-              [1, 100, 'service3', {}]
-            ])
+            startTime: 30100,
+            endTime: 30200,
+            clusteredCount: 1,
+            activeDuration: 100,
+            clusteredValues: {
+              [JSON.stringify('s3')]: {
+                count: 1, duration: 100, value: 's3', ids: {}, extra: []
+              }
+            }
           }
         ],
         cluster: false
@@ -553,36 +562,44 @@ testSuite({
    */
   testClusteringAggregated: function() {
     var values = [
-      [0, 100, 1, [
-        data.createAggregatedValue_(1, 'service1')]
-      ],
-      [100, 200, 1, [
-        data.createAggregatedValue_(1, 'service1')]
-      ],
-      [100, 300, 1, [
-        data.createAggregatedValue_(2, 'service2')]
-      ],
+      {
+        startTime: 0,
+        endTime: 100,
+        services: [{startTime: 0, endTime: 100, value: 's1', id: 1}]
+      },
+      {
+        startTime: 100,
+        endTime: 200,
+        services: [{startTime: 100, endTime: 200, value: 's1', id: 1}]
+      },
+      {
+        startTime: 100,
+        endTime: 300,
+        services: [{startTime: 100, endTime: 300, value: 's2', id: 2}]
+      }
     ];
     var expected = [
       {
-        'startTime': 0,
-        'endTime': 300,
-        'clusteredCount': 2,
-        'activeDuration': 400,
-        'clusteredValues': createExpectedClusteredValues([
-          [1, 200, data.createAggregatedValue_(1, 'service1'), {
-            1: true
-          }],
-          [1, 200, data.createAggregatedValue_(2, 'service2'), {
-            2: true
-          }]
-        ])
+        startTime: 0,
+        endTime: 300,
+        firstEntryEndTime: 100,
+        clusteredCount: 2,
+        activeDuration: 400,
+        clusteredValues: {
+          [JSON.stringify('s1')]: {
+            // Since both s1 entries had ID 1, they are only counted once.
+            count: 1, duration: 200, value: 's1', ids: {1: true}, extra: []
+          },
+          [JSON.stringify('s2')]: {
+            count: 1, duration: 200, value: 's2', ids: {2: true}, extra: []
+          }
+        }
       }
     ];
     var aggregated = {
       name: 'test',
       type: 'service',
-      values: createAggregatedValues(values),
+      values: values,
       cluster: true
     };
     var clustered = data.cluster([
@@ -608,7 +625,8 @@ testSuite({
     var csv =
         'metric,type,start_time,end_time,value,opt\n' +
         'CPU running,service,1000,5000,1000~wr1|2000~wr2|3000~wr3,\n';
-    var testData = data.processHistorianV2Data(csv, 2300, {}, '', true);
+    var logs = [{source: historianV2Logs.Sources.BATTERY_HISTORY, csv: csv}];
+    var testData = data.processHistorianV2Data(logs, 2300, {}, '', true);
 
     var runningGroup = testData.nameToBarGroup[Csv.CPU_RUNNING];
     assertNotNull(runningGroup);
@@ -807,15 +825,14 @@ testSuite({
       {
         desc: 'Unknown wakeup reason for running entry',
         running: [
-          [100, 200, '200~Unknown wakeup reason']
+          [100, 200, '200~Unknown']
         ],
         expected: [
-          [100, 200, 1,
-            [
-              data.createRunningValue_(
-                  100, 200, 'Unknown wakeup reason')
-            ]
-          ]
+          {
+            startTime: 100,
+            endTime: 200,
+            services: [{startTime: 100, endTime: 200, value: 'Unknown'}]
+          }
         ]
       },
       {
@@ -824,12 +841,11 @@ testSuite({
           [100, 200, '200~']
         ],
         expected: [
-          [100, 200, 1,
-            [
-              data.createRunningValue_(
-                  100, 200, '')
-            ]
-          ]
+          {
+            startTime: 100,
+            endTime: 200,
+            services: [{startTime: 100, endTime: 200, value: ''}]
+          }
         ]
       },
       {
@@ -845,18 +861,33 @@ testSuite({
           ]
         ],
         expected: [
-          [1000, 4000, 4,
-            [
-              data.createRunningValue_(1000, 2000,
-                  'Abort:Pending Wakeup Sources: ipc00000177_FLP Service Cal '),
-              data.createRunningValue_(2000, 2500,
-                  'Abort:Pending Wakeup Sources: sh2ap_wakelock '),
-              data.createRunningValue_(2500, 3500,
-                  'Abort:Some devices failed to suspend'),
-              data.createRunningValue_(3500, 4500,
-                  'Abort:Pending Wakeup Sources: sh2ap_wakelock ')
+          {
+            startTime: 1000,
+            endTime: 4000,
+            services: [
+              {
+                startTime: 1000,
+                endTime: 2000,
+                value:
+                    'Abort:Pending Wakeup Sources: ipc00000177_FLP Service Cal '
+              },
+              {
+                startTime: 2000,
+                endTime: 2500,
+                value: 'Abort:Pending Wakeup Sources: sh2ap_wakelock '
+              },
+              {
+                startTime: 2500,
+                endTime: 3500,
+                value: 'Abort:Some devices failed to suspend'
+              },
+              {
+                startTime: 3500,
+                endTime: 4500,
+                value: 'Abort:Pending Wakeup Sources: sh2ap_wakelock '
+              }
             ]
-          ]
+          }
         ]
       }
     ];
@@ -865,9 +896,8 @@ testSuite({
       var running =
           createTestSeries(t.running, true, Csv.CPU_RUNNING, 'string');
 
-      var expectedValues = createAggregatedValues(t.expected);
       var output = data.splitRunningValues_(running);
-      assertArrayEquals(t.desc, expectedValues, output);
+      assertArrayEquals(t.desc, t.expected, output);
     });
   },
   /**
@@ -877,21 +907,41 @@ testSuite({
    */
   testAddUnavailableSeries: function() {
     // Report start time is 4000.
-    var csv = [
+    var batteryHistory = [
       'metric,type,start_time,end_time,value,opt',
-      'Wifi running,bool,4000,10000,true,',
-      'AM Low Memory,service,7000,8000,20,',
-      'ANR,service,9000,10000,2103~com.google.test~-flag~reason~,',
-      'Crashes,service,8000,9000,com.google.test,1',
+      'Wifi running,bool,4000,10000,true,'
     ].join('\n');
 
-    var groupToLogStart = {};
-    groupToLogStart[Csv.CRASHES] = 2000;  // Before report start time.
-    groupToLogStart[Csv.AM_LOW_MEMORY_ANR] = 5000;  // After report start time.
-    groupToLogStart['Group not in csv'] = 1000;  // Shouldn't actually happen.
+    var eventLog = [
+      'metric,type,start_time,end_time,value,opt',
+      'AM Low Memory,service,7000,8000,20,',
+      'ANR,service,9000,10000,"2103,com.google.test,-flag,reason,",'
+    ].join('\n');
 
-    var result =
-        data.processHistorianV2Data(csv, 2300, {}, '', true, groupToLogStart);
+    var logcat = [
+      'metric,type,start_time,end_time,value,opt',
+      'Crashes,service,8000,9000,com.google.test,1'
+    ].join('\n');
+
+    var logs = [
+      {
+        source: historianV2Logs.Sources.BATTERY_HISTORY,
+        csv: batteryHistory
+      },
+      // Begins after report start time.
+      {
+        source: historianV2Logs.Sources.EVENT_LOG,
+        csv: eventLog,
+        startMs: 5000
+      },
+      // Begins before report start time.
+      {
+        source: historianV2Logs.Sources.LOGCAT,
+        csv: logcat,
+        startMs: 2000
+      }
+    ];
+    var result = data.processHistorianV2Data(logs, 2300, {}, '', true);
 
     var wantGroups = [Csv.AM_LOW_MEMORY_ANR, Csv.CRASHES, Csv.WIFI_RUNNING];
     var gotGroups = Object.keys(result.nameToBarGroup);
@@ -911,5 +961,185 @@ testSuite({
     assertEquals(metrics.UNAVAILABLE_TYPE, gotSeries.type);
     assertEquals('Report start time', 4000, gotSeries.values[0].startTime);
     assertEquals('Log start time', 5000, gotSeries.values[0].endTime);
+  },
+  /**
+   * Tests whether events of aggregated series are merged correctly.
+   */
+  testMergeSplitEntries() {
+    var tests = [
+      {
+        desc: 'Event has been split up multiple times',
+        eventsToMerge: [
+          {
+            startTime: 0,
+            endTime: 100,
+            services: [{startTime: 0, endTime: 400, value: 'service1', id: 0}]
+          },
+          {
+            startTime: 100,
+            endTime: 200,
+            services: [{startTime: 0, endTime: 400, value: 'service1', id: 0}]
+          },
+          {
+            startTime: 200,
+            endTime: 300,
+            services: [{startTime: 0, endTime: 400, value: 'service1', id: 0}]
+          },
+          {
+            startTime: 300,
+            endTime: 400,
+            services: [{startTime: 0, endTime: 400, value: 'service1', id: 0}]
+          },
+          // This is an event with a different UID shouldn't be merged.
+          {
+            startTime: 400,
+            endTime: 500,
+            services: [{startTime: 400, endTime: 500, value: 'service1', id: 1}]
+          }
+        ],
+        expected: [
+          {
+            startTime: 0,
+            endTime: 400,
+            services: [{startTime: 0, endTime: 400, value: 'service1', id: 0}]
+          },
+          {
+            startTime: 400,
+            endTime: 500,
+            services: [{startTime: 400, endTime: 500, value: 'service1', id: 1}]
+          }
+        ]
+      },
+      {
+        desc: 'Multiple different events',
+        eventsToMerge: [
+          {
+            startTime: 0,
+            endTime: 100,
+            services: [{startTime: 0, endTime: 200, value: 'service1', id: 0}]
+          },
+          {
+            startTime: 100,
+            endTime: 200,
+            services: [{startTime: 0, endTime: 200, value: 'service1', id: 0}]
+          },
+          {
+            startTime: 200,
+            endTime: 300,
+            services: [{startTime: 200, endTime: 400, value: 'service2', id: 1}]
+          },
+          {
+            startTime: 300,
+            endTime: 400,
+            services: [{startTime: 200, endTime: 400, value: 'service2', id: 1}]
+          }
+        ],
+        expected: [
+          {
+            startTime: 0,
+            endTime: 200,
+            services: [{startTime: 0, endTime: 200, value: 'service1', id: 0}]
+          },
+          {
+            startTime: 200,
+            endTime: 400,
+            services: [{startTime: 200, endTime: 400, value: 'service2', id: 1}]
+          }
+        ]
+      },
+      {
+        desc: 'Entry with multiple events should not be merged',
+        eventsToMerge: [
+          {
+            startTime: 0,
+            endTime: 100,
+            services: [{startTime: 0, endTime: 400, value: 'service1', id: 0}]
+          },
+          {
+            startTime: 100,
+            endTime: 200,
+            services: [
+              {startTime: 0, endTime: 400, value: 'service1', id: 0},
+              {startTime: 100, endTime: 200, value: 'service2', id: 1}
+            ]
+          },
+          {
+            startTime: 200,
+            endTime: 300,
+            services: [{startTime: 0, endTime: 400, value: 'service1', id: 0}]
+          },
+          {
+            startTime: 300,
+            endTime: 400,
+            services: [{startTime: 0, endTime: 400, value: 'service1', id: 0}]
+          }
+        ],
+        expected: [
+          {
+            startTime: 0,
+            endTime: 100,
+            services: [{startTime: 0, endTime: 400, value: 'service1', id: 0}]
+          },
+          {
+            startTime: 100,
+            endTime: 200,
+            services: [
+              {startTime: 0, endTime: 400, value: 'service1', id: 0},
+              {startTime: 100, endTime: 200, value: 'service2', id: 1}
+            ]
+          },
+          {
+            startTime: 200,
+            endTime: 400,
+            services: [{startTime: 0, endTime: 400, value: 'service1', id: 0}]
+          }
+        ]
+      },
+      {
+        desc: 'Single event',
+        eventsToMerge: [
+          {
+            startTime: 0,
+            endTime: 100,
+            services: [{startTime: 0, endTime: 400, value: 'service1', id: 0}]
+          }
+        ],
+        expected: [
+          {
+            startTime: 0,
+            endTime: 100,
+            services: [{startTime: 0, endTime: 400, value: 'service1', id: 0}]
+          }
+        ]
+      }
+    ];
+    tests.forEach(function(test) {
+      data.mergeSplitEntries(test.eventsToMerge);
+      assertArrayEquals(test.desc, test.expected, test.eventsToMerge);
+    });
+  },
+  /**
+   * Tests that metrics are aggregated when they have overlapping entries.
+   */
+  testDetermineAggregate: function() {
+    var csv =
+        'metric,type,start_time,end_time,value,opt\n' +
+        Csv.SYNC_APP + ',service,1000,2000,com.google.example.1\n' +
+        'Overlapping,service,3000,4000,com.google.example.2\n' +
+        'Overlapping,service,7000,9000,com.google.example.3\n' +
+        'Overlapping,service,3500,5000,com.google.example.3\n' +
+        'Non overlapping,service,2000,5000,com.google.example.2\n' +
+        'Non overlapping,service,5000,7000,com.google.example.3\n';
+    var logs = [{source: historianV2Logs.Sources.BATTERY_HISTORY, csv: csv}];
+    var wantAggregated = [Csv.SYNC_APP, 'Overlapping'];
+    var wantNonAggregated = ['Non overlapping'];
+
+    data.processHistorianV2Data(logs, 2300, {}, '', true);
+    wantAggregated.forEach(function(metric) {
+      assertTrue(metrics.isAggregatedMetric(metric));
+    });
+    wantNonAggregated.forEach(function(metric) {
+      assertFalse(metrics.isAggregatedMetric(metric));
+    });
   }
 });

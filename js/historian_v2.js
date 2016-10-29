@@ -32,17 +32,24 @@ goog.require('historian.power.Overlay');
 
 /**
  * Creates a historian v2 plot.
- * @param {!jQuery} container The panel body container of the plot.
+ * @param {!jQuery} container Container the timeline is rendered in.
  * @param {!historian.HistorianV2Data} data The data for rendering Historian V2.
  * @param {!historian.LevelSummaryData} levelSummaryData
  * @param {!historian.State} state Global Historian state.
  * @param {?jQuery} powerStatsContainer The panel body container for the power
  *     statistics.
+ * @param {!jQuery} panel The panel body container of the plot. Used for
+ *     calculating rendered sizes.
+ * @param {!Object<boolean>} barHidden Groups hidden by default.
+ * @param {!Array<string>} barOrder Order of groups rendered as bars.
  * @constructor
  * @struct
  */
-historian.HistorianV2 =
-    function(container, data, levelSummaryData, state, powerStatsContainer) {
+historian.HistorianV2 = function(container, data, levelSummaryData, state,
+    powerStatsContainer, panel, barHidden, barOrder) {
+  /** @private @const {!jQuery} */
+  this.panel_ = panel;
+
   /** @private @const {!jQuery} */
   this.container_ = container;
 
@@ -52,18 +59,22 @@ historian.HistorianV2 =
   /** @private {!historian.LevelSummaryData} */
   this.levelSummaryData_ = levelSummaryData;
 
+  /** @private {!Object<!Array<(!historian.Entry)>>} */
+  this.summaryData_ = data.nameToSummary;
+
   /** @private {!historian.State} */
   this.state_ = state;
 
   historian.color.generateSeriesColors(this.data_.nameToBarGroup);
 
   /** @private {!historian.BarData} */
-  var barData = new historian.BarData(this.data_.nameToBarGroup,
-      historian.metrics.hiddenBarMetrics, historian.metrics.ORDER, true);
+  var barData = new historian.BarData(this.container_,
+      this.data_.nameToBarGroup, barHidden, barOrder, true);
 
   /** @private {!historian.LevelData} */
-  this.levelData_ = new historian.LevelData(this.data_.nameToLevelGroup,
-      this.data_.defaultLevelMetric, this.data_.configs);
+  this.levelData_ = new historian.LevelData(
+      this.data_.nameToLevelGroup, this.data_.defaultLevelMetric,
+      this.data_.configs, this.container_);
 
   var config = this.levelData_.getConfig();
 
@@ -75,7 +86,8 @@ historian.HistorianV2 =
       barData,
       this.levelData_,
       this.zoomHandler_.bind(this),
-      this.data_.location
+      this.data_.location,
+      this.panel_
       );
 
   var running = this.data_.nameToBarGroup[historian.metrics.Csv.CPU_RUNNING];
@@ -89,21 +101,21 @@ historian.HistorianV2 =
   /** @private {!historian.Bars} */
   this.bars_ = new historian.Bars(this.context_, barData,
                                   this.levelData_,
-                                  this.data_.serviceMapper,
                                   this.data_.timeToDelta,
                                   this.state_,
-                                  powerEstimator);
+                                  powerEstimator,
+                                  this.container_);
   /** @private {!historian.LevelLine} */
-  this.levelLine_ = new historian.LevelLine(
-      this.context_, this.levelData_, this.levelSummaryData_);
+  this.levelLine_ = new historian.LevelLine(this.context_, this.levelData_,
+      this.levelSummaryData_, this.summaryData_, this.container_);
 
   /** @private {!historian.SeriesLevel} */
-  this.seriesLevel_ = new historian.SeriesLevel(
+  this.seriesLevel_ = new historian.SeriesLevel(this.container_,
       this.context_, barData, this.levelSummaryData_, this.state_);
 
   /** @private {!historian.power.Overlay} */
   this.powerOverlay_ = new historian.power.Overlay(
-      this.context_, this.levelData_, powerEstimator);
+      this.context_, this.levelData_, powerEstimator, this.container_);
 
   /**
    * Whether Historian v2 is currently being displayed.
@@ -121,13 +133,34 @@ historian.HistorianV2 =
 
 
 /**
+ * The properties of a Historian v2 timeline.
+ *
+ * panel: Selector of the panel the timeline container is in.
+ *     Used for calculating rendered sizes.
+ * tabSelector: Selector of the tab to render in and listen for tab shown
+ *     events. Undefined for comparison view timelines.
+ * container: Selector of the container the timeline is rendered in. This is
+ *     a descendant of the panel and tab containers (if applicable).
+ * historian: Reference to the constructed HistorianV2 object.
+ *
+ * @typedef {{
+ *   panel: string,
+ *   tabSelector: (string|undefined),
+ *   container: string,
+ *   historian: (!historian.HistorianV2|undefined)
+ * }}
+ */
+historian.HistorianV2.Timeline;
+
+
+/**
  * Clears the rendered level line and replaces it with a new level line created
  * from the level data.
  */
 historian.HistorianV2.prototype.onLevelSeriesChange = function() {
   this.levelLine_.clear();
-  this.levelLine_ = new historian.LevelLine(
-      this.context_, this.levelData_, this.levelSummaryData_);
+  this.levelLine_ = new historian.LevelLine(this.context_, this.levelData_,
+      this.levelSummaryData_, this.summaryData_, this.container_);
 };
 
 
@@ -145,7 +178,7 @@ historian.HistorianV2.prototype.setDisplayed = function(displayed) {
  * @private
  */
 historian.HistorianV2.prototype.handleResize_ = function() {
-  this.container_.on('historian.resize', this.resize_.bind(this));
+  this.panel_.on('historian.resize', this.resize_.bind(this));
 };
 
 
@@ -156,7 +189,9 @@ historian.HistorianV2.prototype.handleResize_ = function() {
 historian.HistorianV2.prototype.handleDataUpdate_ = function() {
   var updateLevelSummaries = this.levelLine_.renderLevelSummaries
       .bind(this.levelLine_);
-  $(this.container_)
+  // The events are triggered on the panel in historian.js, so it's used
+  // instead of this.container_.
+  this.panel_
       .on('historian.levelSummary.update', updateLevelSummaries)
       .on('historian.levelSummary.metrics', updateLevelSummaries)
       .on('historian.levelSummary.filter', updateLevelSummaries);

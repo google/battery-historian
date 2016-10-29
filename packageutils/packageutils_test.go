@@ -17,6 +17,7 @@ package packageutils
 import (
 	"fmt"
 	"reflect"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -302,10 +303,10 @@ func TestGuessPackageWithInvalidServices(t *testing.T) {
 
 	// Test invalid UID that will yield an error
 	pkg, err := GuessPackage("Here's my number, so call me maybe", "123-456-7890", packageList)
-	expErr := "error getting appID from string: strconv.ParseInt: parsing \"123-456-7890\": invalid syntax"
+	expErr := regexp.MustCompile(`error getting appID from string: .* parsing "123-456-7890": invalid syntax`)
 	if err == nil {
 		t.Errorf("Error not thrown with invalid unparsable UID")
-	} else if err.Error() != expErr {
+	} else if !expErr.MatchString(err.Error()) {
 		t.Errorf("Incorrect error. Got %s, want %s", err, expErr)
 	}
 	if pkg.GetPkgName() != "" {

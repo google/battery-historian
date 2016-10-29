@@ -16,8 +16,11 @@
 
 goog.provide('historian.metricsTest');
 goog.setTestOnly('historian.metricsTest');
+
 goog.require('goog.testing.jsunit');
 goog.require('historian.metrics');
+goog.require('historian.metrics.Csv');
+goog.require('historian.metrics.DataHasher');
 
 
 /**
@@ -25,12 +28,16 @@ goog.require('historian.metrics');
  */
 var testMetricsUnique = function() {
   var arraysToCheck = [
-    historian.metrics.ORDER,
-    historian.metrics.HIDDEN_BAR_METRICS_,
+    historian.metrics.BATTERY_HISTORY_ORDER,
+    historian.metrics.BATTERY_HISTORY_HIDDEN,
     historian.metrics.METRICS_TO_AGGREGATE_,
-    historian.metrics.APP_SPECIFIC_METRICS_,
-    historian.metrics.UNRELIABLE_METRICS_
+    historian.metrics.APP_SPECIFIC_METRICS_
   ];
+  var unreliable = [];
+  for (var rv in historian.metrics.UNRELIABLE_METRICS_) {
+    unreliable = unreliable.concat(historian.metrics.UNRELIABLE_METRICS_[rv]);
+  }
+  arraysToCheck.push(unreliable);
   arraysToCheck.forEach(function(a) {
     var seen = {};
     a.forEach(function(e) {
@@ -43,12 +50,92 @@ var testMetricsUnique = function() {
 
 
 /**
- * Tests that names for error metrics are generated correctly.
+ * Tests that names for metrics are generated correctly.
  */
-var testErrorMetrics = function() {
-  var metric = 'Test metric';
-  var expectedErrorMetric = 'Test metric [Error]';
-  var gotErrorMetric = historian.metrics.errorMetric(metric);
-  assertEquals(gotErrorMetric, expectedErrorMetric);
-  assertEquals(historian.metrics.baseMetric(gotErrorMetric), metric);
+var testMetricNames = function() {
+  var tests = [
+    {
+      name: 'Error metric',
+      metricType: historian.metrics.ERROR_TYPE,
+      want: 'Error metric [Error]'
+    },
+    {
+      name: 'Unavailable metric',
+      metricType: historian.metrics.UNAVAILABLE_TYPE,
+      want: 'Unavailable metric: no data'
+    },
+    {
+      name: 'Normal metric',
+      metricType: 'string',
+      want: 'Normal metric'
+    }
+  ];
+
+  tests.forEach(function(test) {
+    var got = historian.metrics.typedMetricName(test.metricType, test.name);
+    assertEquals('Modified metric name', test.want, got);
+    assertEquals('Original metric name', test.name,
+        historian.metrics.baseMetric(test.metricType, got));
+  });
+};
+
+
+/**
+ * Sorts the array by series log source, then name.
+ * @param {!Array<!historian.SeriesData>} series
+ */
+var sortSeries = function(series) {
+  series.sort(function(a, b) {
+    var sourceDiff = a.source.localeCompare(b.source);
+    return sourceDiff ? sourceDiff : a.name.localeCompare(b.name);
+  });
+};
+
+
+/**
+ * Tests adding and getting series via the data hasher.
+ */
+var testDataHasher = function() {
+  var allSeries = new historian.metrics.DataHasher();
+
+  var kernelBatteryHistory = {
+    name: historian.metrics.Csv.KERNEL_WAKESOURCE,
+    source: historian.historianV2Logs.Sources.BATTERY_HISTORY,
+    type: 'string',
+    values: [{startTime: 0, endTime: 10, value: 'test'}],
+    cluster: true
+  };
+  allSeries.add(kernelBatteryHistory);
+  assertObjectEquals(kernelBatteryHistory,
+      allSeries.getBatteryHistorySeries(kernelBatteryHistory.name));
+
+  // Try adding a series that already exists.
+  var kernelBatteryHistoryNew = {
+    name: kernelBatteryHistory.name,
+    source: kernelBatteryHistory.source,
+    type: kernelBatteryHistory.type,
+    values: [],  // Different values to original series.
+    cluster: kernelBatteryHistory.cluster
+  };
+  allSeries.add(kernelBatteryHistoryNew);
+  assertObjectEquals(kernelBatteryHistory,
+      allSeries.getBatteryHistorySeries(kernelBatteryHistory.name));
+
+  // Add a series from a different log with the same name.
+  var kernelTrace = {
+    name: historian.metrics.Csv.KERNEL_WAKESOURCE,
+    source: historian.historianV2Logs.Sources.KERNEL_TRACE,
+    type: 'string',
+    values: [],
+    cluster: true
+  };
+  allSeries.add(kernelTrace);
+  assertObjectEquals(kernelTrace,
+      allSeries.get(kernelTrace.source, kernelTrace.name));
+
+  var wantSeries = [kernelBatteryHistory, kernelTrace];
+  var gotSeries = allSeries.getAll();
+  sortSeries(wantSeries);
+  sortSeries(gotSeries);
+  assertArrayEquals(wantSeries, gotSeries);
 };

@@ -17,6 +17,10 @@ specific language governing permissions and limitations under the License.
   <span>Aggregated Checkin Stats:</span>
 </div>
 <div>
+  <input type="checkbox" id="show-low-metrics">
+  <label for="show-low-metrics" style="font-weight:normal;">
+    Show metrics with 0 values.<br>
+  </label>
   <table id="checkin" class="summary-content to-datatable no-paging no-ordering no-searching no-info">
     <thead>
       <tr>
@@ -53,6 +57,11 @@ specific language governing permissions and limitations under the License.
       <tr data-jump="#syncmanager-syncs" class="row-clickable table-jump">
         <td>Sync Activity</td>
         <td>{{.CheckinSummary.AggSyncTasks.Duration}} ({{.CheckinSummary.AggSyncTasks.Count}} times)</td>
+      </tr>
+
+      <tr data-jump="#jobscheduler-jobs" class="row-clickable table-jump">
+        <td>JobScheduler Activity</td>
+        <td>{{.CheckinSummary.AggScheduledJobs.Duration}} ({{.CheckinSummary.AggScheduledJobs.Count}} times)</td>
       </tr>
 
       <tr data-jump="#wakeups" class="row-clickable table-jump">
@@ -141,34 +150,55 @@ specific language governing permissions and limitations under the License.
       </tr>
 
       {{if ge .CheckinSummary.ReportVersion 14}}
+      <tr>
+        <td>Wifi Power Usage</td>
+        <td>{{printf "%.2f%%/hr, %.2f%% total" .CheckinSummary.WifiDischargeRatePerHr.V .CheckinSummary.WifiDischargePoints}}</td>
+      </tr>
+      <tr>
+        <td>Wifi Transfer Time</td>
+        <td>{{.CheckinSummary.WifiTransferTime.V}}</td>
+      </tr>
+      <tr>
+        <td>Wifi Idle Time</td>
+        <td>{{.CheckinSummary.WifiIdleTime.V}}</td>
+      </tr>
+      <tr>
+        <td>Bluetooth Power Usage</td>
+        <td>{{printf "%.2f%%/hr, %.2f%% total" .CheckinSummary.BluetoothDischargeRatePerHr.V .CheckinSummary.BluetoothDischargePoints}}</td>
+      </tr>
+      <tr>
+        <td>Bluetooth Transfer Time</td>
+        <td>{{.CheckinSummary.BluetoothTransferTime.V}}</td>
+      </tr>
+      <tr>
+        <td>Bluetooth Idle Time</td>
+        <td>{{.CheckinSummary.BluetoothIdleTime.V}}</td>
+      </tr>
+      <tr data-jump="#camera-use" class="row-clickable table-jump">
+        <td>Camera Use</td>
+        <td>{{.CheckinSummary.AggCameraUse.Duration}} ({{.CheckinSummary.AggCameraUse.Count}} times)</td>
+      </tr>
+      <tr data-jump="#flashlight-use" class="row-clickable table-jump">
+        <td>Flashlight Time</td>
+        <td>{{.CheckinSummary.AggFlashlightUse.Duration}} ({{.CheckinSummary.AggFlashlightUse.Count}} times)</td>
+      </tr>
+      {{end}}
+      {{if ge .CheckinSummary.ReportVersion 17}}
+        {{if .CheckinSummary.ModemDischargePoints}}
+        <!-- Not every device has modem power usage data -->
         <tr>
-          <td>Wifi On Time</td>
-          <td>{{.CheckinSummary.WifiOnTime.V }}</td>
+          <td>Modem Power Usage</td>
+          <td>{{printf "%.2f%%/hr, %.2f%% total" .CheckinSummary.ModemDischargeRatePerHr.V .CheckinSummary.ModemDischargePoints}}</td>
         </tr>
-        <tr>
-          <td>Wifi Idle Time</td>
-          <td>{{.CheckinSummary.WifiIdleTime.V }}</td>
-        </tr>
-        <tr>
-          <td>Wifi Transmit Time</td>
-          <td>{{.CheckinSummary.WifiTransmitTime.V }}</td>
-        </tr>
-        <tr>
-          <td>Wifi Power Usage</td>
-          <td>{{printf "%.2f%%/hr, %.2f%% total" .CheckinSummary.WifiDischargeRatePerHr.V .CheckinSummary.WifiDischargePoints}}</td>
-        </tr>
-        <tr>
-          <td>Bluetooth Idle Time</td>
-          <td>{{.CheckinSummary.BluetoothIdleTime.V }}</td>
-        </tr>
-        <tr>
-          <td>Bluetooth Transmit Time</td>
-          <td>{{.CheckinSummary.BluetoothTransmitTime.V }}</td>
-        </tr>
-        <tr>
-          <td>Bluetooth Power Usage</td>
-          <td>{{printf "%.2f%%/hr, %.2f%% total" .CheckinSummary.BluetoothDischargeRatePerHr.V .CheckinSummary.BluetoothDischargePoints}}</td>
-        </tr>
+        {{end}}
+      <tr>
+        <td>Modem Transfer Time</td>
+        <td>{{.CheckinSummary.ModemTransferTime.V}}</td>
+      </tr>
+      <tr>
+        <td>Modem Idle Time</td>
+        <td>{{.CheckinSummary.ModemIdleTime.V}}</td>
+      </tr>
       {{end}}
     </tbody>
   </table>
@@ -233,7 +263,9 @@ specific language governing permissions and limitations under the License.
         <th>Uid</th>
         <th class="duration">Duration / Hr</th>
         <th>Count / Hr</th>
-        <th class="duration">Total Duration</th>
+        <th class="duration" title="When wakelocks are held at the same time, the time is split evenly between them, so the time shown here is a lower bound of the total duration the named wakelock was held for.">
+          Minimum Duration
+        </th>
         <th>Total Count</th>
       </tr>
     </thead>
@@ -282,6 +314,49 @@ specific language governing permissions and limitations under the License.
     </thead>
     <tbody>
       {{range $i, $wl := .CheckinSummary.SyncTasks}}
+      <tr>
+        <td>{{$i}}</td>
+        <td>{{$wl.Name}}</td>
+        <td>{{$wl.UID}}</td>
+        <td class="to-norm-timeval">{{$wl.Duration}}</td>
+        <td class="to-norm-val">{{$wl.Count}}</td>
+        <td>{{$wl.Duration}}</td>
+        <td>{{$wl.Count}}</td>
+      </tr>
+      {{end}}
+    </tbody>
+  </table>
+</div>
+{{end}}
+
+{{if .CheckinSummary.ScheduledJobs}}
+<div class="summary-title-inline" id="jobscheduler-jobs">
+  <span>JobScheduler Jobs:</span>
+</div>
+<div class="summary-content sliding">
+  <table class="to-datatable to-highlight to-highlight-cell-only">
+    <colgroup>
+      <col span="1" width="5%">
+      <col span="1" width="45%">
+      <col span="1" width="10%">
+      <col span="1" width="10%">
+      <col span="1" width="10%">
+      <col span="1" width="10%">
+      <col span="1" width="10%">
+    </colgroup>
+    <thead>
+      <tr>
+        <th>Ranking</th>
+        <th>Name</th>
+        <th>Uid</th>
+        <th class="duration">Duration / Hr</th>
+        <th>Count / Hr</th>
+        <th class="duration">Total Duration</th>
+        <th>Total Count</th>
+      </tr>
+    </thead>
+    <tbody>
+      {{range $i, $wl := .CheckinSummary.ScheduledJobs}}
       <tr>
         <td>{{$i}}</td>
         <td>{{$wl.Name}}</td>
@@ -463,28 +538,20 @@ specific language governing permissions and limitations under the License.
       </tr>
     </thead>
     <tbody>
-      {{if ge .CheckinSummary.ReportVersion 12}}
-        {{range $i, $app := .CheckinSummary.WifiScanActivity}}
-        <tr>
-          <td>{{$i}}</td>
-          <td>{{$app.Name}}</td>
-          <td>{{$app.UID}}</td>
-          <td class="to-norm-timeval">{{$app.Duration}}</td>
-          <td class="to-norm-val">{{$app.Count}}</td>
-          <td>{{$app.Duration}}</td>
-          <td>{{$app.Count}}</td>
-        </tr>
+      {{range $i, $app := .CheckinSummary.WifiScanActivity}}
+      <tr>
+        <td>{{$i}}</td>
+        <td>{{$app.Name}}</td>
+        <td>{{$app.UID}}</td>
+        <td class="to-norm-timeval">{{$app.Duration}}</td>
+        {{if ge $.CheckinSummary.ReportVersion 12}}
+        <td class="to-norm-val">{{$app.Count}}</td>
         {{end}}
-      {{else}}
-        {{range $i, $app := .CheckinSummary.WifiScanActivity}}
-        <tr>
-          <td>{{$i}}</td>
-          <td>{{$app.Name}}</td>
-          <td>{{$app.UID}}</td>
-          <td class="to-norm-timeval">{{$app.Duration}}</td>
-          <td>{{$app.Duration}}</td>
-        </tr>
+        <td>{{$app.Duration}}</td>
+        {{if ge $.CheckinSummary.ReportVersion 12}}
+        <td>{{$app.Count}}</td>
         {{end}}
+      </tr>
       {{end}}
     </tbody>
   </table>
@@ -652,7 +719,10 @@ specific language governing permissions and limitations under the License.
 </div>
 <div class="summary-content sliding">
   {{if .CheckinSummary.AppWakeupsByAlarmName}}
-  <input type="checkbox" id="show-wakeup-breakdown">Break down wakeup alarms by alarm name<br>
+  <input type="checkbox" id="show-wakeup-breakdown">
+  <label for="show-wakeup-breakdown" style="font-weight:normal;">
+    Break down wakeup alarms by alarm name
+  </label><br>
   <div id="wakeup-breakdown" style="display:none">
     <table class="to-datatable">
       <colgroup>
@@ -705,15 +775,15 @@ specific language governing permissions and limitations under the License.
         </tr>
       </thead>
       <tbody>
-          {{range $i, $aw := .CheckinSummary.AppWakeups}}
-          <tr>
-            <td>{{$i}}</td>
-            <td>{{$aw.Name}}</td>
-            <td>{{$aw.UID}}</td>
-            <td>{{printf "%.2f" $aw.CountPerHr}}</td>
-            <td>{{$aw.Count}}</td>
-          </tr>
-          {{end}}
+        {{range $i, $aw := .CheckinSummary.AppWakeups}}
+        <tr>
+          <td>{{$i}}</td>
+          <td>{{$aw.Name}}</td>
+          <td>{{$aw.UID}}</td>
+          <td>{{printf "%.2f" $aw.CountPerHr}}</td>
+          <td>{{$aw.Count}}</td>
+        </tr>
+        {{end}}
       </tbody>
     </table>
   </div>
@@ -876,6 +946,70 @@ specific language governing permissions and limitations under the License.
         <td class="to-norm-val">{{$g.Count}}</td>
         <td>{{$g.Duration}}</td>
         <td>{{$g.Count}}</td>
+      </tr>
+      {{end}}
+    </tbody>
+  </table>
+</div>
+{{end}}
+
+{{if .CheckinSummary.AppStates}}
+<div class="summary-title-inline" id="app-states">
+  <span>Time Spent In Each App State:</span>
+</div>
+<div class="summary-content sliding">
+  <table class="to-datatable">
+    <colgroup>
+      <col span="1" width="35%">
+      <col span="1" width="5%">
+      <col span="1" width="10%">
+      <col span="1" width="10%">
+      <col span="1" width="10%">
+      <col span="1" width="10%">
+      <col span="1" width="10%">
+      <col span="1" width="10%">
+    </colgroup>
+    <thead>
+      <tr>
+        <th>Name</th>
+        <th>Uid</th>
+        <th class="duration">Top / Hr</th>
+        <th class="duration">Foreground Service / Hr</th>
+        <th class="duration">Top Sleeping / Hr</th>
+        <th class="duration">Foreground / Hr</th>
+        <th class="duration">Background / Hr</th>
+        <th class="duration">Cached / Hr</th>
+      </tr>
+    </thead>
+    <tbody>
+      {{range $i, $s := .CheckinSummary.AppStates}}
+      <tr>
+        <td>{{$s.Name}}</td>
+        <td>{{$s.UID}}</td>
+        <td class="to-norm-timeval"
+            title="{{$s.Top.V}} total">
+          {{$s.Top.V}}
+        </td>
+        <td class="to-norm-timeval"
+            title="{{$s.ForegroundService.V}} total">
+          {{$s.ForegroundService.V}}
+        </td>
+        <td class="to-norm-timeval"
+            title="{{$s.TopSleeping.V}} total">
+          {{$s.TopSleeping.V}}
+        </td>
+        <td class="to-norm-timeval"
+            title="{{$s.Foreground.V}} total">
+          {{$s.Foreground.V}}
+        </td>
+        <td class="to-norm-timeval"
+            title="{{$s.Background.V}} total">
+          {{$s.Background.V}}
+        </td>
+        <td class="to-norm-timeval"
+            title="{{$s.Cached.V}} total">
+          {{$s.Cached.V}}
+        </td>
       </tr>
       {{end}}
     </tbody>

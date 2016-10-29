@@ -78,6 +78,17 @@ historian.time.getTime = function(t, loc) {
 
 
 /**
+ * Returns the time zone in the short format. e.g. PDT UTC-07:00
+ * @param {number} t The unix timestamp.
+ * @param {string} loc The IANA time zone location.
+ * @return {string} The time zone in the short format.
+ */
+historian.time.getTimeZoneShort = function(t, loc) {
+  return moment(t).tz(loc).format('z UTCZ');
+};
+
+
+/**
  * Returns the ms duration formatted as a human readable string.
  * Format is "1h 3m 4s 30.25ms".
  * @param {number} duration The time duration in ms.

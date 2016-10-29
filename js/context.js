@@ -16,7 +16,6 @@
 
 goog.provide('historian.Context');
 
-goog.require('goog.math.Range');
 goog.require('historian.constants');
 goog.require('historian.time');
 
@@ -25,8 +24,7 @@ goog.require('historian.time');
 /**
  * Class containing the outer svg elements, axes, and scales.
  * Manages zoom events, calling redraw on registered objects.
- * @param {!jQuery} container The plot container located inside the panel.
- *     It has the plot's precise size (excluding paddings and margins).
+ * @param {!jQuery} container Container containing the graph.
  * @param {{min: number, max: number}} xExtent Min and max startTime value of
  *     the data.
  * @param {{min: number, max: number}} yDomain The input range for the y scale.
@@ -35,15 +33,17 @@ goog.require('historian.time');
  * @param {function()} zoomHandler Handler for zoom events.
  * @param {string} location The IANA time zone associated with the time data.
  *     e.g. 'Europe/London'.
+ * @param {!jQuery} panel Panel the timeline is rendered in, has the plot's size
+ *     (excluding paddings and margins).
  * @constructor
  * @struct
  */
 historian.Context = function(container, xExtent, yDomain, barData, levelData,
-    zoomHandler, location) {
+    zoomHandler, location, panel) {
   /** @private @const {!jQuery} */
-  this.container_ = container;
+  this.panel_ = panel;
   /** @const {!jQuery} */
-  this.graph = this.container_.find('.graph');
+  this.graph = container.find('.graph');
 
   var xDomainSpan = xExtent.max - xExtent.min;
   var xDomainMargin = xDomainSpan * 0.05;
@@ -65,12 +65,20 @@ historian.Context = function(container, xExtent, yDomain, barData, levelData,
   // Clear previous rendering.
   this.graph.children().remove();
 
+  // Copy the default SVG contents to the graph div.
+  this.graph.append(container.find('.svg-content svg').clone());
+
+  // SVG doesn't seem to like patterns having the same ID, but we can't access
+  // a pattern unless it's in the SVG, so append the container name to make it
+  // unique.
+  var svgPattern = this.graph.find('svg pattern');
+  svgPattern.attr('id', svgPattern.attr('id') + '-' + container.attr('id'));
+
   /**
    * The outer svg element.
    * @type {!Object}
    */
-  this.svg = d3.select(this.graph[0])
-      .append('svg');
+  this.svg = d3.select(this.graph[0]).select('svg');
 
   /**
    * Width and height of the SVG.
@@ -99,14 +107,6 @@ historian.Context = function(container, xExtent, yDomain, barData, levelData,
 
   /** @private {!historian.LevelData} */
   this.levelData_ = levelData;
-
-  /**
-   * Scale that maps each row to its y coordinate.
-   * @type {!d3.scaleType}
-   */
-  this.rowScale = d3.scale.linear()
-      .domain([0, this.barData_.getData().length])
-      .range([this.visSize[historian.constants.HEIGHT], 0]);
 
   /**
    * IANA time zone.
@@ -216,6 +216,15 @@ historian.Context = function(container, xExtent, yDomain, barData, levelData,
 
   this.renderAxes_();
 
+  /**
+   * Scale that maps each row to its y coordinate.
+   * @type {!d3.scaleType}
+   */
+  this.rowScale = d3.scale.linear()
+      .range([this.visSize[historian.constants.HEIGHT], 0]);
+
+  this.onSeriesChange();  // Set the row scale domain.
+
   /** @type {!d3.zoomType} */
   this.zoom = d3.behavior.zoom()
       .x(this.xScale)
@@ -279,7 +288,8 @@ historian.Context.prototype.invertPosition = function(pos) {
  */
 historian.Context.prototype.onSeriesChange = function() {
   var d = this.barData_.getData();
-  this.rowScale.domain([0, d.length]);
+  var minNumRows = this.visSize[historian.constants.HEIGHT] / 40;
+  this.rowScale.domain([0, Math.max(d.length, minNumRows)]);
 };
 
 
@@ -360,7 +370,19 @@ historian.Context.prototype.renderAxes_ = function() {
   // Add text for x axis.
   var xLabel = 'Time';
   if (this.location != '') {
-    xLabel += ' (' + this.location + ')';
+    // Convert the location to the short format time zone. e.g. PDT UTC-07:00
+    // The short format also depends on the timestamp. e.g. California uses
+    // PST-08:00 in the winter and PDT-07:00 in the summer.
+    // If the short format time zone calculated from the start of the bug
+    // report differs from that calculated from the end of the bug report,
+    // we show both (can happen if the bug report spans over daylight savings).
+    var startTimeZone =
+        historian.time.getTimeZoneShort(this.xDomain_[0], this.location);
+    var endTimeZone =
+        historian.time.getTimeZoneShort(this.xDomain_[1], this.location);
+    var shortTimeZone = startTimeZone == endTimeZone ? startTimeZone :
+        startTimeZone + ' -> ' + endTimeZone;
+    xLabel += ' (' + this.location + ' ' + shortTimeZone + ')';
   }
   this.svg.append('text')
       .attr('class', 'x-legend')
@@ -378,7 +400,10 @@ historian.Context.prototype.renderAxes_ = function() {
  */
 historian.Context.prototype.getSizes_ = function() {
   // Calculate new sizes of the SVG and visualization.
-  this.svgSize = [this.container_.width(), this.container_.height()];
+  this.svgSize = [
+    this.panel_.width(),
+    this.panel_.height() - this.panel_.find('.settings').height()
+  ];
   this.svgSize[historian.constants.WIDTH] = Math.max(
       this.svgSize[historian.constants.WIDTH],
       historian.Context.MIN_SVG_SIZE[historian.constants.WIDTH]
@@ -419,6 +444,8 @@ historian.Context.prototype.resize = function() {
       .range([0, this.visSize[historian.constants.WIDTH]]);
   this.yScale.range([this.visSize[historian.constants.HEIGHT], 0]);
   this.rowScale.range([this.visSize[historian.constants.HEIGHT], 0]);
+  // Need to recalculate the row scale to prevent rows from becoming too tall.
+  this.onSeriesChange();
   // Because the range is modified programatically,
   // we need to call this.zoom.x again.
   // However this would reset the scale to 1 and translate to [0, 0],
@@ -492,15 +519,12 @@ historian.Context.prototype.msPerPixel = function() {
 
 
 /**
- * Returns whether a data point is visible in the current time range.
- * @param {historian.Entry|historian.AggregatedEntry} v The data point.
- * @return {boolean} true if visible, false otherwise.
+ * Returns the start and end time of the currently viewable time range.
+ * @return {{start: number, end: number}}
  */
-historian.Context.prototype.inViewableRange = function(v) {
-  var startTime = this.xScale.invert(0);
-  var endTime = this.xScale.invert(this.visSize[historian.constants.WIDTH]);
-
-  var dataRange = new goog.math.Range(v.startTime, v.endTime);
-  var extent = new goog.math.Range(startTime, endTime);
-  return goog.math.Range.hasIntersection(dataRange, extent);
+historian.Context.prototype.getViewableTimeRange = function() {
+  return {
+    start: this.xScale.invert(0),
+    end: this.xScale.invert(this.visSize[historian.constants.WIDTH])
+  };
 };

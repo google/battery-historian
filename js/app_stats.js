@@ -32,6 +32,7 @@ goog.require('historian.utils');
 goog.forwardDeclare('batterystats.BatteryStats');
 goog.forwardDeclare('batterystats.BatteryStats.App');
 goog.forwardDeclare('batterystats.BatteryStats.App.Apk');
+goog.forwardDeclare('batterystats.BatteryStats.App.BluetoothMisc');
 goog.forwardDeclare('batterystats.BatteryStats.App.Child');
 goog.forwardDeclare('batterystats.BatteryStats.App.Network');
 goog.forwardDeclare('batterystats.BatteryStats.App.Process');
@@ -41,6 +42,7 @@ goog.forwardDeclare('batterystats.BatteryStats.App.Sync');
 goog.forwardDeclare('batterystats.BatteryStats.App.Wakelock');
 goog.forwardDeclare('batterystats.BatteryStats.App.WakeupAlarm');
 goog.forwardDeclare('batterystats.BatteryStats.App.Wifi');
+goog.forwardDeclare('batterystats.BatteryStats.ControllerActivity');
 
 
 /**
@@ -191,16 +193,76 @@ historian.appstats.displayAppApk = function(apk) {
 
 
 /**
+ * Creates table rows for the given controller data.
+ *
+ * @param {string} name Name to be used in the display.
+ * @param {batterystats.BatteryStats.ControllerActivity} controller
+ *     the controller field to create rows for.
+ * @return {!Array<!historian.TableRow>} Rows for the controller data.
+ */
+historian.appstats.getControllerActivityDetails = function(name, controller) {
+  if (!controller) {
+    return [];
+  }
+
+  var rows = [];
+
+  rows.push([
+    name + ' idle time',
+    controller.idle_time_msec ?
+        historian.time.formatDuration(controller.idle_time_msec) : '0s'
+  ]);
+  var tx_time_msec = 0;
+  var rx_time_msec = controller.rx_time_msec || 0;
+  if (controller.tx) {
+    tx_time_msec = controller.tx.reduce(function(prev, tx) {
+      var t = tx.time_msec || 0;
+      return prev + t;
+    }, 0);
+  }
+  rows.push([
+    name + ' transfer time',
+    goog.string.subs('%s total (%s receiving, %s transmitting)',
+        historian.time.formatDuration(rx_time_msec + tx_time_msec),
+        historian.time.formatDuration(rx_time_msec),
+        historian.time.formatDuration(tx_time_msec)
+    )
+  ]);
+  var powerMah = controller.power_mah;
+  if (powerMah) {
+    rows.push([
+      'Power used by ' + name.toLowerCase(),
+      historian.deviceCapacity > 0 ?
+          (100 * powerMah / historian.deviceCapacity).toFixed(2) + '%' :
+          powerMah + ' mAh'
+    ]);
+  }
+
+  return rows;
+};
+
+
+/**
  * Displays or hides the section detailing the app's network activity.
  *
  * @param {batterystats.BatteryStats.App.Network} network
  *     the Network field of the app proto
  * @param {batterystats.BatteryStats.App.Wifi} wifi
  *     the Wifi field of the app proto
+ * @param {batterystats.BatteryStats.ControllerActivity} wifi_controller
+ *     the wifi_controller field of the app proto
+ * @param {batterystats.BatteryStats.ControllerActivity} modem_controller
+ *     the modem_controller field of the app proto
+ * @param {batterystats.BatteryStats.ControllerActivity} bt_controller
+ *     the bluetooth_controller field of the app proto
+ * @param {batterystats.BatteryStats.App.BluetoothMisc} bt_misc
+ *     the bluetooth_misc field of the app proto
  */
-historian.appstats.displayAppNetworkInfo = function(network, wifi) {
+historian.appstats.displayAppNetworkInfo = function(network, wifi,
+    wifi_controller, modem_controller, bt_controller, bt_misc) {
   var section = $('#appNetworkInfoSection');
-  if (network || wifi) {
+  if (network || wifi || wifi_controller || modem_controller ||
+      bt_controller || bt_misc) {
     section.show();
     var bodyRows = [];
     if (network) {
@@ -243,6 +305,27 @@ historian.appstats.displayAppNetworkInfo = function(network, wifi) {
       row.title = 'Amount of time the app kept the mobile radio active';
       bodyRows.push(row);
       bodyRows.push(['Mobile active count', network.mobile_active_count]);
+
+      var btRx = network.bt_bytes_rx || 0;
+      var btTx = network.bt_bytes_tx || 0;
+      if (btRx || btTx) {
+        bodyRows.push([
+          'Bluetooth data transferred',
+          goog.string.subs('%s total (%s received, %s transmitted)',
+              historian.utils.describeBytes(btRx + btTx),
+              historian.utils.describeBytes(btRx),
+              historian.utils.describeBytes(btTx))
+        ]);
+      }
+
+      var mblWakeups = network.mobile_wakeup_count || 0;
+      var wfiWakeups = network.wifi_wakeup_count || 0;
+      if (mblWakeups) {
+        bodyRows.push(['Number of mobile radio wakeups', mblWakeups]);
+      }
+      if (wfiWakeups) {
+        bodyRows.push(['Number of wifi radio wakeups', wfiWakeups]);
+      }
     }
     if (wifi) {
       bodyRows.push([
@@ -250,7 +333,7 @@ historian.appstats.displayAppNetworkInfo = function(network, wifi) {
         wifi.full_wifi_lock_time_msec ?
             historian.time.formatDuration(wifi.full_wifi_lock_time_msec) : ''
       ]);
-      if (historian.appstats.reportVersion >= 12) {
+      if (historian.reportVersion >= 12) {
         // This was added during the time when the report version was 12 and
         // the BatteryStatsImpl version was 119, but some version
         // reports won't have this info.
@@ -263,7 +346,8 @@ historian.appstats.displayAppNetworkInfo = function(network, wifi) {
         wifi.scan_time_msec ?
             historian.time.formatDuration(wifi.scan_time_msec) : ''
       ]);
-      if (historian.appstats.reportVersion >= 14) {
+      if (historian.reportVersion >= 14 && historian.reportVersion < 17) {
+        // These fields were deprecated in report version 17.
         bodyRows.push([
           'Wifi idle time',
           wifi.idle_time_msec ?
@@ -287,6 +371,22 @@ historian.appstats.displayAppNetworkInfo = function(network, wifi) {
           )
         ]);
       }
+    }
+    bodyRows = bodyRows.concat(historian.appstats.getControllerActivityDetails(
+        'Wifi', wifi_controller));
+    bodyRows = bodyRows.concat(historian.appstats.getControllerActivityDetails(
+        'Modem', modem_controller));
+    bodyRows = bodyRows.concat(historian.appstats.getControllerActivityDetails(
+        'Bluetooth', bt_controller));
+    if (bt_misc) {
+      bodyRows.push([
+        'Bluetooth scanning',
+        goog.string.subs('%s times for %s total',
+            bt_misc.ble_scan_count ? bt_misc.ble_scan_count : 0,
+            bt_misc.ble_scan_time_msec ?
+            historian.time.formatDuration(bt_misc.ble_scan_time_msec) : '0s'
+            )
+          ]);
     }
     var table = historian.tables.createTable(null, bodyRows)
         .addClass('no-paging no-ordering no-info no-header');
@@ -313,11 +413,11 @@ historian.appstats.displayAppProcess = function(processes, states) {
   // believed to be reliable.
   var section = $('#appProcessSection');
   if ((processes && processes.length > 0) ||
-      (states && historian.appstats.reportVersion >= 17)) {
+      (states && historian.reportVersion >= 17)) {
     section.show();
     $('#appProcess').empty();
 
-    if (states && historian.appstats.reportVersion >= 17) {
+    if (states && historian.reportVersion >= 17) {
       var bodyRows = [];
       bodyRows.push([
         {
@@ -370,7 +470,7 @@ historian.appstats.displayAppProcess = function(processes, states) {
       historian.tables.activateTableCopy(table);
     }
     if ((processes && processes.length > 0) &&
-        (states && historian.appstats.reportVersion >= 17)) {
+        (states && historian.reportVersion >= 17)) {
       // Add space and identify the process list if both tables are being shown.
       $('#appProcess').append('<br><h4>Processes:</h4>');
     }
@@ -824,7 +924,9 @@ historian.appstats.displayApp = function(appUid) {
   historian.appstats.displayAppApk(app.RawStats.apk);
 
   historian.appstats.displayAppNetworkInfo(app.RawStats.network,
-      app.RawStats.wifi);
+      app.RawStats.wifi, app.RawStats.wifi_controller,
+      app.RawStats.modem_controller, app.RawStats.bluetooth_controller,
+      app.RawStats.bluetooth_misc);
 
   historian.appstats.displayAppProcess(app.RawStats.process,
       app.RawStats.state_time);
@@ -854,15 +956,15 @@ historian.appstats.showNoSelection = function() {
 
 /**
  * Gets the value of a specified field. Will assume the field is part of
- * RawStats unless the field starts with a period.
+ * RawStats unless the field starts with a period. For repeated fields, the sum
+ * of all the values of the specified field will be returned.
  *
- * @private
  * @param {!historian.AppStat} stat AppStat to get the value from.
  * @param {string} field Full path to the field (eg. flashlight.total_time_msec)
  * @return {string|number|undefined} The value of the field, or undefined if it
  * was not accessible.
  */
-historian.appstats.getValue_ = function(stat, field) {
+historian.appstats.getValue = function(stat, field) {
   var parts = field.split('.');
   var ret;
   var start;
@@ -878,6 +980,20 @@ historian.appstats.getValue_ = function(stat, field) {
     var f = parts[i];
     if (f in ret) {
       ret = ret[f];
+    } else if (Array.isArray(ret)) {
+      return ret.reduce(function(prev, cur) {
+        for (var j = i; j < parts.length; j++) {
+          var g = parts[j];
+          if (g in cur) {
+            cur = cur[g];
+          } else {
+            // The rest of the parts are undefined meaning there's nothing to
+            // get ...early return.
+            return prev;
+          }
+        }
+        return prev + cur;
+      },0);
     } else {
       // The rest of the parts are undefined meaning there's nothing to get
       // ...early return.
@@ -898,9 +1014,9 @@ historian.appstats.sortAppSelector_ = function() {
   var selected = $(historian.appstats.APP_SELECTOR_ID_).val();
 
   historian.appstats.appOptions.sort(function(a, b) {
-    var x = historian.appstats.getValue_(
+    var x = historian.appstats.getValue(
         a.stat, /** @type {string} */(selection));
-    var y = historian.appstats.getValue_(
+    var y = historian.appstats.getValue(
         b.stat, /** @type {string} */(selection));
 
     if (!x && !y) {
@@ -969,7 +1085,7 @@ historian.appstats.showSortedAppTable_ = function() {
   for (var i = 0; i < historian.appstats.appOptions.length; i++) {
     var appOption = historian.appstats.appOptions[i];
     var raw = appOption.stat.RawStats;
-    var val = historian.appstats.getValue_(appOption.stat,
+    var val = historian.appstats.getValue(appOption.stat,
         /** @type {string} */(selection));
     if (!val) {
       // Don't add it to the table if there's no data.

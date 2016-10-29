@@ -60,7 +60,14 @@ go run cmd/battery-historian/battery-historian.go [--port <default:9999>]
 
 To take a bug report from your Android device, you will need to enable USB debugging under `Settings > System > Developer Options`. On Android 4.2 and higher, the Developer options screen is hidden by default. You can enable this by following the instructions [here](<http://developer.android.com/tools/help/adb.html#Enabling>).
 
-To obtain a bug report from your development device:
+To obtain a bug report from your development device running Android 7.0 and
+higher:
+
+```
+$ adb bugreport bugreport.zip
+```
+
+For devices 6.0 and lower:
 
 ```
 $ adb bugreport > bugreport.txt

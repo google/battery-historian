@@ -146,7 +146,7 @@ func main() {
 			BuildFingerprint: proto.String(m.BuildFingerprint),
 		}
 
-		stats[i], warns, errs = checkinparse.ParseBatteryStats(&ctr, checkinparse.CreateCheckinReport(s), nil)
+		stats[i], warns, errs = checkinparse.ParseBatteryStats(&ctr, checkinparse.CreateBatteryReport(s), nil)
 
 		if len(errs) > 0 {
 			log.Fatalf("Could not parse battery stats: %v", errs)

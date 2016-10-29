@@ -29,13 +29,25 @@ specific language governing permissions and limitations under the License.
     <script src="//maxcdn.bootstrapcdn.com/bootstrap/3.3.6/js/bootstrap.min.js"></script>
 
     <script src="//cdnjs.cloudflare.com/ajax/libs/flot/0.8.3/jquery.flot.min.js" type="text/javascript"></script>
-    <script src="/third_party/flot-axislabels/jquery.flot.axislabels.js?ver={{.ResVersion}}" type="text/javascript"></script>
+    <script src="third_party/flot-axislabels/jquery.flot.axislabels.js?ver={{.ResVersion}}" type="text/javascript"></script>
     <script src="//www.benjaminbuffet.com/public/js/jquery.flot.orderBars.js" type="text/javascript"></script>
     <script src="//cdnjs.cloudflare.com/ajax/libs/flot/0.8.3/jquery.flot.pie.min.js" type="text/javascript"></script>
 
-    <link type="text/css" rel="stylesheet" href="/static/stylesheet.css?ver={{.ResVersion}}">
-    <link type="text/css" rel="stylesheet" href="/static/historian.css?ver={{.ResVersion}}">
-    <link type="text/css" rel="stylesheet" href="/static/histogram.css?ver={{.ResVersion}}">
+    <link type="text/css" rel="stylesheet" href="static/stylesheet.css?ver={{.ResVersion}}">
+    <link type="text/css" rel="stylesheet" href="static/historian.css?ver={{.ResVersion}}">
+    <link type="text/css" rel="stylesheet" href="static/histogram.css?ver={{.ResVersion}}">
+
+    <script src="//www.gstatic.com/external_hosted/jquery_form/jquery.form.min.js" charset="utf-8"></script>
+
+    <script type="text/javascript" src="//cdnjs.cloudflare.com/ajax/libs/d3/3.5.15/d3.js"></script>
+    {{ if .IsOptimizedJs }}
+    <script src="compiled/historian-optimized.js?ver={{.ResVersion}}"></script>
+    {{ else }}
+    <!-- Need to load Closure in header. -->
+    <script>CLOSURE_NO_DEPS=true</script>
+    <script type="text/javascript" src="third_party/closure-library/closure/goog/base.js"></script>
+    <script type="text/javascript" src="compiled/historian_deps-runfiles.js"></script>
+    {{ end }}
 
     <title>Battery Historian</title>
   </head>
@@ -44,16 +56,10 @@ specific language governing permissions and limitations under the License.
     <nav class="navbar navbar-inverse navbar-fixed-top">
       <div class="container-fluid">
         <div class="navbar-header">
-          <a href="/" class="navbar-brand">Battery Historian</a>
+          <a href="." class="navbar-brand">Battery Historian</a>
         </div>
         <div id="navbar" class="collapse navbar-collapse">
           <ul id="menu-top" class="nav navbar-nav navbar-right" style="display: none">
-            <li id="historian-series-groups" class="dropdown sdk-version-21">
-              <a href="#" class="dropdown-toggle" data-toggle="dropdown">Historian V2<span class="caret"></span></a>
-              <ul id="menu-data" class="dropdown-menu scrollable-menu">
-                <li class="dropdown-header">Configure metrics shown</li>
-              </ul>
-            </li>
             <li class="dropdown sdk-version-21">
               <a href="#" id="views-dropdown" class="dropdown-toggle" data-toggle="dropdown">Views<span class="caret"></span></a>
               <ul id="menu-views" class="dropdown-menu">
@@ -75,7 +81,7 @@ specific language governing permissions and limitations under the License.
                 </a></li>
               </ul>
             </li>
-            <li><a href="/" id="new-report">Analyze a new bugreport</a></li>
+            <li><a href="." id="new-report">Analyze a new bugreport</a></li>
           </ul>
         </div>
       </div>

@@ -133,6 +133,40 @@ func appID(app *bspb.BatteryStats_App) string {
 	return fmt.Sprintf("UNKNOWN_%d", u)
 }
 
+// ComputeDeltaFromSameDevice takes two Batterystats protos taken from the same device and outputs
+// a third one that contains the difference between the two, including fields that can only be
+// subtracted in special cases (same device and same start clock time). Second will be subtracted
+// from first.
+func ComputeDeltaFromSameDevice(first, second *bspb.BatteryStats) *bspb.BatteryStats {
+	d := ComputeDelta(first, second)
+	if d == nil || first.GetSystem().GetBattery().GetStartClockTimeMsec() != second.GetSystem().GetBattery().GetStartClockTimeMsec() {
+		// Nothing more we can do.
+		return d
+	}
+	if d.System == nil {
+		d.System = &bspb.BatteryStats_System{}
+	}
+	d.System.ChargeStep = subtractChargeStep(first.GetSystem().GetChargeStep(), second.GetSystem().GetChargeStep())
+	d.System.DischargeStep = subtractDischargeStep(first.GetSystem().GetDischargeStep(), second.GetSystem().GetDischargeStep())
+
+	// We can set the StartClockTime and these other fields because the reports came from the
+	// same device and have the same start clock time, so they are truly overlapping reports.
+	if d.System.Battery == nil {
+		d.System.Battery = &bspb.BatteryStats_System_Battery{}
+	}
+	d.System.Battery.StartClockTimeMsec = proto.Int64(
+		second.GetSystem().GetBattery().GetStartClockTimeMsec() + int64(second.GetSystem().GetBattery().GetTotalRealtimeMsec()))
+	d.StartTimeUsec = proto.Int64(d.GetSystem().GetBattery().GetStartClockTimeMsec() * 1e3)
+	d.EndTimeUsec = first.EndTimeUsec
+	if d.System.PowerUseSummary == nil {
+		d.System.PowerUseSummary = &bspb.BatteryStats_System_PowerUseSummary{}
+	}
+	// Battery capacity of the same device doesn't change.
+	d.System.PowerUseSummary.BatteryCapacityMah = proto.Float32(first.GetSystem().GetPowerUseSummary().GetBatteryCapacityMah())
+
+	return d
+}
+
 // ComputeDelta takes two protos and outputs a third one that
 // contains the difference between the two. Second will be subtracted from first.
 func ComputeDelta(first, second *bspb.BatteryStats) *bspb.BatteryStats {
@@ -290,12 +324,12 @@ func ComputeDelta(first, second *bspb.BatteryStats) *bspb.BatteryStats {
 	return nil
 }
 
-// SubtractChargeStep "subtracts" the ChargeStep data in one list from the data in the other list.
+// subtractChargeStep "subtracts" the ChargeStep data in one list from the data in the other list.
 // This function acts a little differently from ComputeDelta in that it will "subtract" the shorter list from
 // the longer list by only returning data in the longer list that is not in the shorter list.
 // The input lists must come from reports from the same device with the same StartClockTimeMsec, otherwise,
 // function behavior is undefined.
-func SubtractChargeStep(c1, c2 []*bspb.BatteryStats_System_ChargeStep) []*bspb.BatteryStats_System_ChargeStep {
+func subtractChargeStep(c1, c2 []*bspb.BatteryStats_System_ChargeStep) []*bspb.BatteryStats_System_ChargeStep {
 	if len(c1) == len(c2) {
 		return nil
 	}
@@ -308,12 +342,12 @@ func SubtractChargeStep(c1, c2 []*bspb.BatteryStats_System_ChargeStep) []*bspb.B
 	return c2[l1:]
 }
 
-// SubtractDischargeStep "subtracts" the DischargeStep data in one list from the data in the other list.
+// subtractDischargeStep "subtracts" the DischargeStep data in one list from the data in the other list.
 // This function acts a little differently from ComputeDelta in that it will "subtract" the shorter list from
 // the longer list by only returning data in the longer list that is not in the shorter list.
 // The input lists must come from reports from the same device with the same StartClockTimeMsec, otherwise,
 // function behavior is undefined.
-func SubtractDischargeStep(c1, c2 []*bspb.BatteryStats_System_DischargeStep) []*bspb.BatteryStats_System_DischargeStep {
+func subtractDischargeStep(c1, c2 []*bspb.BatteryStats_System_DischargeStep) []*bspb.BatteryStats_System_DischargeStep {
 	if len(c1) == len(c2) {
 		return nil
 	}

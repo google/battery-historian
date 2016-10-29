@@ -27,12 +27,16 @@ import (
 	"net/http"
 	"os"
 	"path"
+	"regexp"
 	"strings"
+	"sync"
+	"time"
 
 	"github.com/golang/protobuf/proto"
 
 	"github.com/google/battery-historian/activity"
 	"github.com/google/battery-historian/bugreportutils"
+	"github.com/google/battery-historian/checkindelta"
 	"github.com/google/battery-historian/checkinparse"
 	"github.com/google/battery-historian/checkinutil"
 	"github.com/google/battery-historian/historianutils"
@@ -41,6 +45,7 @@ import (
 	"github.com/google/battery-historian/parseutils"
 	"github.com/google/battery-historian/powermonitor"
 	"github.com/google/battery-historian/presenter"
+	"github.com/google/battery-historian/wearable"
 
 	bspb "github.com/google/battery-historian/pb/batterystats_proto"
 	sessionpb "github.com/google/battery-historian/pb/session_proto"
@@ -49,10 +54,19 @@ import (
 
 const (
 	// maxFileSize is the maximum file size allowed for uploaded package.
-	maxFileSize     = 50 * 1024 * 1024 // 50 MB Limit
-	minSupportedSDK = 21               // We only support Lollipop bug reports and above
+	maxFileSize = 50 * 1024 * 1024 // 50 MB Limit
 
+	minSupportedSDK        = 21 // We only support Lollipop bug reports and above
 	numberOfFilesToCompare = 2
+
+	// Historian V2 Log sources
+	batteryHistory  = "batteryhistory"
+	eventLog        = "eventlog"
+	kernelTrace     = "kerneltrace"
+	lastLogcat      = "lastlogcat"
+	powermonitorLog = "powermonitor"
+	systemLog       = "systemlog"
+	wearableLog     = "wearable"
 )
 
 var (
@@ -67,6 +81,10 @@ var (
 
 	// Initialized in SetResVersion()
 	resVersion int
+
+	// batteryRE is a regular expression that matches the time information for battery.
+	// e.g. 9,0,l,bt,0,86546081,70845214,99083316,83382448,1458155459650,83944766,68243903
+	batteryRE = regexp.MustCompile(`9,0,l,bt,(?P<batteryTime>.*)`)
 )
 
 type historianData struct {
@@ -79,21 +97,30 @@ type csvData struct {
 	errs []error
 }
 
+type historianV2Log struct {
+	// Log source that the CSV is generated from.
+	// e.g. "batteryhistory" or "eventlog".
+	Source string `json:"source"`
+	CSV    string `json:"csv"`
+	// Optional start time of the log as unix time in milliseconds.
+	StartMs int64 `json:"startMs"`
+}
+
 type uploadResponse struct {
 	SDKVersion          int                      `json:"sdkVersion"`
-	HistorianV2CSV      string                   `json:"historianV2Csv"`
+	HistorianV2Logs     []historianV2Log         `json:"historianV2Logs"`
 	LevelSummaryCSV     string                   `json:"levelSummaryCsv"`
 	DisplayPowermonitor bool                     `json:"displayPowermonitor"`
 	ReportVersion       int32                    `json:"reportVersion"`
 	AppStats            []presenter.AppStat      `json:"appStats"`
+	BatteryStats        *bspb.BatteryStats       `json:"batteryStats"`
 	DeviceCapacity      float32                  `json:"deviceCapacity"`
 	HistogramStats      presenter.HistogramStats `json:"histogramStats"`
 	TimeToDelta         map[string]string        `json:"timeToDelta"`
 	CriticalError       string                   `json:"criticalError"` // Critical errors are ones that cause parsing of important data to abort early and should be shown prominently to the user.
+	Note                string                   `json:"note"`          // A message to show to the user that they should be aware of.
 	FileName            string                   `json:"fileName"`
 	Location            string                   `json:"location"`
-	// GroupToLogStart is a map from logcat group name to the earliest start time of the logs the group's events were found in.
-	GroupToLogStart map[string]int64 `json:"groupToLogStart"`
 }
 
 type uploadResponseCompare struct {
@@ -247,7 +274,7 @@ func (pd *ParsedData) Data() []presenter.HTMLData {
 	return pd.data
 }
 
-// appendCSVs appends any parsed kernel or powermonitor CSVs to the Historian V2 CSV.
+// appendCSVs adds the parsed kernel and/or powermonitor CSVs to the HistorianV2Logs slice.
 func (pd *ParsedData) appendCSVs() error {
 	// Need to append the kernel and powermonitor CSV entries to the end of the existing CSV.
 	if pd.kd != nil {
@@ -257,7 +284,7 @@ func (pd *ParsedData) appendCSVs() error {
 		if len(pd.data) > 1 {
 			return errors.New("kernel trace file uploaded with more than one bug report")
 		}
-		pd.responseArr[0].HistorianV2CSV = appendCSVs(pd.responseArr[0].HistorianV2CSV, pd.kd.csv)
+		pd.responseArr[0].HistorianV2Logs = append(pd.responseArr[0].HistorianV2Logs, historianV2Log{Source: kernelTrace, CSV: pd.kd.csv})
 		pd.data[0].Error += historianutils.ErrorsToString(pd.kd.errs)
 	}
 
@@ -270,7 +297,7 @@ func (pd *ParsedData) appendCSVs() error {
 		}
 		pd.responseArr[0].DisplayPowermonitor = true
 		// Need to append the powermonitor CSV entries to the end of the existing CSV.
-		pd.responseArr[0].HistorianV2CSV = appendCSVs(pd.responseArr[0].HistorianV2CSV, pd.md.csv)
+		pd.responseArr[0].HistorianV2Logs = append(pd.responseArr[0].HistorianV2Logs, historianV2Log{Source: powermonitorLog, CSV: pd.md.csv})
 		pd.data[0].Error += historianutils.ErrorsToString(pd.md.errs)
 	}
 	return nil
@@ -314,25 +341,49 @@ func scriptsPath(dir, script string) string {
 // InitTemplates initializes the HTML templates after google.Init() is called.
 // google.Init() must be called before resources can be accessed.
 func InitTemplates(dir string) {
-	uploadTempl = template.Must(template.ParseFiles(
-		templatePath(dir, "base.html"), templatePath(dir, "body.html"), templatePath(dir, "upload.html"),
-	))
+	uploadTempl = constructTemplate(dir, []string{
+		"base.html",
+		"body.html",
+		"upload.html",
+	})
 
 	// base.html is intentionally excluded from resultTempl. resultTempl is loaded into the HTML
 	// generated by uploadTempl, so attempting to include base.html here causes some of the
 	// javascript files to be imported twice, which causes things to start blowing up.
-	resultTempl = template.Must(template.ParseFiles(
-		templatePath(dir, "body.html"), templatePath(dir, "summaries.html"),
-		templatePath(dir, "checkin.html"), templatePath(dir, "history.html"), templatePath(dir, "appstats.html"),
-		templatePath(dir, "tables.html"), templatePath(dir, "tablesidebar.html"),
-		templatePath(dir, "histogramstats.html"), templatePath(dir, "powerstats.html"),
-	))
-	compareTempl = template.Must(template.ParseFiles(
-		templatePath(dir, "body.html"), templatePath(dir, "compare_summaries.html"),
-		templatePath(dir, "compare_checkin.html"), templatePath(dir, "compare_history.html"),
-		templatePath(dir, "tablesidebar.html"), templatePath(dir, "tables.html"),
-		templatePath(dir, "appstats.html"), templatePath(dir, "histogramstats.html"),
-	))
+	resultTempl = constructTemplate(dir, []string{
+		"body.html",
+		"summaries.html",
+		"historian_v2.html",
+		"checkin.html",
+		"history.html",
+		"appstats.html",
+		"tables.html",
+		"tablesidebar.html",
+		"histogramstats.html",
+		"powerstats.html",
+	})
+
+	compareTempl = constructTemplate(dir, []string{
+		"body.html",
+		"compare_summaries.html",
+		"compare_checkin.html",
+		"compare_history.html",
+		"historian_v2.html",
+		"tablesidebar.html",
+		"tables.html",
+		"appstats.html",
+		"histogramstats.html",
+	})
+}
+
+// constructTemplate returns a new template constructed from parsing the template
+// definitions from the files with the given base directory and filenames.
+func constructTemplate(dir string, files []string) *template.Template {
+	var paths []string
+	for _, f := range files {
+		paths = append(paths, templatePath(dir, f))
+	}
+	return template.Must(template.ParseFiles(paths...))
 }
 
 // SetScriptsDir sets the directory of the Historian and kernel trace Python scripts.
@@ -398,7 +449,7 @@ func HTTPAnalyzeHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	var fs []UploadedFile
+	fs := make(map[string]UploadedFile)
 	//copy each part to destination.
 	for {
 		part, err := reader.NextPart()
@@ -467,13 +518,13 @@ func HTTPAnalyzeHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		fs = append(fs, UploadedFile{part.FormName(), fname, contents})
+		fs[part.FormName()] = UploadedFile{part.FormName(), fname, contents}
 	}
 	AnalyzeAndResponse(w, r, fs)
 }
 
 // AnalyzeAndResponse analyzes the uploaded files and sends the HTTP response in JSON.
-func AnalyzeAndResponse(w http.ResponseWriter, r *http.Request, files []UploadedFile) {
+func AnalyzeAndResponse(w http.ResponseWriter, r *http.Request, files map[string]UploadedFile) {
 	pd := &ParsedData{}
 	defer pd.Cleanup()
 	if err := pd.AnalyzeFiles(files); err != nil {
@@ -484,57 +535,47 @@ func AnalyzeAndResponse(w http.ResponseWriter, r *http.Request, files []Uploaded
 }
 
 // AnalyzeFiles processes and analyzes a bugreport package.
-func (pd *ParsedData) AnalyzeFiles(files []UploadedFile) error {
-	hasBugreport := false
-	for _, file := range files {
-		contents := string(file.Contents)
-		switch file.FileType {
-		case "bugreport", "bugreport2":
-			// Parse the bugreport.
-			if err := pd.parseBugReport(file.FileName, contents); err != nil {
-				return fmt.Errorf("error parsing bugreport: %v", err)
-			}
-			if file.FileType == "bugreport" {
-				hasBugreport = true
-			}
-			// Write the bug report to a file in case we need it to process a kernel trace file.
-			if len(pd.data) < numberOfFilesToCompare {
-				tmpFile, err := writeTempFile(contents)
-				if err != nil {
-					return fmt.Errorf("could not write bugreport: %v", err)
-				}
-				pd.bugReport = tmpFile
-			}
+func (pd *ParsedData) AnalyzeFiles(files map[string]UploadedFile) error {
+	fB, okB := files["bugreport"]
+	if !okB {
+		return errors.New("missing bugreport file")
+	}
 
-		case "kernel":
-			if !kernel.IsTrace(file.Contents) {
-				return fmt.Errorf("invalid kernel trace file: %v", file.FileName)
-			}
-			if pd.kernelTrace != "" {
-				log.Printf("more than one kernel trace file found")
-				continue
-			}
+	// Parse the bugreport.
+	fB2 := files["bugreport2"]
+	if err := pd.parseBugReport(fB.FileName, string(fB.Contents), fB2.FileName, string(fB2.Contents)); err != nil {
+		return fmt.Errorf("error parsing bugreport: %v", err)
+	}
+	// Write the bug report to a file in case we need it to process a kernel trace file.
+	if len(pd.data) < numberOfFilesToCompare {
+		tmpFile, err := writeTempFile(string(fB.Contents))
+		if err != nil {
+			return fmt.Errorf("could not write bugreport: %v", err)
+		}
+		pd.bugReport = tmpFile
+	}
+	if file, ok := files["kernel"]; ok {
+		if !kernel.IsTrace(file.Contents) {
+			return fmt.Errorf("invalid kernel trace file: %v", file.FileName)
+		}
+		if pd.kernelTrace != "" {
+			log.Printf("more than one kernel trace file found")
+		} else {
 			// Need bug report to process kernel trace file, so store the file for later processing.
-			tmpFile, err := writeTempFile(contents)
+			tmpFile, err := writeTempFile(string(file.Contents))
 			if err != nil {
 				return fmt.Errorf("could not write kernel trace file: %v", err)
 			}
 			pd.kernelTrace = tmpFile
-
-		case "powermonitor":
-			// Parse the powermonitor file.
-			if err := pd.parsePowermonitorFile(file.FileName, contents); err != nil {
-				return fmt.Errorf("error parsing powermonitor file: %v", err)
-			}
-		default:
-			// File does not have a supported file type.
-			return fmt.Errorf("invalid file %s of type %s", file.FileName, file.FileType)
+		}
+	}
+	if file, ok := files["powermonitor"]; ok {
+		// Parse the powermonitor file.
+		if err := pd.parsePowermonitorFile(file.FileName, string(file.Contents)); err != nil {
+			return fmt.Errorf("error parsing powermonitor file: %v", err)
 		}
 	}
 
-	if !hasBugreport {
-		return errors.New("missing bugreport file")
-	}
 	return nil
 }
 
@@ -563,9 +604,11 @@ func extractHistogramStats(data presenter.HTMLData) presenter.HistogramStats {
 		TotalAppCrashCount:                  data.CheckinSummary.TotalAppCrashCount,
 		WifiDischargeRatePerHr:              data.CheckinSummary.WifiDischargeRatePerHr,
 		BluetoothDischargeRatePerHr:         data.CheckinSummary.BluetoothDischargeRatePerHr,
+		ModemDischargeRatePerHr:             data.CheckinSummary.ModemDischargeRatePerHr,
 		WifiOnTimePercentage:                data.CheckinSummary.WifiOnTimePercentage,
-		WifiTransmitTimePercentage:          data.CheckinSummary.WifiTransmitTimePercentage,
-		BluetoothTransmitTimePercentage:     data.CheckinSummary.BluetoothTransmitTimePercentage,
+		WifiTransferTimePercentage:          data.CheckinSummary.WifiTransferTimePercentage,
+		BluetoothTransferTimePercentage:     data.CheckinSummary.BluetoothTransferTimePercentage,
+		ModemTransferTimePercentage:         data.CheckinSummary.ModemTransferTimePercentage,
 		TotalAppSyncsPerHr:                  data.CheckinSummary.TotalAppSyncsPerHr,
 		TotalAppWakeupsPerHr:                data.CheckinSummary.TotalAppWakeupsPerHr,
 		TotalAppCPUPowerPct:                 data.CheckinSummary.TotalAppCPUPowerPct,
@@ -594,141 +637,320 @@ func writeTempFile(contents string) (string, error) {
 }
 
 // parseBugReport analyzes the given bug report contents, and updates the ParsedData object.
-func (pd *ParsedData) parseBugReport(fname, contents string) error {
-	meta, err := bugreportutils.ParseMetaInfo(contents)
-	if err != nil {
-		// If there are issues getting the meta info, then the file is most likely not a bug report.
-		return errors.New("error parsing the bug report. Please provide a well formed bug report")
+// contentsB is an optional second bug report. If it's given and the Android IDs and batterystats
+// checkin start times are the same, a diff of the checkins will be saved, otherwise, they will be
+// saved as separate reports.
+func (pd *ParsedData) parseBugReport(fnameA, contentsA, fnameB, contentsB string) error {
+
+	doActivity := func(ch chan activity.LogsData, contents string, pkgs []*usagepb.PackageInfo) {
+		ch <- activity.Parse(pkgs, contents)
 	}
 
-	log.Printf("Trace started analyzing file.")
-	// Generate the Historian plot and parse batterystats and activity manager simultaneously.
-	historianCh := make(chan historianData)
-	summariesCh := make(chan summariesData)
-	checkinCh := make(chan checkinData)
-	activityManagerCh := make(chan activity.LogsData)
-	var loc string
+	doCheckin := func(ch chan checkinData, meta *bugreportutils.MetaInfo, bs string, pkgs []*usagepb.PackageInfo) {
+		var ctr checkinutil.IntCounter
+		s := &sessionpb.Checkin{
+			Checkin:          proto.String(bs),
+			BuildFingerprint: proto.String(meta.BuildFingerprint),
+		}
+		stats, warnings, errs := checkinparse.ParseBatteryStats(&ctr, checkinparse.CreateBatteryReport(s), pkgs)
+		if stats == nil {
+			errs = append(errs, errors.New("could not parse aggregated battery stats"))
+		} else {
+			pd.deviceType = stats.GetBuild().GetDevice()
+		}
+		ch <- checkinData{stats, warnings, errs}
+		log.Printf("Trace finished processing checkin.")
+	}
 
-	go func() {
+	doHistorian := func(ch chan historianData, fname, contents string) {
 		// Create a temporary file to save the bug report, for the Historian script.
 		brFile, err := writeTempFile(contents)
 		if err != nil {
-			historianCh <- historianData{err: err}
+			ch <- historianData{err: err}
 			return
 		}
 		// Don't run the Historian script if it could not create temporary file.
 		defer os.Remove(brFile)
 		html, err := generateHistorianPlot(fname, brFile)
-		historianCh <- historianData{html, err}
+		ch <- historianData{html, err}
 		log.Printf("Trace finished generating Historian plot.")
-	}()
+	}
 
-	var errs []error
-	ce := ""
-	if meta.SdkVersion < minSupportedSDK {
-		ce = "Unsupported bug report version."
-		errs = append(errs, errors.New("unsupported bug report version"))
-	} else {
-		// No point running these if we don't support the sdk version since we won't get any data from them.
-		bs := bugreportutils.ExtractBatterystatsCheckin(contents)
-		if strings.Contains(bs, "Exception occurred while dumping") {
-			ce = "Exception found in battery dump."
-			errs = append(errs, errors.New("exception found in battery dump"))
+	// bs is the batterystats section of the bug report
+	doSummaries := func(ch chan summariesData, bs string, pkgs []*usagepb.PackageInfo) {
+		ch <- analyze(bs, pkgs)
+		log.Printf("Trace finished processing summary data.")
+	}
+
+	doWearable := func(ch chan string, loc, contents string) {
+		if valid, output, _ := wearable.Parse(contents, loc); valid {
+			ch <- output
+		} else {
+			ch <- ""
 		}
-		// Extract device location.
-		go func() {
-			// Retrieve the bugreport end time by parsing the bugreport content.
-			// The bugreport time is preferred over calculating end time using TotalRealtimeMsec
-			// since TotalRealtimeMsec does not account for periods of time when the device was powered off.
-			d, err := bugreportutils.DumpState(contents)
-			if err != nil {
-				log.Printf("failed to extract time information from bugreport dumpstate: %v\n", err)
-			} else {
-				loc = d.Location().String()
-			}
-		}()
+	}
 
-		pkgs, pkgErrs := packageutils.ExtractAppsFromBugReport(contents)
-		errs = append(errs, pkgErrs...)
+	type brData struct {
+		fileName string
+		contents string
+		meta     *bugreportutils.MetaInfo
+		bt       *bspb.BatteryStats_System_Battery
+		dt       time.Time
+	}
 
-		// Activity manager events are only parsed for supported sdk versions, even though they are still present in unsupported sdk version reports.
-		// This is because the events are rendered with Historian v2, which is not generated for unsupported sdk versions.
-		go func() {
-			activityManagerCh <- activity.Parse(pkgs, contents)
-		}()
+	// doParsing needs to be declared before its initialization so that it can call itself recursively.
+	var doParsing func(brDA, brDB *brData)
+	// The earlier report will be subtracted from the later report.
+	doParsing = func(brDA, brDB *brData) {
+		if brDA == nil && brDB == nil {
+			return
+		}
+		if brDA.fileName == "" || brDA.contents == "" {
+			return
+		}
 
-		go func() {
-			var ctr checkinutil.IntCounter
-			s := &sessionpb.Checkin{
-				Checkin:          proto.String(bs),
-				BuildFingerprint: proto.String(meta.BuildFingerprint),
-			}
-			stats, warnings, pbsErrs := checkinparse.ParseBatteryStats(&ctr, checkinparse.CreateCheckinReport(s), pkgs)
-			checkinCh <- checkinData{stats, warnings, pbsErrs}
-			log.Printf("Trace finished processing checkin.")
-			if stats == nil {
-				ce = "Could not parse aggregated battery stats."
-				errs = append(errs, errors.New("could not parse aggregated battery stats"))
+		// Check to see if we should do a stats diff of the two bug reports.
+		diff := brDA != nil && brDB != nil &&
+			// Requires that the second report's contents are not empty.
+			brDB.fileName != "" && brDB.contents != "" &&
+			// Android IDs must be the same.
+			brDA.meta.DeviceID == brDB.meta.DeviceID &&
+			// Batterystats start clock time must be the same.
+			brDA.bt != nil && brDB.bt != nil &&
+			brDA.bt.GetStartClockTimeMsec() == brDB.bt.GetStartClockTimeMsec()
+		var earl, late *brData
+		if !diff {
+			if brDB != nil {
+				var wg sync.WaitGroup
+				// Need to parse each report separately.
+				wg.Add(1)
+				go func() {
+					defer wg.Done()
+					doParsing(brDA, nil)
+				}()
+				wg.Add(1)
+				go func() {
+					defer wg.Done()
+					doParsing(brDB, nil)
+				}()
+				wg.Wait()
 				return
 			}
-			pd.deviceType = stats.GetBuild().GetDevice()
-		}()
+			// Only one report given. This can be parsed on its own.
+			late = brDA
+		} else if brDB.dt.Equal(brDA.dt) {
+			// In the off chance that the times are exactly equal (it's at the second
+			// granularity), set the report with the longer realtime as the later one.
+			if brDB.bt.GetTotalRealtimeMsec() > brDA.bt.GetTotalRealtimeMsec() {
+				earl, late = brDA, brDB
+			} else {
+				earl, late = brDB, brDA
+			}
+		} else if brDB.dt.Before(brDA.dt) {
+			earl, late = brDB, brDA
+		} else {
+			earl, late = brDA, brDB
+		}
 
-		go func() {
-			summariesCh <- analyze(bs, pkgs)
-			log.Printf("Trace finished processing summary data.")
-		}()
+		if diff {
+			log.Printf("Trace started diffing files.")
+		} else {
+			log.Printf("Trace started analyzing %q file.", brDA.fileName)
+		}
+
+		// Generate the Historian plot and Volta parsing simultaneously.
+		historianCh := make(chan historianData)
+		summariesCh := make(chan summariesData)
+		activityManagerCh := make(chan activity.LogsData)
+		wearableCh := make(chan string)
+		var checkinL, checkinE checkinData
+		var warnings []string
+		var bsStats *bspb.BatteryStats
+		var errs []error
+		supV := late.meta.SdkVersion >= minSupportedSDK && (!diff || earl.meta.SdkVersion >= minSupportedSDK)
+
+		ce := ""
+
+		// Only need to generate it for the later report.
+		go doHistorian(historianCh, late.fileName, late.contents)
+		if !supV {
+			ce = "Unsupported bug report version."
+			errs = append(errs, errors.New("unsupported bug report version"))
+		} else {
+			// No point running these if we don't support the sdk version since we won't get any data from them.
+
+			bsL := bugreportutils.ExtractBatterystatsCheckin(late.contents)
+			if strings.Contains(bsL, "Exception occurred while dumping") {
+				ce = "Exception found in battery dump."
+				errs = append(errs, errors.New("exception found in battery dump"))
+			}
+
+			pkgsL, pkgErrs := packageutils.ExtractAppsFromBugReport(late.contents)
+			errs = append(errs, pkgErrs...)
+			checkinECh := make(chan checkinData)
+			checkinLCh := make(chan checkinData)
+			go doCheckin(checkinLCh, late.meta, bsL, pkgsL)
+			if diff {
+				// Calculate batterystats for the earlier report.
+				bsE := bugreportutils.ExtractBatterystatsCheckin(earl.contents)
+				if strings.Contains(bsE, "Exception occurred while dumping") {
+					ce = "Exception found in battery dump."
+					errs = append(errs, errors.New("exception found in battery dump"))
+				}
+				pkgsE, pkgErrs := packageutils.ExtractAppsFromBugReport(earl.contents)
+				errs = append(errs, pkgErrs...)
+				go doCheckin(checkinECh, earl.meta, bsE, pkgsE)
+			}
+
+			// These are only parsed for supported sdk versions, even though they are still
+			// present in unsupported sdk version reports, because the events are rendered
+			// with Historian v2, which is not generated for unsupported sdk versions.
+			go doActivity(activityManagerCh, late.contents, pkgsL)
+			go doWearable(wearableCh, late.dt.Location().String(), late.contents)
+			go doSummaries(summariesCh, bsL, pkgsL)
+
+			checkinL = <-checkinLCh
+			if diff {
+				checkinE = <-checkinECh
+			}
+			if checkinL.batterystats == nil || (diff && checkinE.batterystats == nil) {
+				ce = "Could not parse aggregated battery stats."
+			} else {
+				if diff {
+					bsStats = checkindelta.ComputeDeltaFromSameDevice(checkinL.batterystats, checkinE.batterystats)
+				} else {
+					bsStats = checkinL.batterystats
+				}
+				errs = append(errs, append(checkinL.err, checkinE.err...)...)
+				warnings = append(warnings, append(checkinL.warnings, checkinE.warnings...)...)
+			}
+		}
+
+		historianOutput := <-historianCh
+		if historianOutput.err != nil {
+			historianOutput.html = fmt.Sprintf("Error generating historian plot: %v", historianOutput.err)
+		}
+
+		var summariesOutput summariesData
+		var activityManagerOutput activity.LogsData
+		var wearableOutput string
+
+		if supV {
+			summariesOutput = <-summariesCh
+			activityManagerOutput = <-activityManagerCh
+			wearableOutput = <-wearableCh
+			errs = append(errs, append(summariesOutput.errs, activityManagerOutput.Errs...)...)
+		}
+
+		warnings = append(warnings, activityManagerOutput.Warnings...)
+		fn := late.fileName
+		if diff {
+			fn = fmt.Sprintf("%s - %s", earl.fileName, late.fileName)
+		}
+		data := presenter.Data(late.meta, fn,
+			summariesOutput.summaries,
+			bsStats, historianOutput.html,
+			warnings,
+			errs, summariesOutput.overflow)
+
+		historianV2Logs := []historianV2Log{
+			{
+				Source: batteryHistory,
+				CSV:    summariesOutput.historianV2CSV,
+			},
+			{
+				Source: wearableLog,
+				CSV:    wearableOutput,
+			},
+		}
+		for s, l := range activityManagerOutput.Logs {
+			if l == nil {
+				log.Print("Nil logcat log received")
+				continue
+			}
+			source := ""
+			switch s {
+			case activity.EventLogSection:
+				source = eventLog
+			case activity.SystemLogSection:
+				source = systemLog
+			case activity.LastLogcatSection:
+				source = lastLogcat
+			default:
+				log.Printf("Logcat section %q not handled", s)
+				// Show it anyway.
+				source = s
+			}
+			historianV2Logs = append(historianV2Logs, historianV2Log{
+				Source:  source,
+				CSV:     l.CSV,
+				StartMs: l.StartMs,
+			})
+		}
+
+		var note string
+		if diff {
+			note = "Only the System and App Stats tabs show the delta between the first and second bug reports."
+		}
+		pd.responseArr = append(pd.responseArr, uploadResponse{
+			SDKVersion:      data.SDKVersion,
+			HistorianV2Logs: historianV2Logs,
+			LevelSummaryCSV: summariesOutput.levelSummaryCSV,
+			ReportVersion:   data.CheckinSummary.ReportVersion,
+			AppStats:        data.AppStats,
+			BatteryStats:    bsStats,
+			DeviceCapacity:  bsStats.GetSystem().GetPowerUseSummary().GetBatteryCapacityMah(),
+			HistogramStats:  extractHistogramStats(data),
+			TimeToDelta:     summariesOutput.timeToDelta,
+			CriticalError:   ce,
+			Note:            note,
+			FileName:        data.Filename,
+			Location:        late.dt.Location().String(),
+		})
+		pd.data = append(pd.data, data)
+
+		if diff {
+			log.Printf("Trace finished diffing files.")
+		} else {
+			log.Printf("Trace finished analyzing %q file.", brDA.fileName)
+		}
 	}
 
-	historianOutput := <-historianCh
-	if historianOutput.err != nil {
-		historianOutput.html = fmt.Sprintf("Error generating historian plot: %v", historianOutput.err)
+	newBrData := func(fName, contents string) (*brData, error) {
+		if fName == "" || contents == "" {
+			return nil, nil
+		}
+		br := brData{fileName: fName, contents: contents}
+		var err error
+		br.meta, err = bugreportutils.ParseMetaInfo(contents)
+		if err != nil {
+			// If there are issues getting the meta info, then the file is most likely not a bug report.
+			return nil, errors.New("error parsing the bug report. Please provide a well formed bug report")
+		}
+		var errs []error
+		br.bt, errs = batteryTime(contents)
+		if len(errs) > 0 {
+			log.Printf("failed to extract battery info: %s", historianutils.ErrorsToString(errs))
+			// It's fine to continue if this fails.
+		}
+		br.dt, err = bugreportutils.DumpState(contents)
+		if err != nil {
+			log.Printf("failed to extract time information from bugreport dumpstate: %v", err)
+		}
+		return &br, nil
 	}
 
-	var summariesOutput summariesData
-	var checkinOutput checkinData
-	var activityManagerOutput activity.LogsData
-
-	if meta.SdkVersion >= minSupportedSDK {
-		summariesOutput = <-summariesCh
-		checkinOutput = <-checkinCh
-		activityManagerOutput = <-activityManagerCh
-		errs = append(errs, append(summariesOutput.errs, append(activityManagerOutput.Errs, checkinOutput.err...)...)...)
+	brA, err := newBrData(fnameA, contentsA)
+	if err != nil {
+		return err
 	}
+	brB, err := newBrData(fnameB, contentsB)
+	if err != nil {
+		return err
+	}
+	doParsing(brA, brB)
 
-	log.Printf("Trace finished generating Historian plot and summaries.")
-
-	warnings := append(checkinOutput.warnings, activityManagerOutput.Warnings...)
-	data := presenter.Data(meta,
-		fname, summariesOutput.summaries,
-		checkinOutput.batterystats, historianOutput.html,
-		warnings,
-		errs, summariesOutput.overflow)
-
-	pd.responseArr = append(pd.responseArr, uploadResponse{
-		SDKVersion:      data.SDKVersion,
-		HistorianV2CSV:  appendCSVs(summariesOutput.historianV2CSV, activityManagerOutput.CSV),
-		LevelSummaryCSV: summariesOutput.levelSummaryCSV,
-		ReportVersion:   data.CheckinSummary.ReportVersion,
-		AppStats:        data.AppStats,
-		DeviceCapacity:  checkinOutput.batterystats.GetSystem().GetPowerUseSummary().GetBatteryCapacityMah(),
-		HistogramStats:  extractHistogramStats(data),
-		TimeToDelta:     summariesOutput.timeToDelta,
-		CriticalError:   ce,
-		FileName:        data.Filename,
-		Location:        loc,
-		GroupToLogStart: activityManagerOutput.GroupToLogStart,
-	})
-	pd.data = append(pd.data, data)
 	return nil
-}
-
-// appendCSVs appends a newline character to end of the first CSV if not present, then joins the two CSVs.
-func appendCSVs(csv1, csv2 string) string {
-	if strings.LastIndex(csv1, "\n") != len(csv1)-1 {
-		csv1 += "\n"
-	}
-	return csv1 + csv2
 }
 
 func analyze(bugReport string, pkgs []*usagepb.PackageInfo) summariesData {
@@ -761,4 +983,20 @@ func generateHistorianPlot(reportName, filepath string) (string, error) {
 // generateKernelCSV calls the python script to convert kernel trace files into a CSV format parseable by kernel.Parse.
 func generateKernelCSV(bugReportPath, tracePath, model string) (string, error) {
 	return historianutils.RunCommand("python", scriptsPath(scriptsDir, "kernel_trace.py"), "--bugreport", bugReportPath, "--trace", tracePath, "--device", model)
+}
+
+// batteryTime extracts the battery time info from a bug report.
+func batteryTime(contents string) (*bspb.BatteryStats_System_Battery, []error) {
+	for _, line := range strings.Split(contents, "\n") {
+		if m, result := historianutils.SubexpNames(batteryRE, line); m {
+			s := &bspb.BatteryStats_System{}
+			record := strings.Split(result["batteryTime"], ",")
+			_, errs := checkinparse.SystemBattery(&checkinutil.PrefixCounter{}, record, s)
+			if len(errs) > 0 {
+				return nil, errs
+			}
+			return s.GetBattery(), nil
+		}
+	}
+	return nil, []error{errors.New("could not find battery time info in bugreport")}
 }

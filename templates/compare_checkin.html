@@ -221,8 +221,12 @@ specific language governing permissions and limitations under the License.
         <th>Diff Sec/Hr</th>
         <th>#1 Sec/Hr</th>
         <th>#2 Sec/Hr</th>
-        <th class="duration">#1 Total Duration</th>
-        <th class="duration">#2 Total Duration</th>
+        <th class="duration" title="When wakelocks are held at the same time, the time is split evenly between them, so the time shown here is a lower bound of the total duration the named wakelock was held for.">
+          #1 Minimum Duration
+        </th>
+        <th class="duration" title="When wakelocks are held at the same time, the time is split evenly between them, so the time shown here is a lower bound of the total duration the named wakelock was held for.">
+          #2 Minimum Duration
+        </th>
         <th>Diff Count/Hr</th>
         <th>#1 Count/Hr</th>
         <th>#2 Count/Hr</th>

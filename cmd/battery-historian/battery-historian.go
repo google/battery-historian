@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"path"
 
 	"github.com/google/battery-historian/analyzer"
 )
@@ -28,11 +29,15 @@ var (
 	optimized = flag.Bool("optimized", true, "Whether to output optimized js files. Disable for local debugging.")
 	port      = flag.Int("port", 9999, "service port")
 
-	scriptsDir  = flag.String("scripts_dir", "./scripts", "Directory containing Historian and kernel trace Python scripts.")
-	templateDir = flag.String("template_dir", "./templates", "Directory containing HTML templates.")
+	compiledDir   = flag.String("compiled_dir", "./compiled", "Directory containing compiled js file for Historian v2.")
+	jsDir         = flag.String("js_dir", "./js", "Directory containing uncompiled js files for Historian v2.")
+	scriptsDir    = flag.String("scripts_dir", "./scripts", "Directory containing Historian and kernel trace Python scripts.")
+	staticDir     = flag.String("static_dir", "./static", "Directory containing static files.")
+	templateDir   = flag.String("template_dir", "./templates", "Directory containing HTML templates.")
+	thirdPartyDir = flag.String("third_party_dir", "./third_party", "Directory containing third party files for Historian v2.")
 
 	// resVersion should be incremented whenever the JS or CSS files are modified.
-	resVersion = flag.Int("res_version", 1, "The current version of JS and CSS files. Used to force JS and CSS reloading to avoid cache issues when rolling out new versions.")
+	resVersion = flag.Int("res_version", 2, "The current version of JS and CSS files. Used to force JS and CSS reloading to avoid cache issues when rolling out new versions.")
 )
 
 type analysisServer struct{}
@@ -52,14 +57,58 @@ func (s *analysisServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func initFrontend() {
-	http.Handle("/", &analysisServer{})
-	http.Handle("/static/", http.FileServer(http.Dir(".")))
-	http.Handle("/compiled/", http.FileServer(http.Dir(".")))
-	http.Handle("/third_party/", http.FileServer(http.Dir(".")))
+func compiledPath() string {
+	dir := *compiledDir
+	if dir == "" {
+		dir = "./compiled"
+	}
+	return dir
+}
 
-	if *optimized == false {
-		http.Handle("/js/", http.FileServer(http.Dir(".")))
+func jsPath() string {
+	dir := *jsDir
+	if dir == "" {
+		dir = "./js"
+	}
+	return dir
+}
+
+func staticPath() string {
+	dir := *staticDir
+	if dir == "" {
+		dir = "./static"
+	}
+	return dir
+}
+
+func thirdPartyPath() string {
+	dir := *thirdPartyDir
+	if dir == "" {
+		dir = "./third_party"
+	}
+	return dir
+}
+
+func initFrontend() {
+	urlPrefix := []string{"/", "/historian/"} // Add all paths relative to root
+	urlDirs := map[string]string{
+		"compiled":    compiledPath(),
+		"static":      staticPath(),
+		"third_party": thirdPartyPath(),
+	}
+
+	for _, p := range urlPrefix {
+		http.Handle(p, &analysisServer{})
+
+		for u, f := range urlDirs {
+			url := path.Join(p, u) + "/"
+			http.Handle(url, http.StripPrefix(url, http.FileServer(http.Dir(f))))
+		}
+		if *optimized == false {
+			// Need to handle calls to fetch closure library and js files.
+			j := path.Join(p, "js") + "/"
+			http.Handle(j, http.StripPrefix(j, http.FileServer(http.Dir(jsPath()))))
+		}
 	}
 }
 

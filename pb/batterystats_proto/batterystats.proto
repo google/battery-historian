@@ -74,11 +74,11 @@ message BatteryStats {
   // mutually exclusive.
   optional bool is_diff = 24;
   // True if the android wear device is paired to an ALT mode companion on iPhone.
-  optional bool is_alt_mode = 28;
+  optional bool is_alt_mode = 29;
   // Warnings generated when parsing the report.
-  repeated string warning = 29;
+  repeated string warning = 30;
   // Errors generated when parsing the report.
-  repeated string error = 30;
+  repeated string error = 31;
 
   enum AggregationType {
     // All of the data in the stats.
@@ -162,9 +162,11 @@ message BatteryStats {
     optional Camera camera = 20; // cam.
 
     message Cpu {
-      // Total CPU time with processes executing in userspace.
+      // Total CPU time with processes executing in userspace. Summed up across
+      // multiple cores.
       optional float user_time_ms = 1;
-      // Total CPU time with processes executing kernel syscalls.
+      // Total CPU time with processes executing kernel syscalls. Summed up
+      // across multiple cores.
       optional float system_time_ms = 2;
       // Total CPU power consumed in milli-ampere-milliseconds.
       optional float power_ma_ms = 3;
@@ -210,6 +212,10 @@ message BatteryStats {
       optional float mobile_active_count = 10;
       optional int64 bt_bytes_rx = 11;
       optional int64 bt_bytes_tx = 12;
+      // Number of times the app woke up the mobile radio.
+      optional int32 mobile_wakeup_count = 13;
+      // Number of times the app woke up the wifi radio.
+      optional int32 wifi_wakeup_count = 14;
     };
     optional Network network = 6; // nt.
 
@@ -336,15 +342,47 @@ message BatteryStats {
       // 2. removal of "unpopular" wakelock names that appear less than X%
       //    (in terms of #unique android_id's) of all daily reports.
       optional string name = 1;
-      // Full wakelock.
+
+      // Full wakelocks keep the screen on. Based on
+      // PowerManager.SCREEN_BRIGHT_WAKE_LOCK (deprecated in API 13) and
+      // PowerManager.SCREEN_DIM_WAKE_LOCK (deprecated in API 17).
       optional float full_time_msec = 2;
       optional float full_count = 3;
-      // Partial wakelock.
+      // Currently (as of their introduction in v19), current and max durations
+      // are only tracked while the screen is off and the device is on battery,
+      // so they are not currently tracked for full wakelocks, and -1 will
+      // always be printed out for them.
+      optional int64 full_current_duration_msec = 8;
+      optional int64 full_max_duration_msec = 9;
+
+      // Partial wakelocks ensure the CPU is running while allowing the screen
+      // to turn off. Based on PowerManager.PARTIAL_WAKE_LOCK.
+      // If multiple partial wakelocks are held at the same time, the total time
+      // is split evenly between them, so this value (partial_time_msec) may not
+      // constitute the complete duration the wakelock was held.
       optional float partial_time_msec = 4;
       optional float partial_count = 5;
-      // Window wakelock.
+      // If the wakelock was being held at the time of the report, this will be
+      // how long the current hold had been active for. Unlike
+      // partial_time_msec, this duration is not split between wakelocks and so
+      // constitutes the complete current wakelock duration.
+      optional int64 partial_current_duration_msec = 10;
+      // The maximum duration the wakelock had been held for. Unlike
+      // partial_time_msec, this duration is not split between wakelocks and so
+      // constitutes the complete maximum wakelock duration.
+      optional int64 partial_max_duration_msec = 11;
+
+      // Window wakelocks keep the screen on.
       optional float window_time_msec = 6;
       optional float window_count = 7;
+      // Currently (as of their introduction in v19), current and max durations
+      // are only tracked while the screen is off and the device is on battery,
+      // so they are not currently tracked for window wakelocks, and -1 will
+      // always be printed out for them.
+      optional int64 window_current_duration_msec = 12;
+      optional int64 window_max_duration_msec = 13;
+
+      // Next tag = 14
     };
     repeated Wakelock wakelock = 11; // wl.
 
@@ -352,7 +390,9 @@ message BatteryStats {
       optional string name = 1;
       optional int32 count = 2;
     }
-    // The sum of these counts should equal apk.wakeups.
+    // If an apk doesn't have service stats, then the APK_DATA line isn't
+    // printed, so apk.wakeups could be 0 even though there are WakeupAlarm
+    // entries here.
     repeated WakeupAlarm wakeup_alarm = 29; // wua.
 
     message Wifi {
@@ -410,8 +450,12 @@ message BatteryStats {
       optional float total_uptime_msec = 5;
       // Wall clock time when the data collection started.
       optional int64 start_clock_time_msec = 6;
+      // Time spent on battery with the screen off.
       optional float screen_off_realtime_msec = 7;
       optional float screen_off_uptime_msec = 8;
+      // The estimated real battery capacity, which may be less than the
+      // declared battery capacity (for example, because of battery aging).
+      optional int64 estimated_battery_capacity_mah = 9;
     };
     optional Battery battery = 1; // bt.
 
@@ -424,6 +468,13 @@ message BatteryStats {
       // Discharged points while screen is on.
       optional float screen_on = 3;
       optional float screen_off = 4;
+      // Total amount of battery discharged in mAh. This will only be non-zero
+      // for devices that report battery discharge via a coulomb counter.
+      optional int64 total_mah = 5;
+      // Total amount of battery discharged while the screen was off in mAh.
+      // This will only be non-zero for devices that report battery discharge
+      // via a coulomb counter.
+      optional int64 total_mah_screen_off = 6;
     };
     optional BatteryDischarge battery_discharge = 2; // dc.
 
@@ -461,10 +512,18 @@ message BatteryStats {
       optional DisplayState.State display_state = 3;
       // Indicates status in power save mode.
       optional PowerSaveMode.Mode power_save_mode = 4;
-      // Indicates status in idle mode.
+      // Indicates status in Doze mode.
       optional IdleMode.Mode idle_mode = 5;
     };
     repeated ChargeStep charge_step = 18; // csd.
+
+    // Approximation for how much time remains until the battery is fully
+    // charged. The device will print -1 if there wasn't enough data to
+    // calculate an estimate, or if the battery is currently discharging.
+    message ChargeTimeRemaining {
+      optional int64 usec = 1;
+    }
+    optional ChargeTimeRemaining charge_time_remaining = 25;
 
     message DataConnection {
       enum Name {
@@ -509,6 +568,14 @@ message BatteryStats {
       optional IdleMode.Mode idle_mode = 5;
     };
     repeated DischargeStep discharge_step = 19; // dsd.
+
+    // Approximation for how much run time is remaining on the battery. The
+    // device will print -1 if there wasn't enough data to calculate an estimate
+    // or if the battery is currently charging.
+    message DischargeTimeRemaining {
+      optional int64 usec = 1;
+    }
+    optional DischargeTimeRemaining discharge_time_remaining = 26;
 
     message DisplayState {
       enum State {
@@ -560,9 +627,9 @@ message BatteryStats {
       // Rx and Tx times are reported from the Wifi chip. Running time is
       // recorded based on API calls, so it's more of an estimate.
       // RxTime + TxTime doesn't need to equal RunningTime.
-      optional float wifi_rx_time_msec = 4 [deprecated = true]; // Moved to global_wifi_controller data.;
-      optional float wifi_tx_time_msec = 5 [deprecated = true]; // Moved to global_wifi_controller data.;
-      optional float wifi_power_mah = 6 [deprecated = true]; // Moved to global_wifi_controller data.;
+      optional float wifi_rx_time_msec = 4 [deprecated = true]; // Moved to global_wifi_controller data.
+      optional float wifi_tx_time_msec = 5 [deprecated = true]; // Moved to global_wifi_controller data.
+      optional float wifi_power_mah = 6 [deprecated = true]; // Moved to global_wifi_controller data.
     };
     optional GlobalWifi global_wifi = 21; // gwfl
 
@@ -584,6 +651,10 @@ message BatteryStats {
       optional string name = 1;
       optional float time_msec = 2;
       optional float count = 3;
+      // The kernel doesn't have the data to enable printing out current and max
+      // durations, so -1 is always printed out for them.
+      optional int64 current_duration_msec = 4;
+      optional int64 max_duration_msec = 5;
     };
     repeated KernelWakelock kernel_wakelock = 7; // kwl.
 
@@ -668,8 +739,9 @@ message BatteryStats {
     message PowerUseSummary {
       optional float battery_capacity_mah = 1;
       optional float computed_power_mah = 2;
-      // Lower bound approximation.
+      // Lower bound of actual power drained.
       optional float min_drained_power_mah = 3;
+      // Upper bound of actual power drained.
       optional float max_drained_power_mah = 4;
     };
     optional PowerUseSummary power_use_summary = 10; // pws.
@@ -773,9 +845,9 @@ message BatteryStats {
     };
     repeated WifiState wifi_state = 15; // wst & wsc.
 
-    // Next tag: 25
+    // Next tag: 27
   };
   optional System system = 27; // System-level stats.
 
-  // Next tag: 31
+  // Next tag: 32
 };

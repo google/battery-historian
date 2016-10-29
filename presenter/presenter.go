@@ -132,9 +132,11 @@ type HistogramStats struct {
 	WifiKiloBytesPerHr              aggregated.MFloat32
 	WifiDischargeRatePerHr          aggregated.MFloat32
 	BluetoothDischargeRatePerHr     aggregated.MFloat32
+	ModemDischargeRatePerHr         aggregated.MFloat32
 	WifiOnTimePercentage            float32
-	WifiTransmitTimePercentage      float32
-	BluetoothTransmitTimePercentage float32
+	WifiTransferTimePercentage      float32
+	BluetoothTransferTimePercentage float32
+	ModemTransferTimePercentage     float32
 	BluetoothOnTimePercentage       float32
 	// Wakelock Data
 	PartialWakelockTimePercentage float32
@@ -177,6 +179,7 @@ type UnplugSummary struct {
 	LevelDropPerHour float64
 	SystemStats      []DurationStats
 	BreakdownStats   []MultiDurationStats
+	PowerStates      map[string]parseutils.PowerState
 }
 
 // DurationStats contain stats on the occrurence frequency and activity duration of a metric present in history.
@@ -884,12 +887,14 @@ func Data(meta *bugreportutils.MetaInfo, fname string, summaries []parseutils.Ac
 				   mapPrint("ChargingStatusSummary", s.ChargingStatusSummary, duration),
 				*/
 			},
+			PowerStates: s.PowerStateOverallSummary,
 		}
 		output = append(output, t)
 	}
 	if checkinOutput.GetSystem().GetPowerUseSummary().GetBatteryCapacityMah() == 0 {
 		errs = append(errs, errors.New("device capacity is 0"))
 	}
+
 	return HTMLData{
 		DeviceID:        meta.DeviceID,
 		SDKVersion:      meta.SdkVersion,

@@ -18,9 +18,8 @@ specific language governing permissions and limitations under the License.
     <div>
       <span>Sort apps by</span>
       <select id="appSorter">
-        <!-- TODO: support repeated fields -->
         <option value="name">Name</option>
-        <option value=".CPUPowerPrediction" data-type="percentage">Device estimated power use</option>
+        <option value=".DevicePowerPrediction" data-type="percentage">Device estimated power use</option>
         {{if ge .CheckinSummary.ReportVersion 14}}
         <option value="audio.total_time_msec" data-type="duration">Audio time</option>
         <option value="audio.count">Audio count</option>
@@ -39,11 +38,23 @@ specific language governing permissions and limitations under the License.
         <option value="state_time.foreground_service_time_msec" data-type="duration">Foreground service time</option>
         <option value="state_time.top_time_msec" data-type="duration">Top time</option>
         {{end}}
+        <option value="scheduled_job.total_time_msec" data-type="duration">Total scheduled job time</option>
+        <option value="scheduled_job.count">Total scheduled job count</option>
+        <option value="sync.total_time_msec" data-type="duration">Total sync time</option>
+        <option value="sync.count">Total sync count</option>
         <option value="vibrator.total_time_msec" data-type="duration">Vibrator time</option>
         <option value="vibrator.count">Vibrator count</option>
         {{if ge .CheckinSummary.ReportVersion 14}}
         <option value="video.total_time_msec" data-type="duration">Video time</option>
         <option value="video.count">Video count</option>
+        {{end}}
+        <option value="wakelock.partial_time_msec" data-type="duration">Total userspace wakelock time</option>
+        <option value="wakelock.partial_count">Total userspace wakelock count</option>
+        {{if .CheckinSummary.AppWakeupsByAlarmName}}
+        <!-- The sum of the count of individual wakeup alarms is more accurate than the number retrieved from apk.wakeups -->
+        <option value="wakeup_alarm.count">Total number of wakeup alarms</option>
+        {{else}}
+        <option value="apk.wakeups">Total number of wakeup alarms</option>
         {{end}}
         <option value="wifi.full_wifi_lock_time_msec" data-type="duration">Full wifi lock time</option>
         <option value="wifi.scan_time_msec" data-type="duration">Wifi scan time</option>

@@ -1,0 +1,56 @@
+<!--
+Copyright 2016 Google Inc. All rights reserved.
+Licensed under the Apache License, Version 2.0 (the "License"); you may not use
+this file except in compliance with the License. You may obtain a copy of the
+License at
+      http://www.apache.org/licenses/LICENSE-2.0
+Unless required by applicable law or agreed to in writing, software distributed
+under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
+CONDITIONS OF ANY KIND, either express or implied. See the License for the
+specific language governing permissions and limitations under the License.
+-->
+
+{{define "historianv2"}}
+<div class="sdk-version-21">
+  <div class="historian-v2 settings">
+    <span class="settings-section">
+      <!-- Class instead of ID as this template is included twice in comparison view. -->
+      <select class='configure-metrics'></select>
+    </span>
+    <span class="settings-section">
+      <label>Show bars</label><input class="show-bars" type="checkbox" checked>
+    </span>
+    <span class="settings-section">
+      <label>Show level summaries</label><input class="show-level-summary" type="checkbox" checked>
+    </span>
+    <span class="settings-section">
+      <label>Show line overlay</label><input class="show-line-overlay" type="checkbox" checked>
+    </span>
+    <span class="settings-section">
+      <label>Show rate of change</label><input class="show-rate-of-change" type="checkbox">
+    </span>
+  </div>
+  <div class="graph"></div>
+  <!-- The graph div is cleared and redrawn on several occasions, so put the default
+       SVG contents in a separate div that can be copied into the graph div. -->
+  <div class="svg-content" style="display:none;">
+    <svg>
+      <!-- Diagonal hatching pattern for rendering unavailable log times in the graph. -->
+      <pattern id="diagonal-hatch"
+               width="10"
+               height="10"
+               patternTransform="rotate(45 0 0)"
+               patternUnits="userSpaceOnUse">
+        <line x1="0" y1="0" x2="0" y2="10" style="stroke: LightGray; stroke-width: 8" />
+      </pattern>
+    </svg>
+  </div>
+</div>
+{{end}}
+
+{{define "overflow_message"}}
+<div id="dialog-message" data-toggle="tooltip" title="Overflow detected">
+  Battery history log overflow has been detected in the bugreport.
+  Please note the visual timeline does not show events after the overflow.
+</div>
+{{end}}

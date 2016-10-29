@@ -19,6 +19,7 @@ goog.provide('historian.LevelConfiguration');
 
 goog.require('goog.string');
 goog.require('historian.metrics.Csv');
+goog.require('historian.time');
 goog.require('historian.utils');
 
 
@@ -34,8 +35,8 @@ goog.require('historian.utils');
  *   name: string,
  *   legendText: string,
  *   levelDisplayText: string,
- *   hiddenBarMetrics: !Array<string>,
- *   yDomain: {min: number, max: number}
+ *   yDomain: {min: number, max: number},
+ *   isRateOfChange: boolean
  * }}
  */
 historian.LevelConfiguration;
@@ -75,20 +76,40 @@ historian.LevelConfigs.DEFAULT_Y_DOMAIN_ = {min: 0, max: 100};
  * Gets the config corresponding to the given name. Creates a default config
  * using the name and data if one does not exist.
  * @param {string} name The metric to get the level config for.
+ * @param {boolean=} opt_isRateOfChange True if the data to display is the
+ *     rate of change for the series.
  * @param {!Array<!historian.Entry>=} opt_data The values to calculate
  *     the range for.
  * @return {!historian.LevelConfiguration}
  */
-historian.LevelConfigs.prototype.getConfig = function(name, opt_data) {
+historian.LevelConfigs.prototype.getConfig =
+    function(name, opt_isRateOfChange, opt_data) {
+  var isRateOfChange = opt_isRateOfChange || false;
   if (!(name in this.configs_)) {
     var yDomain = historian.LevelConfigs.DEFAULT_Y_DOMAIN_;
     if (opt_data) {
       var extent = d3.extent(opt_data, function(d) {
-        return d.value;
+        // If it is rate of change data, only consider entries that are longer
+        // than 10 seconds, as those entries are usually not important and
+        // may extremely skew the graph.
+        if (!isRateOfChange ||
+            d.endTime - d.startTime > 10 * historian.time.MSECS_IN_SEC) {
+          return d.value;
+        }
+        // Return undefined so d3 will ignore the value.
       });
-      yDomain = {min: extent[0], max: extent[1]};
+      if (isRateOfChange) {
+        // When displaying rate of change data, we want 0 to be in the middle
+        // of the y-axis, so set the min and max range using the larger of
+        // two absolute values.
+        var maxAbsVal = Math.max(Math.abs(extent[0]), Math.abs(extent[1]));
+        yDomain = {min: -maxAbsVal, max: maxAbsVal};
+      } else {
+        yDomain = {min: extent[0], max: extent[1]};
+      }
     }
-    this.configs_[name] = historian.LevelConfigs.createConfig_(name, yDomain);
+    this.configs_[name] = historian.LevelConfigs.createConfig_(
+        name, yDomain, isRateOfChange);
   }
   return this.configs_[name];
 };
@@ -98,10 +119,13 @@ historian.LevelConfigs.prototype.getConfig = function(name, opt_data) {
  * Creates a config for the given metric.
  * @param {string} name The metric name.
  * @param {{min: number, max: number}} yDomain The extent of metric values.
+ * @param {boolean} isRateOfChange True if the data to display is the
+ *     rate of change for the series.
  * @return {!historian.LevelConfiguration} The config for the metric.
  * @private
  */
-historian.LevelConfigs.createConfig_ = function(name, yDomain) {
+historian.LevelConfigs.createConfig_ =
+    function(name, yDomain, isRateOfChange) {
   return {
     displayPowerInfo: false,
     enableSampling: false,
@@ -111,8 +135,8 @@ historian.LevelConfigs.createConfig_ = function(name, yDomain) {
     id: historian.utils.toValidID(name),
     legendText: name,
     levelDisplayText: name,
-    hiddenBarMetrics: [],
-    yDomain: yDomain
+    yDomain: yDomain,
+    isRateOfChange: isRateOfChange
   };
 };
 
@@ -134,8 +158,8 @@ historian.LevelConfigs.batteryLevelConfig_ = function(c) {
     name: historian.metrics.Csv.BATTERY_LEVEL,
     legendText: 'Battery Level',
     levelDisplayText: 'Battery Level',
-    hiddenBarMetrics: [],
-    yDomain: historian.LevelConfigs.DEFAULT_Y_DOMAIN_
+    yDomain: historian.LevelConfigs.DEFAULT_Y_DOMAIN_,
+    isRateOfChange: false
   };
 };
 
@@ -162,8 +186,8 @@ historian.LevelConfigs.coulombChargeConfig_ = function(c) {
     name: historian.metrics.Csv.COULOMB_CHARGE,
     legendText: 'Coulomb Charge',
     levelDisplayText: 'Coulomb Charge',
-    hiddenBarMetrics: [],
-    yDomain: {min: 0, max: c}
+    yDomain: {min: 0, max: c},
+    isRateOfChange: false
   };
 };
 
@@ -187,15 +211,11 @@ historian.LevelConfigs.powermonitorConfig_ = function(data) {
     name: 'Powermonitor',
     legendText: 'Powermonitor Reading (mA)',
     levelDisplayText: 'Powermonitor (mA)',
-    hiddenBarMetrics: [
-      historian.metrics.Csv.BATTERY_LEVEL,
-      historian.metrics.Csv.COULOMB_CHARGE,
-      historian.metrics.Csv.POWERMONITOR
-    ],
     yDomain: {
       min: Math.min(0, extent[0] || 0),
       max: Math.max(1000, extent[1] || 1000)
-    }  // mA
+    },  // mA
+    isRateOfChange: false
   };
 };
 

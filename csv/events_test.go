@@ -98,6 +98,32 @@ func TestExtractEvents(t *testing.T) {
 			},
 		},
 		{
+			desc: "Match all events",
+			input: []string{
+				FileHeader,
+				"Mobile network type,string,1422620452417,1422620453917,hspa,",
+				"Charging status,string,1422620452417,1422620453917,c,",
+			},
+			wantEvents: map[string][]Event{
+				"Mobile network type": {
+					{
+						Type:  "string",
+						Start: 1422620452417,
+						End:   1422620453917,
+						Value: "hspa",
+					},
+				},
+				"Charging status": {
+					{
+						Type:  "string",
+						Start: 1422620452417,
+						End:   1422620453917,
+						Value: "c",
+					},
+				},
+			},
+		},
+		{
 			desc: "Errors in parsing",
 			input: []string{
 				FileHeader,
@@ -135,6 +161,107 @@ func TestExtractEvents(t *testing.T) {
 		}
 		if !reflect.DeepEqual(got, want) {
 			t.Errorf("%v: ExtractEvents(%v) generated incorrect events:\n got: %q\n want: %q", test.desc, test.input, got, want)
+		}
+	}
+}
+
+// TestMergeEvents test merging overlapping events.
+func TestMergeEvents(t *testing.T) {
+	tests := []struct {
+		input []Event
+		want  []Event
+	}{
+		// Test case 1: events are not overlapped
+		{
+			[]Event{
+				{Start: 0, End: 1},
+				{Start: 2, End: 3},
+				{Start: 4, End: 5},
+				{Start: 8, End: 10},
+			},
+			[]Event{
+				{Start: 0, End: 1},
+				{Start: 2, End: 3},
+				{Start: 4, End: 5},
+				{Start: 8, End: 10},
+			},
+		},
+		// Test case 2: events are included in one big event
+		{
+			[]Event{
+				{Start: 0, End: 10},
+				{Start: 0, End: 2},
+				{Start: 4, End: 5},
+				{Start: 7, End: 12},
+				{Start: 1, End: 3},
+			},
+			[]Event{
+				{Start: 0, End: 12},
+			},
+		},
+		// Test case 3: events are partially overlaped, second event is overlapped with first event's right part
+		{
+			[]Event{
+				{Start: 0, End: 5},
+				{Start: 3, End: 8},
+			},
+			[]Event{
+				{Start: 0, End: 8},
+			},
+		},
+		// Test case 4: events are partially overlaped, second event is overlapped with first event's left part
+		{
+			[]Event{
+				{Start: 4, End: 8},
+				{Start: 2, End: 5},
+			},
+			[]Event{
+				{Start: 2, End: 8},
+			},
+		},
+		// Test case 5: events are not overlaped but connected by edges
+		{
+			[]Event{
+				{Start: 1, End: 4},
+				{Start: 4, End: 8},
+				{Start: 8, End: 10},
+			},
+			[]Event{
+				{Start: 1, End: 10},
+			},
+		},
+		// Test case 6: random events contain all above situations
+		{
+			[]Event{
+				{Start: 0, End: 1},
+				{Start: 3, End: 4},
+				{Start: 5, End: 10},
+				{Start: 6, End: 8},
+				{Start: 7, End: 9},
+				{Start: 12, End: 16},
+				{Start: 11, End: 15},
+				{Start: 16, End: 18},
+				{Start: 20, End: 22},
+				{Start: 26, End: 29},
+				{Start: 25, End: 27},
+				{Start: 30, End: 33},
+			},
+			[]Event{
+				{Start: 0, End: 1},
+				{Start: 3, End: 4},
+				{Start: 5, End: 10},
+				{Start: 11, End: 18},
+				{Start: 20, End: 22},
+				{Start: 25, End: 29},
+				{Start: 30, End: 33},
+			},
+		},
+	}
+	var output []Event
+	for _, test := range tests {
+		output = MergeEvents(test.input)
+		if !reflect.DeepEqual(test.want, output) {
+			t.Errorf("MergeEvents(%v) = %v, want %v", test.input, output, test.want)
 		}
 	}
 }

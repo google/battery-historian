@@ -19,6 +19,7 @@ goog.module.declareLegacyNamespace();
 
 var Event = goog.require('historian.power.Event');
 var array = goog.require('goog.array');
+var asserts = goog.require('goog.asserts');
 var tables = goog.require('historian.tables');
 var time = goog.require('historian.time');
 var utils = goog.require('historian.utils');
@@ -28,20 +29,21 @@ var utils = goog.require('historian.utils');
  * Upper bound for device standby mA current.
  * @const {number}
  */
-var BASE_THRESHOLD = 50; // TODO: finetune or make configurable.
+var MAX_STANDBY_CURRENT = 50;
 
 
 /**
  * Returns the first wakeup reason that doesn't start with 'Abort'.
  * Each running event can have multiple wakeup reasons.
- * @param {!Array<!historian.RunningValue>} wakeupReasons
+ * @param {!Array<!historian.Entry>} wakeupReasons
  * @return {string}
  */
 var getFirstNonAbort = function(wakeupReasons) {
   var element = wakeupReasons.find(function(element) {
     return !element.value.startsWith('Abort');
   });
-  return element ? element.value : 'No non abort events found';
+  return element ? asserts.assertString(element.value) :
+      'No non abort events found';
 };
 
 
@@ -136,7 +138,7 @@ var Estimator = goog.defineClass(null, {
             name: wakeupReason,
             power: this.getWakeupPower_(wakeupReason)
           };
-        }.bind(this))
+        }, this)
         .sort(function(a, b) {
           return (b.power - a.power || a.name.localeCompare(b.name));
         })
@@ -197,7 +199,7 @@ var Estimator = goog.defineClass(null, {
           var prevTimeRange = i == 0 ? null : events[i - 1].getTimeRange();
           var prevEndTime = prevTimeRange ? prevTimeRange.end : null;
           return total + powerEvent.getPower(prevEndTime);
-        }.bind(this), 0);
+        }, 0);
   },
 
   /**
@@ -239,7 +241,7 @@ var Estimator = goog.defineClass(null, {
           var curValue = this.powermonitorEvents_[powermonitorIdx].value;
           var prevValue = this.powermonitorEvents_[powermonitorIdx - 1].value;
 
-          if ((curValue < BASE_THRESHOLD) && (curValue < prevValue)) {
+          if ((curValue < MAX_STANDBY_CURRENT) && (curValue < prevValue)) {
             risingStartIdx = powermonitorIdx;
           }
         }
@@ -282,7 +284,7 @@ var Estimator = goog.defineClass(null, {
       // We want to count the falling edge after the end of a running event.
       // Add all powermonitor events that are larger than the base threshold.
       while ((powermonitorIdx < this.powermonitorEvents_.length) &&
-          (this.powermonitorEvents_[powermonitorIdx].value > BASE_THRESHOLD)) {
+          (this.powermonitorEvents_[powermonitorIdx].value > MAX_STANDBY_CURRENT)) {
         // Stop if an intersection is found with the next wakeup event.
         var curPowermonitor = this.powermonitorEvents_[powermonitorIdx];
         if (nextRunning && hasIntersection(nextRunning, curPowermonitor)) {
@@ -334,7 +336,7 @@ var Estimator = goog.defineClass(null, {
 
     // If vals is empty, add a single zero entry so we don't have to deal with
     // empty array checks in the calculations.
-    var nonEmptyVals = (vals.length > 0) ? vals : [0];
+    var nonEmptyVals = vals.length ? vals : [0];
     return {
       wakeup: wakeupReason,
       avg: total / nonEmptyVals.length,
@@ -360,7 +362,6 @@ var Estimator = goog.defineClass(null, {
         formatter: function(number) {
           return time.formatDuration(number);
         },
-        generatedStats: [],
         key: Estimator.TableMetric.DURATION
       },
       // Generator for the current table.
@@ -371,7 +372,6 @@ var Estimator = goog.defineClass(null, {
         formatter: function(number) {
           return number.toFixed(3);
         },
-        generatedStats: [],
         key: Estimator.TableMetric.AVERAGE_CURRENT
       },
       // Generator for the energy table.
@@ -382,23 +382,20 @@ var Estimator = goog.defineClass(null, {
         formatter: function(number) {
           return number.toFixed(3);
         },
-        generatedStats: [],
         key: Estimator.TableMetric.ENERGY
       }
     ];
-    // Generate stats for each wakeup reason for each table - duration,
-    // average current and energy.
-    for (var wakeupReason in this.wakeupReasonToEventsMap_) {
-      tableGenerators.forEach(function(generator) {
-        generator.generatedStats.push(
-            this.calculateWakeupStats(wakeupReason, generator.accessor));
-      }, this);
-    }
 
     var tables = {};
+    var wakeupReasons = Object.keys(this.wakeupReasonToEventsMap_);
     tableGenerators.forEach(function(generator) {
+      // Generate stats for each wakeup reason for the current table type.
+      var tableStats = wakeupReasons.map(function(wakeupReason) {
+        return this.calculateWakeupStats(wakeupReason, generator.accessor);
+      }, this);
+
       // Sort the table's stats by the average property.
-      var sorted = generator.generatedStats.sort(function(a, b) {
+      var sorted = tableStats.sort(function(a, b) {
         return b.avg - a.avg;
       });
       // Convert each stat into table row format.
@@ -416,7 +413,7 @@ var Estimator = goog.defineClass(null, {
         }
         return row;
       });
-    });
+    }, this);
     return tables;
   },
 

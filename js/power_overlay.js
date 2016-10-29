@@ -17,7 +17,6 @@
 goog.module('historian.power.Overlay');
 goog.module.declareLegacyNamespace();
 
-
 var Csv = goog.require('historian.metrics.Csv');
 var data = goog.require('historian.data');
 var time = goog.require('historian.time');
@@ -35,17 +34,21 @@ var DROPDOWN_ID = '#power-selector';
 var DROPDOWN_CONTAINER_ID = '#power-selector-container';
 
 
+/**
+ * Renders the powermonitor overlay, showing the powermonitor events
+ * corresponding to the selected wakeup reason.
+ */
 exports = goog.defineClass(null, {
   /**
-   * Renders the powermonitor overlay, showing the powermonitor events
-   * corresponding to the selected wakeup reason.
+   * Renders the wakeup reason selector and registers listeners.
    * @param {!historian.Context} context The context for the visualization.
    * @param {!historian.LevelData} levelData The Historian v2 level data.
    * @param {!historian.power.Estimator} powerEstimator
+   * @param {!jQuery} container Container the timeline is rendered in.
    * @constructor
    * @final
    */
-  constructor: function(context, levelData, powerEstimator) {
+  constructor: function(context, levelData, powerEstimator, container) {
     /** @private {!historian.Context} */
     this.context_ = context;
 
@@ -57,7 +60,7 @@ exports = goog.defineClass(null, {
 
     /**
      * Line generator.
-     * @private {function (this:Node, !Array<!historian.Entry>): string}
+     * @private {function(this:Node, !Array<!historian.Entry>): string}
      */
     this.levelLine_ = d3.svg.line()
         .x(function(d) {
@@ -68,6 +71,9 @@ exports = goog.defineClass(null, {
         })
         .interpolate('linear');
 
+    /** @private {!jQuery} */
+    this.container_ = container;
+
     this.renderSelector_();
     this.levelData_.registerListener(this.render.bind(this));
   },
@@ -77,7 +83,7 @@ exports = goog.defineClass(null, {
    * Renders the options for the dropdown selector.
    */
   renderSelector_: function() {
-    var dropdown = $(DROPDOWN_ID);
+    var dropdown = this.container_.find(DROPDOWN_ID);
     dropdown.append($('<option></option>'));
     this.powerEstimator_.getWakeupReasons().forEach(function(wakeupReason) {
       dropdown.append($('<option></option>')
@@ -124,7 +130,7 @@ exports = goog.defineClass(null, {
    * @private
    */
   clear_: function() {
-    $('.' + OVERLAY_CLASS).remove();
+    this.container_.find('.' + OVERLAY_CLASS).remove();
   },
 
   /**
@@ -144,7 +150,7 @@ exports = goog.defineClass(null, {
    * @private
    */
   showSelector_: function(show) {
-    $(DROPDOWN_CONTAINER_ID).toggle(show);
+    this.container_.find(DROPDOWN_CONTAINER_ID).toggle(show);
   },
 
   /**
@@ -153,6 +159,7 @@ exports = goog.defineClass(null, {
    * @private
    */
   getSelected_: function() {
-    return String($(DROPDOWN_ID + ' option:selected').val());
+    return String(
+        this.container_.find(DROPDOWN_ID + ' option:selected').val());
   }
 });

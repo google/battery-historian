@@ -87,7 +87,7 @@ func (e *entry) GetKey(desc string) csv.Key {
 func Parse(f string) (bool, string, []error) {
 	var errs []error
 	var buf bytes.Buffer
-	csvState := csv.NewState(&buf, false)
+	csvState := csv.NewState(&buf, true)
 
 	activeMap := make(map[string]*entry)
 

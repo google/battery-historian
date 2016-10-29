@@ -30,9 +30,9 @@ type ChildInfo struct {
 	Head bool
 }
 
-// CheckinReport is a lightweight struct (compared to BatteryStats proto) to store Android checkin
+// BatteryReport is a lightweight struct (compared to BatteryStats proto) to store Android checkin
 // reports including batterystats and package manager dumps.
-type CheckinReport struct {
+type BatteryReport struct {
 	TimeUsec          int64 // End time, therefore, the time this report was taken.
 	TimeZone          string
 	AndroidID         int64

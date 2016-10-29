@@ -19,6 +19,8 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+
+	"github.com/google/battery-historian/csv"
 )
 
 // Tests the generating of CSV entries from a Kernel Wakesource logging file.
@@ -37,6 +39,7 @@ func TestParse(t *testing.T) {
 				`<idle>-0 [001] dNs4 "1970-01-01 00:00:51.000000" wakeup_source_deactivate: vbus-tegra-otg state=0x18490000`,
 			}, "\n"),
 			strings.Join([]string{
+				csv.FileHeader,
 				`Kernel Wakesource,service,50000,51000,[timerfd],`,
 			}, "\n"),
 			true,
@@ -49,7 +52,10 @@ func TestParse(t *testing.T) {
 				`AlarmManager-1285 [000] d..2 "1970-01-01 00:00:51.000000" wakeup_source_deactivate: [timerfd] state=0x1b740007`,
 				`AlarmManager-1285 [000] d..2 "1970-01-01 00:00:52.000000" wakeup_source_deactivate: [timerfd] state=0x1b750006`,
 			}, "\n"),
-			`Kernel Wakesource,service,50000,51000,[timerfd],`,
+			strings.Join([]string{
+				csv.FileHeader,
+				`Kernel Wakesource,service,50000,51000,[timerfd],`,
+			}, "\n"),
 			true,
 			[]error{fmt.Errorf("negative transition without positive transition for %q, wakesource %q", KernelWakeSource, "[timerfd]")},
 		},
@@ -61,6 +67,7 @@ func TestParse(t *testing.T) {
 				`AlarmManager-1285 [000] d..2 "1970-01-01 00:00:52.000000" wakeup_source_deactivate: [timerfd] state=0x1b750006`,
 			}, "\n"),
 			strings.Join([]string{
+				csv.FileHeader,
 				`Kernel Wakesource,service,50000,52000,[timerfd],`,
 			}, "\n"),
 			true,
@@ -74,6 +81,7 @@ func TestParse(t *testing.T) {
 				`dhd_watchdog_th-148 [000] d..3 "1970-01-01 00:00:51.000000" wakeup_source_deactivate: [timerfd] state=0x22290003`,
 			}, "\n"),
 			strings.Join([]string{
+				csv.FileHeader,
 				`Kernel Wakesource,service,50000,51000,[timerfd],`,
 				`Kernel Wakesource,service,50000,51000,vbus-tegra-otg,`,
 			}, "\n"),
@@ -92,6 +100,7 @@ func TestParse(t *testing.T) {
 				`healthd-188 [000] d..2 "2015-05-28 19:50:27.643544" wakeup_source_deactivate: [timerfd] state=0x17700003`,
 			}, "\n"),
 			strings.Join([]string{
+				csv.FileHeader,
 				`Kernel Wakesource,service,1432842627636,1432842627636,[timerfd],`,
 				`Kernel Wakesource,service,1432842627636,1432842627636,eventpoll,`,
 				`Kernel Wakesource,service,1432842627636,1432842627643,[timerfd],`,
@@ -110,6 +119,7 @@ func TestParse(t *testing.T) {
 				`<...>-809 [001] d..2 "2015-06-23 17:28:14.250634" wakeup_source_deactivate: PowerManagerService.WakeLocks state=0x7a3d0001`,
 			}, "\n"),
 			strings.Join([]string{
+				csv.FileHeader,
 				`Kernel Wakesource,service,1435079323754,1435080494250,PowerManagerService.WakeLocks,`,
 			}, "\n"),
 			true,

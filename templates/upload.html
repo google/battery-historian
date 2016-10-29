@@ -13,7 +13,7 @@ specific language governing permissions and limitations under the License.
 {{ define "content" }}
 <p id="processingError" style="display:none" class="alert alert-danger"></p>
 <div id="file-upload">
-  <link rel="stylesheet" href="/static/upload.css?ver={{.ResVersion}}">
+  <link rel="stylesheet" href="static/upload.css?ver={{.ResVersion}}">
   <h1>Upload Bugreport</h1>
   <p>Both .txt and .zip bug reports are accepted.</p>
   <form class="form-signin" method="post" enctype="multipart/form-data">
@@ -77,20 +77,10 @@ specific language governing permissions and limitations under the License.
   <div class="progress" style="display:none">
     <div class="progress-bar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">0%</div>
   </div>
-
-  <script src="//www.gstatic.com/external_hosted/jquery_form/jquery.form.min.js" charset="utf-8"></script>
-
-  <script type="text/javascript" src="//cdnjs.cloudflare.com/ajax/libs/d3/3.5.15/d3.js"></script>
-  {{ if .IsOptimizedJs }}
-  <script src="/compiled/historian-optimized.js?ver={{.ResVersion}}"></script>
-  {{ else }}
-  <!-- Need to load Closure in header. -->
-  <script>CLOSURE_NO_DEPS=true</script>
-  <script type="text/javascript" src="/third_party/closure-library/closure/goog/base.js"></script>
-  <script type="text/javascript" src="/compiled/historian_deps-runfiles.js"></script>
-  <script type="text/javascript">
-    goog.require('historian.upload');
-  </script>
-  {{ end }}
+  {{if not .IsOptimizedJs}}
+    <script type="text/javascript">
+      goog.require('historian.upload');
+    </script>
+  {{end}}
 </div>
 {{ end }}

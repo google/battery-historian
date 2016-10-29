@@ -480,9 +480,8 @@ testSuite({
       for (var wakeupReason in test.expectedTimeRanges) {
         var expectedTimes = test.expectedTimeRanges[wakeupReason];
         var gotEvents = powerEstimator.getEvents(wakeupReason);
-        var gotTimes = [];
-        gotEvents.forEach(function(event) {
-          gotTimes.push(event.getTimeRange());
+        var gotTimes = gotEvents.map(function(event) {
+          return event.getTimeRange();
         });
         assertObjectEquals(test.desc, expectedTimes, gotTimes);
       }

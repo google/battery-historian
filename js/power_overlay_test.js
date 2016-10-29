@@ -29,7 +29,7 @@ var mockmatchers = goog.require('goog.testing.mockmatchers');
 var testSuite = goog.require('goog.testing.testSuite');
 
 
-var mockControl_;
+var mockControl;
 
 var overlay;
 var mockLevelData;
@@ -46,32 +46,32 @@ var mockGetSelected;
 testSuite({
 
   setUp: function() {
-    mockControl_ = new MockControl();
+    mockControl = new MockControl();
 
     // Mock UI functions.
-    mockControl_.createMethodMock(Overlay.prototype, 'renderSelector_')();
-    mockClear = mockControl_.createMethodMock(Overlay.prototype, 'clear_');
-    mockDraw = mockControl_.createMethodMock(Overlay.prototype, 'draw_');
+    mockControl.createMethodMock(Overlay.prototype, 'renderSelector_')();
+    mockClear = mockControl.createMethodMock(Overlay.prototype, 'clear_');
+    mockDraw = mockControl.createMethodMock(Overlay.prototype, 'draw_');
     mockShowSelector =
-        mockControl_.createMethodMock(Overlay.prototype, 'showSelector_');
+        mockControl.createMethodMock(Overlay.prototype, 'showSelector_');
     mockGetSelected =
-        mockControl_.createMethodMock(Overlay.prototype, 'getSelected_');
+        mockControl.createMethodMock(Overlay.prototype, 'getSelected_');
 
     // Mock power estimator.
-    mockContext = mockControl_.createStrictMock(Context);
-    mockLevelData = mockControl_.createStrictMock(LevelData);
+    mockContext = mockControl.createStrictMock(Context);
+    mockLevelData = mockControl.createStrictMock(LevelData);
     mockLevelData.registerListener(mockmatchers.isFunction);
-    mockEstimator = mockControl_.createStrictMock(Estimator);
-    mockControl_.$replayAll();
+    mockEstimator = mockControl.createStrictMock(Estimator);
+    mockControl.$replayAll();
 
     overlay = new Overlay(mockContext, mockLevelData, mockEstimator);
 
-    mockControl_.$verifyAll();
-    mockControl_.$resetAll();
+    mockControl.$verifyAll();
+    mockControl.$resetAll();
   },
 
   tearDown: function() {
-    mockControl_.$tearDown();
+    mockControl.$tearDown();
   },
 
   /**
@@ -83,10 +83,10 @@ testSuite({
     mockLevelData.getConfig().$returns({name: Csv.POWERMONITOR});
     mockGetSelected().$returns('');
     mockShowSelector(true);
-    mockControl_.$replayAll();
+    mockControl.$replayAll();
 
     overlay.render();
-    mockControl_.$verifyAll();
+    mockControl.$verifyAll();
   },
 
   /**
@@ -100,10 +100,10 @@ testSuite({
     mockShowSelector(true);
     mockContext.msPerPixel().$returns(10);
     mockEstimator.getEvents('wake_reason').$returns([]);
-    mockControl_.$replayAll();
+    mockControl.$replayAll();
 
     overlay.render();
-    mockControl_.$verifyAll();
+    mockControl.$verifyAll();
   },
 
   /**
@@ -117,11 +117,11 @@ testSuite({
     mockShowSelector(true);
     mockContext.msPerPixel().$returns(10);
 
-    var mockPowerEvent1 = mockControl_.createStrictMock(Event);
+    var mockPowerEvent1 = mockControl.createStrictMock(Event);
     var powermonitorEvents1 = [{startTime: 1000}, {startTime: 2000}];
     mockPowerEvent1.getPowermonitorEvents().$returns(powermonitorEvents1);
 
-    var mockPowerEvent2 = mockControl_.createStrictMock(Event);
+    var mockPowerEvent2 = mockControl.createStrictMock(Event);
     var powermonitorEvents2 = [{startTime: 300}];
     mockPowerEvent2.getPowermonitorEvents().$returns(powermonitorEvents2);
 
@@ -129,10 +129,10 @@ testSuite({
         .$returns([mockPowerEvent1, mockPowerEvent2]);
     mockDraw(powermonitorEvents1);
     mockDraw(powermonitorEvents2);
-    mockControl_.$replayAll();
+    mockControl.$replayAll();
 
     overlay.render();
-    mockControl_.$verifyAll();
+    mockControl.$verifyAll();
 
   },
 
@@ -147,19 +147,19 @@ testSuite({
     mockShowSelector(true);
     mockContext.msPerPixel().$returns(2000);
 
-    var mockPowerEvent = mockControl_.createStrictMock(Event);
+    var mockPowerEvent = mockControl.createStrictMock(Event);
     var powermonitorEvents = [{startTime: 1000}, {startTime: 1100}];
     mockPowerEvent.getPowermonitorEvents().$returns(powermonitorEvents);
 
     mockEstimator.getEvents('wake_reason').$returns([mockPowerEvent]);
     var sampled = [{startTime: 1000}];
-    var sampleMock = mockControl_.createMethodMock(data, 'sampleData');
+    var sampleMock = mockControl.createMethodMock(data, 'sampleData');
     sampleMock(powermonitorEvents).$returns(sampled);
     mockDraw(sampled);
-    mockControl_.$replayAll();
+    mockControl.$replayAll();
 
     overlay.render();
-    mockControl_.$verifyAll();
+    mockControl.$verifyAll();
   },
 
   /**
@@ -170,9 +170,9 @@ testSuite({
     mockLevelData.getConfig().$returns({name: Csv.BATTERY_LEVEL});
     mockGetSelected().$returns('');
     mockShowSelector(false);
-    mockControl_.$replayAll();
+    mockControl.$replayAll();
 
     overlay.render();
-    mockControl_.$verifyAll();
+    mockControl.$verifyAll();
   }
 });

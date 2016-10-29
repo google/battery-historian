@@ -231,16 +231,82 @@ testSuite({
         startTime: 20,
         endTime: 20,
         expected: []
+      },
+      {
+        desc: 'Multiple entries with same start and end times',
+        multiOnly: true,
+        data: [
+          [1000, 2000, 'a'],
+          [1000, 2000, 'b'],
+          [2000, 3000, 'a'],
+          [2000, 3000, 'b'],
+          [3000, 4000, 'a'],
+          [3000, 4000, 'b']
+        ],
+        startTime: 2000,
+        endTime: 3000,
+        expected: [
+          [2000, 3000, 'a'],
+          [2000, 3000, 'b']
+        ]
       }
     ];
     tests.forEach(function(t) {
       var data = testUtils.createData(t.data);
 
-      var result = utils.inTimeRange(t.startTime, t.endTime, data);
+      var result = utils.inTimeRangeMulti(t.startTime, t.endTime, data);
       var expected = testUtils.createData(t.expected);
 
-      assertObjectEquals(t.desc + ': Expected ' + JSON.stringify(expected) +
+      assertObjectEquals(t.desc +
+          '[multi]: Expected ' + JSON.stringify(expected) +
           ', got ' + JSON.stringify(result), expected, result);
+
+      if (!t.multiOnly) {
+        result = utils.inTimeRange(t.startTime, t.endTime, data);
+        expected = testUtils.createData(t.expected);
+
+        assertObjectEquals(t.desc + ': Expected ' + JSON.stringify(expected) +
+            ', got ' + JSON.stringify(result), expected, result);
+      }
+    });
+  },
+  // Tests the generating of the first derivative for the given data.
+  testGenerativeDerivative: function() {
+    var tests = [
+      {
+        desc: 'Empty array',
+        data: [],
+        expected: []
+      },
+      {
+        desc: 'One element in array',
+        data: [
+          [11000, 11333, 800]
+        ],
+        expected: []
+      },
+      {
+        desc: 'Multiple elements in array',
+        data: [
+          [0, 60000, 100],
+          [60000, 90000, 99],
+          [90000, 330000, 97],
+          [330000, 330000, 99],
+          [330000, 340000, 98]
+        ],
+        expected: [
+          [0, 60000, -60],
+          [60000, 90000, -240],
+          [90000, 330000, 30],
+          [330000, 330000, 0]
+        ],
+      }
+    ];
+    tests.forEach(function(t) {
+      var result = utils.generateDerivative(testUtils.createData(t.data));
+      var expected = testUtils.createData(t.expected);
+      assertArrayEquals(t.desc + ': Expected ' + expected +
+          ', got ' + result, expected, result);
     });
   }
 });

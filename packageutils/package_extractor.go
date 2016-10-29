@@ -49,7 +49,7 @@ var (
 	packageDumpCompatRE = regexp.MustCompile(`compat name=(?P<package>\S+)`)
 
 	// packageDumpVersionCodeRE is a regular expression to match a version code line in the package dump section (eg. 'versionCode=94 targetSdk=19')
-	packageDumpVersionCodeRE = regexp.MustCompile(`versionCode=(?P<versionCode>\d+)\stargetSdk=\d+`)
+	packageDumpVersionCodeRE = regexp.MustCompile(`versionCode=(?P<versionCode>\d+)(\sminSdk=\S+)?\stargetSdk=\d+`)
 
 	// packageDumpVersionNameRE is a regular expression to match a version name line in the package dump section (eg. 'versionName=4.0.3')
 	packageDumpVersionNameRE = regexp.MustCompile(`versionName=(?P<versionName>\S+)`)

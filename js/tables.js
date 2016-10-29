@@ -187,6 +187,61 @@ historian.tables.makeTablesCopiable = function(tables) {
 
 
 /**
+ * Returns the contents of the table as a string.
+ * @param {!jQuery} table The table to return as a string.
+ * @param {string=} opt_tableName The name of the table to use as a header.
+ * @return {string} The table as a string.
+ */
+historian.tables.toString = function(table, opt_tableName) {
+  var rows = $(table).find('tr').get();
+  var maxLengths = rows
+      .map(function(curValue, index) {
+        var lengths = [];
+        $(curValue).find('th, td').each(function() {
+          lengths.push($(this).text().length);
+        });
+        return lengths;
+      })
+      .reduce(function(curMax, lengths) {
+        for (var i = 0; i < lengths.length; i++) {
+          if (i >= curMax.length) {
+            curMax.push(lengths[i]);
+          } else {
+            curMax[i] = Math.max(curMax[i], lengths[i]);
+          }
+        }
+        return curMax;
+      }, []);
+  var tableName = opt_tableName || '';
+  var content = rows
+      .map(function(curValue, index) {
+        var padded = [];
+        var x = $(curValue).find('th, td');
+        var numEmpty = 0;
+        for (var i = 0; i < x.length; i++) {
+          var text = /** @type {string} */ ($(x[i]).text());
+          if (text.trim().length == 0) {
+            numEmpty++;
+          }
+          padded.push(historian.utils.padString(
+              text, maxLengths[i], ' '));
+        }
+        if (numEmpty != x.length) {
+          // Tables without an official header will return an extra row
+          // with empty values in this process. We just ignore them so we
+          // don't create an extra row that is completely empty.
+          return padded;
+        }
+      })
+      .reduce(function(allContents, padded) {
+        var addition = padded ? padded.join(' | ') + '\n' : '';
+        return allContents + addition;
+      }, tableName);
+  return content;
+};
+
+
+/**
  * Adds copy functionality to a table.
  * @param {!jQuery} table The table that should have copy functionality enabled.
  */
@@ -200,52 +255,10 @@ historian.tables.activateTableCopy = function(table) {
       .addClass('btn btn-default btn-xs table-copy')
       .prependTo($(table).parent())
       .click(function() {
-        var rows = $(table).find('tr').get();
-        var maxLengths = rows
-            .map(function(curValue, index) {
-              var lengths = [];
-              $(curValue).find('th, td').each(function() {
-                lengths.push($(this).text().length);
-              });
-              return lengths;
-            })
-            .reduce(function(curMax, lengths) {
-              for (var i = 0; i < lengths.length; i++) {
-                if (i >= curMax.length) {
-                  curMax.push(lengths[i]);
-                } else {
-                  curMax[i] = Math.max(curMax[i], lengths[i]);
-                }
-              }
-              return curMax;
-            }, []);
         // Use the table name as a header, if possible.
         var tableName = tableNameSpan && tableNameSpan.text() ?
             tableNameSpan.text() + '\n' : '';
-        var content = rows
-            .map(function(curValue, index) {
-              var padded = [];
-              var x = $(curValue).find('th, td');
-              var numEmpty = 0;
-              for (var i = 0; i < x.length; i++) {
-                var text = /** @type {string} */ ($(x[i]).text());
-                if (text.trim().length == 0) {
-                  numEmpty++;
-                }
-                padded.push(historian.utils.padString(
-                    text, maxLengths[i], ' '));
-              }
-              if (numEmpty != x.length) {
-                // Tables without an official header will return an extra row
-                // with empty values in this process. We just ignore them so we
-                // don't create an extra row that is completely empty.
-                return padded;
-              }
-            })
-            .reduce(function(allContents, padded) {
-              var addition = padded ? padded.join(' | ') + '\n' : '';
-              return allContents + addition;
-            }, tableName);
+        var content = historian.tables.toString(table, tableName);
         var textArea = $('<textarea></textarea>')
             .val(content)
             .appendTo('body')
@@ -289,6 +302,25 @@ historian.tables.normalizeTableEntries = function() {
 
 
 /**
+ * Marks each table row, whose cell in column valuesColNumber contains no non-0
+ * numerals, with the 'label-zero-value-row' class. Non-digits are ignored.
+ * @param {jQuery} table The table whose rows are to be marked.
+ * @param {number} valuesColNumber The column number (0-indexed) whose cells are
+ *   searched for non-0 numerals.
+ */
+historian.tables.determineZeroValueRows = function(table, valuesColNumber) {
+  table.find('tbody tr').each(function() {
+    var row = this;
+    var valueCell = row.cells[valuesColNumber];
+    // Mark if valueCell does not contain a non-zero number.
+    if (!/[1-9]/.test($(valueCell).html())) {
+      $(row).addClass('label-zero-value-row');
+    }
+  });
+};
+
+
+/**
  * Initializes the tables.
  * Adds custom duration sorting to duration columns.
  * Normalizes some of the duration columns.
@@ -322,6 +354,18 @@ historian.tables.initTables = function() {
     } else {
       $('#wakeup-breakdown').hide();
       $('#wakeup-no-breakdown').show();
+    }
+  });
+  // Show aggregated checkin stats with 0 levels only if checkbox checked.
+  // 0-Values are determined by looking at Checkin's column 1 (second column).
+  historian.tables.determineZeroValueRows($('table#checkin'), 1);
+  var lowAggCheckinRows = $('table#checkin .label-zero-value-row');
+  lowAggCheckinRows.hide();
+  $('#show-low-metrics').change(function() {
+    if ($(this).prop('checked')) {
+      lowAggCheckinRows.show();
+    } else {
+      lowAggCheckinRows.hide();
     }
   });
 };

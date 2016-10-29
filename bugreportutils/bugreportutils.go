@@ -58,10 +58,15 @@ var (
 	// pidRE is a regular expression to match PID to app name and UID.
 	pidRE = regexp.MustCompile(`PID #` + `(?P<pid>\d+)` + `: ProcessRecord[^:]+:` + `(?P<app>[^/]+)` + `/` + `(?P<uid>.*)` + `}`)
 
-	// sensorLineRE is a regular expression to match the sensor list line in the sensorservice dump of a bug report.
-	sensorLineRE = regexp.MustCompile(`(?P<sensorName>[^|]+)` + `\|` + `(?P<sensorManufacturer>[^|]+)` + `\|` +
+	// sensorLineMMinusRE is a regular expression to match the sensor list line in the sensorservice dump of a bug report from MNC or before.
+	sensorLineMMinusRE = regexp.MustCompile(`(?P<sensorName>[^|]+)` + `\|` + `(?P<sensorManufacturer>[^|]+)` + `\|` +
 		`(\s*version=(?P<versionNumber>\d+)\s*\|)?` + `\s*(?P<sensorTypeString>[^|]+)` +
 		`\|` + `\s*(?P<sensorNumber>0x[0-9A-Fa-f]+)`)
+
+	// sensorLineNPlusRE is a regular expression to match the sensor list line in the sensorservice dump of a bug report starting from NRD42 and onwards.
+	sensorLineNPlusRE = regexp.MustCompile(`(?P<sensorNumber>0x?[0-9A-Fa-f]+)` + `\)\s*` +
+		`(?P<sensorName>[^|]+)` + `\s*\|` + `(?P<sensorManufacturer>[^|]+)` + `\|\s*ver:\s*` +
+		`(?P<versionNumber>\d+)` + `\s*\|\s*type:\s*` + `(?P<sensorTypeString>[^(]+)` + `\(\d+\)\s*\|`)
 
 	// TimeZoneRE is a regular expression to match the timezone string in a bug report.
 	TimeZoneRE = regexp.MustCompile(`^\[persist.sys.timezone\]:\s+\[` + `(?P<timezone>\S+)\]`)
@@ -199,25 +204,30 @@ Loop:
 		if !inSSection {
 			continue
 		}
-		if m, result := historianutils.SubexpNames(sensorLineRE, line); m {
-			n, err := strconv.ParseInt(result["sensorNumber"], 0, 32)
+		m, result := historianutils.SubexpNames(sensorLineMMinusRE, line)
+		if !m {
+			m, result = historianutils.SubexpNames(sensorLineNPlusRE, line)
+		}
+		if !m {
+			continue
+		}
+		n, err := strconv.ParseInt(result["sensorNumber"], 0, 32)
+		if err != nil {
+			return nil, err
+		}
+		v := 0
+		if x := result["versionNumber"]; x != "" {
+			v, err = strconv.Atoi(x)
 			if err != nil {
 				return nil, err
 			}
-			v := 0
-			if x := result["versionNumber"]; x != "" {
-				v, err = strconv.Atoi(x)
-				if err != nil {
-					return nil, err
-				}
-			}
+		}
 
-			sensors[int32(n)] = SensorInfo{
-				Name:    result["sensorName"],
-				Number:  int32(n),
-				Type:    result["sensorTypeString"],
-				Version: int32(v),
-			}
+		sensors[int32(n)] = SensorInfo{
+			Name:    result["sensorName"],
+			Number:  int32(n),
+			Type:    result["sensorTypeString"],
+			Version: int32(v),
 		}
 	}
 

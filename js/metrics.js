@@ -19,8 +19,10 @@
  */
 goog.provide('historian.metrics');
 goog.provide('historian.metrics.Csv');
+goog.provide('historian.metrics.DataHasher');
 
 goog.require('historian.constants');
+goog.require('historian.historianV2Logs');
 
 
 /** CPU Running entry that intersects with a wakelock entry. */
@@ -103,10 +105,12 @@ historian.metrics.Csv = {
   SIGNIFICANT_MOTION: 'Significant motion',
 
   // Service metrics
+  APPLICATION_PROCESSOR_WAKEUP: 'App Processor wakeup',
   WAKELOCK_IN: 'Wakelock_in',
   WAKE_LOCK_HELD: 'Partial wakelock',
   SYNC_APP: 'SyncManager',
   ACTIVE_PROCESS: 'Active process',
+  LONG_WAKELOCK: 'Long Wakelocks',
   FOREGROUND_PROCESS: 'Foreground process',
   TOP_APPLICATION: 'Top app',
   CONNECTIVITY: 'Network connectivity',
@@ -122,7 +126,9 @@ historian.metrics.Csv = {
 
   // Logcat metrics
   CRASHES: 'Crashes',
+  NATIVE_CRASHES: 'Native crash',
   BLUETOOTH_SCAN: 'Bluetooth Scan',
+  LOGCAT_MISC: 'Logcat misc',
 
   // Event log metrics.
   AM_PROC_START: 'AM Proc Start',
@@ -132,20 +138,30 @@ historian.metrics.Csv = {
   AM_LOW_MEMORY: 'AM Low Memory',
   AM_ANR: 'ANR',
   // Group name for AM_LOW_MEMORY and AM_ANR.
-  AM_LOW_MEMORY_ANR: 'AM Low Memory / ANR'
+  AM_LOW_MEMORY_ANR: 'AM Low Memory / ANR',
+
+  // Summary metrics
+  APP_CPU_USAGE: 'Highest App CPU Usage',
+  LOW_POWER_STATE: 'Low Power State',
+
+  // Wearable metrics
+  WEARABLE_RPC: 'Wearable RPC',
+  WEARABLE_TRANSPORT: 'Wearable Transport'
 };
 
 
 /**
- * Defines the order the metrics are drawn in Historian v2.
+ * Default order of metrics in the Battery History timeline.
  * @const {!Array<string>}
  */
-historian.metrics.ORDER = [
+historian.metrics.BATTERY_HISTORY_ORDER = [
   historian.metrics.Csv.REBOOT,
   historian.metrics.Csv.CPU_RUNNING,
+  historian.metrics.Csv.APPLICATION_PROCESSOR_WAKEUP,
   historian.metrics.KERNEL_UPTIME,
   historian.metrics.Csv.WAKELOCK_IN,
   historian.metrics.Csv.WAKE_LOCK_HELD,
+  historian.metrics.Csv.LONG_WAKELOCK,
   historian.metrics.Csv.KERNEL_WAKESOURCE,
   historian.metrics.Csv.SCREEN_ON,
   historian.metrics.Csv.TOP_APPLICATION,
@@ -198,7 +214,34 @@ historian.metrics.ORDER = [
   historian.metrics.Csv.PACKAGE_INSTALL,
   historian.metrics.Csv.PACKAGE_UNINSTALL,
   historian.metrics.Csv.PACKAGE_ACTIVE,
-  historian.metrics.Csv.PACKAGE_INACTIVE
+  historian.metrics.Csv.PACKAGE_INACTIVE,
+
+  historian.metrics.Csv.BATTERY_LEVEL,
+  historian.metrics.Csv.COULOMB_CHARGE,
+  historian.metrics.Csv.TEMPERATURE,
+  historian.metrics.Csv.PLUGGED,
+  historian.metrics.Csv.CHARGING_ON,
+
+  historian.metrics.Csv.WEARABLE_RPC,
+  historian.metrics.Csv.WEARABLE_TRANSPORT,
+
+  historian.metrics.Csv.LOGCAT_MISC
+];
+
+
+/**
+ * Default hidden metrics in the Battery History timeline.
+ * @const {!Array<string>}
+ */
+historian.metrics.BATTERY_HISTORY_HIDDEN = [
+  historian.metrics.Csv.BRIGHTNESS,
+  historian.metrics.Csv.CHARGING_STATUS,
+  historian.metrics.Csv.DEVICE_ACTIVE,
+  historian.metrics.Csv.HEALTH,
+  historian.metrics.Csv.MONSOON,
+  historian.metrics.Csv.PLUG_TYPE,
+  historian.metrics.Csv.TMP_WHITE_LIST,
+  historian.metrics.Csv.VOLTAGE,
 ];
 
 
@@ -265,28 +308,6 @@ historian.metrics.getLevelSummaryDimensionKey = function(name) {
 
 
 /**
- * Map for testing whether metric will be hidden by default as a bar metric.
- * True for the metric if metric is to be hidden.
- * @type {!Object<boolean>}
- */
-historian.metrics.hiddenBarMetrics = {};
-
-
-/**
- * Metrics that will be hidden by default as a bar metric.
- * @private @const {!Array<string>}
- */
-historian.metrics.HIDDEN_BAR_METRICS_ = [
-  historian.metrics.Csv.HEALTH,
-  historian.metrics.Csv.PLUG_TYPE,
-  historian.metrics.Csv.CHARGING_STATUS,
-  historian.metrics.Csv.VOLTAGE,
-  historian.metrics.Csv.BRIGHTNESS,
-  historian.metrics.Csv.POWERMONITOR
-];
-
-
-/**
  * Map for testing whether metric will be aggregated.
  * True for metrics to be aggregated.
  * @type {!Object<boolean>}
@@ -299,11 +320,15 @@ historian.metrics.metricsToAggregate = {};
  * @private @const {!Array<string>}
  */
 historian.metrics.METRICS_TO_AGGREGATE_ = [
-  historian.metrics.Csv.SYNC_APP,
-  historian.metrics.Csv.FOREGROUND_PROCESS,
-  historian.metrics.Csv.WAKELOCK_IN,
+  historian.metrics.Csv.ACTIVE_PROCESS,
   historian.metrics.Csv.CONNECTIVITY,
-  historian.metrics.Csv.KERNEL_WAKESOURCE
+  historian.metrics.Csv.FOREGROUND_PROCESS,
+  historian.metrics.Csv.KERNEL_WAKESOURCE,
+  historian.metrics.Csv.LONG_WAKELOCK,
+  historian.metrics.Csv.SCHEDULED_JOB,
+  historian.metrics.Csv.SYNC_APP,
+  historian.metrics.Csv.WAKELOCK_IN,
+  historian.metrics.Csv.WEARABLE_TRANSPORT
 ];
 
 
@@ -320,8 +345,10 @@ historian.metrics.appSpecificMetrics = {};
  * @private @const {!Array<string>}
  */
 historian.metrics.APP_SPECIFIC_METRICS_ = [
+  historian.metrics.Csv.APPLICATION_PROCESSOR_WAKEUP,
   historian.metrics.Csv.SYNC_APP,
   historian.metrics.Csv.FOREGROUND_PROCESS,
+  historian.metrics.Csv.LONG_WAKELOCK,
   historian.metrics.Csv.WAKELOCK_IN,
   historian.metrics.Csv.TOP_APPLICATION,
   historian.metrics.Csv.SCHEDULED_JOB,
@@ -333,8 +360,9 @@ historian.metrics.APP_SPECIFIC_METRICS_ = [
   historian.metrics.Csv.AM_PROC_START,
   historian.metrics.Csv.AM_PROC_DIED,
   historian.metrics.Csv.AM_ANR,
+  historian.metrics.Csv.BLUETOOTH_SCAN,
   historian.metrics.Csv.CRASHES,
-  historian.metrics.Csv.BLUETOOTH_SCAN
+  historian.metrics.Csv.NATIVE_CRASHES
 ];
 
 
@@ -347,12 +375,15 @@ historian.metrics.unreliableMetrics = {};
 
 
 /**
- * Metrics which are unreliable.
- * @private @const {!Array<string>}
+ * Metrics which are unreliable. The key is the report version in which the
+ * metric reliability was fixed. The -1 key indicates that the metric is
+ * still unreliable. The current structure assumes that metrics won't become
+ * unreliable in the future.
+ * @private @const {!Object<number, !Array<string>>}
  */
-historian.metrics.UNRELIABLE_METRICS_ = [
-  historian.metrics.Csv.AUDIO
-];
+historian.metrics.UNRELIABLE_METRICS_ = {
+  17: [historian.metrics.Csv.AUDIO] // Fixed in report version 17.
+};
 
 
 /**
@@ -373,8 +404,9 @@ historian.metrics.RENDER_AS_CIRCLES_ = [
   historian.metrics.Csv.AM_PROC_DIED,
   historian.metrics.Csv.AM_LOW_MEMORY,
   historian.metrics.Csv.AM_ANR,
+  historian.metrics.Csv.BLUETOOTH_SCAN,
   historian.metrics.Csv.CRASHES,
-  historian.metrics.Csv.BLUETOOTH_SCAN
+  historian.metrics.Csv.NATIVE_CRASHES
 ];
 
 
@@ -396,6 +428,33 @@ historian.metrics.LOGCAT_METRICS_ = [
 
 
 /**
+ * Map from metric name to bool, for testing whether a metric has only instant
+ * events (duration 0 ms).
+ * @type {!Object<boolean>}
+ */
+historian.metrics.instantMetrics = {};
+
+
+/**
+ * Metrics that only have instant events.
+ * @private @const {!Array<string>}
+ */
+historian.metrics.INSTANT_METRICS_ = [
+  historian.metrics.Csv.APPLICATION_PROCESSOR_WAKEUP,
+  historian.metrics.Csv.BATTERY_LEVEL,
+  historian.metrics.Csv.CRASHES,
+  historian.metrics.Csv.NATIVE_CRASHES,
+  historian.metrics.Csv.SIGNIFICANT_MOTION,
+  historian.metrics.Csv.DEVICE_ACTIVE,
+  historian.metrics.Csv.PACKAGE_INSTALL,
+  historian.metrics.Csv.PACKAGE_UNINSTALL,
+  historian.metrics.Csv.PACKAGE_ACTIVE,
+  historian.metrics.Csv.PACKAGE_INACTIVE,
+  historian.metrics.Csv.WEARABLE_RPC
+];
+
+
+/**
  * Map from group name to descriptor to display in help tooltips.
  * @type {!Object<string>}
  */
@@ -406,23 +465,33 @@ historian.metrics.descriptors = {};
  * Sets up the maps for testing properties for the metrics.
  */
 historian.metrics.initMetrics = function() {
-  historian.metrics.HIDDEN_BAR_METRICS_.forEach(function(m) {
-    historian.metrics.hiddenBarMetrics[m] = true;
-  });
   historian.metrics.METRICS_TO_AGGREGATE_.forEach(function(m) {
     historian.metrics.metricsToAggregate[m] = true;
   });
   historian.metrics.APP_SPECIFIC_METRICS_.forEach(function(m) {
     historian.metrics.appSpecificMetrics[m] = true;
   });
-  historian.metrics.UNRELIABLE_METRICS_.forEach(function(m) {
-    historian.metrics.unreliableMetrics[m] = true;
-  });
+  for (var rv in historian.metrics.UNRELIABLE_METRICS_) {
+    // Javascript implicitly converts keys to strings, so we need to convert it
+    // back to a number.
+    rv = Number(rv);
+    if (historian.reportVersion >= rv) {
+      // If the current report version is higher than the version the metrics
+      // were fixed in, then we shouldn't mark them as unreliable.
+      continue;
+    }
+    historian.metrics.UNRELIABLE_METRICS_[rv].forEach(function(m) {
+      historian.metrics.unreliableMetrics[m] = true;
+    });
+  }
   historian.metrics.RENDER_AS_CIRCLES_.forEach(function(m) {
     historian.metrics.renderAsCircles[m] = true;
   });
   historian.metrics.LOGCAT_METRICS_.forEach(function(m) {
     historian.metrics.logcatMetrics[m] = true;
+  });
+  historian.metrics.INSTANT_METRICS_.forEach(function(m) {
+    historian.metrics.instantMetrics[m] = true;
   });
   // Descriptors populated here will be shown in the corresponding help icon.
   historian.metrics.descriptors[historian.metrics.Csv.WAKE_LOCK_HELD] =
@@ -437,6 +506,15 @@ historian.metrics.initMetrics = function() {
       'system stats Userspace Wakelocks table for absolute numbers.\n\n' +
       'You can also enable full wakelock reporting:\n' +
       'adb shell dumpsys batterystats --enable full-wake-history';
+  historian.metrics.descriptors[historian.metrics.Csv.LONG_WAKELOCK] =
+      'Wakelocks are currently logged as being held for a long time after ' +
+      'being held for a minute, so the time shown here is the amount of time ' +
+      'the wakelock was held after the initial minute.';
+  historian.metrics.descriptors[historian.metrics.KERNEL_UPTIME] =
+      'Time when the CPU is running but there is no userspace wakelock held ' +
+      'is attributed to kernel only uptime. This metric is generated by ' +
+      'comparing CPU running and Userspace wakelock events and is not ' +
+      'present in the battery history log.';
 };
 
 
@@ -451,22 +529,133 @@ historian.metrics.isAggregatedMetric = function(name) {
 
 
 /**
- * Returns the metric name appended with the error identifier.
+ * Returns the metric name modified for the given type.
+ * @param {string} type The type of the metric.
  * @param {string} name The original metric name.
  * @return {string}
  */
-historian.metrics.errorMetric = function(name) {
-  return name + ' [Error]';
+historian.metrics.typedMetricName = function(type, name) {
+  switch (type) {
+    case historian.metrics.ERROR_TYPE:
+      return name + ' [Error]';
+    case historian.metrics.UNAVAILABLE_TYPE:
+      return name + ': no data';
+    default:
+      return name;
+  }
 };
 
 
 /**
- * Gets the base metric name without the error identifier.
- * @param {string} name The name for the error metric.
+ * Gets the base metric name without the error or unavailable identifier.
+ * @param {string} type The type of the metric.
+ * @param {string} name The name for the error or unavailable metric.
  * @return {string} The original metric name.
  */
-historian.metrics.baseMetric = function(name) {
-  var lastIndex = name.lastIndexOf(' ');
-  return ((lastIndex == historian.constants.NOT_FOUND) ? name :
-      name.substring(0, lastIndex));
+historian.metrics.baseMetric = function(type, name) {
+  var lastIndex = historian.constants.NOT_FOUND;
+  switch (type) {
+    case historian.metrics.ERROR_TYPE:
+      lastIndex = name.lastIndexOf(' ');
+      break;
+    case historian.metrics.UNAVAILABLE_TYPE:
+      lastIndex = name.lastIndexOf(':');
+      break;
+  }
+  return lastIndex == historian.constants.NOT_FOUND ? name :
+      name.substring(0, lastIndex);
+};
+
+
+/**
+ * Returns whether duration should be shown for entries in the given series.
+ * @param {string} seriesName
+ * @return {boolean} True if duration should be shown.
+ */
+historian.metrics.hasDuration = function(seriesName) {
+  // Don't show durations for userspace partial wakelocks or screen on
+  // reasons since they will confuse people.
+  // Instant metrics only have events with no duration.
+  return (seriesName != historian.metrics.Csv.WAKE_LOCK_HELD) &&
+      (seriesName != historian.metrics.Csv.SCREEN_ON) &&
+      !(seriesName in historian.metrics.instantMetrics);
+};
+
+
+/**
+ * Returns the hash of the log source and series name. Currently assumes each
+ * log source has unique series names.
+ * @param {!historian.historianV2Logs.Sources} logSource
+ * @param {string} seriesName
+ * @return {string}
+ */
+historian.metrics.hash = function(logSource, seriesName) {
+  return logSource + seriesName;
+};
+
+
+
+/**
+ * DataHasher stores series data, hashing based on the log source and series
+ * name.
+ * @constructor
+ * @struct
+ */
+historian.metrics.DataHasher = function() {
+  /**
+   * Map from the series hash to the corresponding series data.
+   * @private {!Object<!historian.SeriesData>}
+   */
+  this.series_ = {};
+};
+
+
+/**
+ * Adds the given series data to the map if it doesn't exist, otherwise nothing
+ * is done.
+ * @param {!historian.SeriesData} seriesData
+ */
+historian.metrics.DataHasher.prototype.add = function(seriesData) {
+  var hash = historian.metrics.hash(seriesData.source, seriesData.name);
+  if (!(hash in this.series_)) {
+    this.series_[hash] = seriesData;
+  }
+};
+
+
+/**
+ * Returns the series data corresponding to the log source and series name.
+ * @param {!historian.historianV2Logs.Sources} logSource
+ * @param {string} seriesName
+ * @return {?historian.SeriesData}
+ */
+historian.metrics.DataHasher.prototype.get = function(logSource, seriesName) {
+  var hash = historian.metrics.hash(logSource, seriesName);
+  return hash in this.series_ ?
+      this.series_[historian.metrics.hash(logSource, seriesName)] : null;
+};
+
+
+/**
+ * Returns all the stored series data.
+ * @return {!Array<!historian.SeriesData>}
+ */
+historian.metrics.DataHasher.prototype.getAll = function() {
+  var series = [];
+  for (var hash in this.series_) {
+    series.push(this.series_[hash]);
+  }
+  return series;
+};
+
+
+/**
+ * Returns the series data for series from the BATTERY_HISTORY log.
+ * @param {string} seriesName Name of the series to get data for.
+ * @return {?historian.SeriesData}
+ */
+historian.metrics.DataHasher.prototype.getBatteryHistorySeries =
+    function(seriesName) {
+  return this.get(
+      historian.historianV2Logs.Sources.BATTERY_HISTORY, seriesName);
 };

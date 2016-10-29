@@ -30,6 +30,7 @@ goog.require('historian.time');
 /**
  * Creates the SeriesLevel boxes to be hovered.
  *
+ * @param {!jQuery} container Container for the visualization.
  * @param {!historian.Context} context The visualization context.
  * @param {!historian.BarData} barData The bar data used in historian V2.
  * @param {!historian.LevelSummaryData} levelSummaryData
@@ -37,7 +38,8 @@ goog.require('historian.time');
  * @constructor
  * @struct
  */
-historian.SeriesLevel = function(context, barData, levelSummaryData, state) {
+historian.SeriesLevel = function(
+    container, context, barData, levelSummaryData, state) {
   /** @private {!historian.Context} */
   this.context_ = context;
 
@@ -59,7 +61,31 @@ historian.SeriesLevel = function(context, barData, levelSummaryData, state) {
   /** @private {?historian.Tooltip} */
   this.tooltip_ = null;
 
+  /** @private {boolean} */
+  this.show_ = true;
+
   this.barData_.registerListener(this.onSeriesChange.bind(this));
+
+  var wasShown = container.find('.show-level-summary').is(':checked');
+  container.find('.show-level-summary').change(function(event) {
+    this.show_ = $(event.target).is(':checked');
+    if (event.hasOwnProperty('originalEvent')) {
+      // Change here if the user made the change; ignore if it was changed
+      // programatically.
+      wasShown = this.show_;
+    }
+    this.onSeriesChange();
+  }.bind(this));
+
+  // The level summary data is confusing without the bars, so
+  // hide it automatically if the bars are hidden.
+  container.find('.show-bars').change(function(event) {
+    if (!$(event.target).is(':checked')) {
+      container.find('.show-level-summary').prop('checked', false).change();
+    } else {
+      container.find('.show-level-summary').prop('checked', wasShown).change();
+    }
+  });
 };
 
 
@@ -94,6 +120,9 @@ historian.SeriesLevel.prototype.update = function() {
  * @private
  */
 historian.SeriesLevel.prototype.renderSeriesLevel_ = function() {
+  if (!this.show_) {
+    return;
+  }
   var seriesGroups = this.context_.svgSeriesLevel.selectAll('g.series-level')
       .data(this.groupsToRender_, function(series) { return series.name; });
   seriesGroups.enter().append('g')

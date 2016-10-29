@@ -23,19 +23,18 @@ import (
 	"testing"
 
 	"github.com/golang/protobuf/proto"
+	"github.com/google/battery-historian/csv"
 	usagepb "github.com/google/battery-historian/pb/usagestats_proto"
 )
 
 // TestParse tests the generation of CSV entries for activity manager events from the bug report event logs.
 func TestParse(t *testing.T) {
 	tests := []struct {
-		desc                string
-		input               []string
-		pkgs                []*usagepb.PackageInfo
-		wantCSV             []string
-		wantGroupToLogStart map[string]int64
-		wantWarnings        []string
-		wantErrors          []error
+		desc  string
+		input []string
+		pkgs  []*usagepb.PackageInfo
+
+		wantLogsData LogsData
 	}{
 		{
 			desc: "Multple am_proc_start and am_proc_died events",
@@ -49,18 +48,23 @@ func TestParse(t *testing.T) {
 				`09-15 09:29:35.654 29393 30001 I am_proc_start: [11,26297,1110003,android.process.acore,broadcast,com.android.providers.contacts/.PackageIntentReceiver]`,
 				`09-15 09:32:09.049 29393 30001 I am_proc_died: [11,26187,com.google.android.gms.unstable]`,
 				`09-15 09:32:11.261 29393 31350 I am_proc_died: [11,26297,android.process.acore]`,
+				`------ 0.165s was the duration of 'EVENT LOG' ------`, // This should not be considered a new section.
 				``,
 				`[persist.sys.timezone]: [America/Los_Angeles]`,
 			},
-			wantCSV: []string{
-				`Activity Manager Proc,service,1442334565370,1442334729049,26187~10007~com.google.android.gms.unstable~com.google.android.gms/.droidguard.DroidGuardService,10007`,
-				`Activity Manager Proc,service,1442334575654,1442334731261,26297~10003~android.process.acore~com.android.providers.contacts/.PackageIntentReceiver,10003`,
-			},
-			wantGroupToLogStart: map[string]int64{
-				"Activity Manager Proc": 1442334565370,
+			wantLogsData: LogsData{
+				Logs: map[string]*Log{
+					EventLogSection: &Log{
+						CSV: strings.Join([]string{
+							csv.FileHeader,
+							`Activity Manager Proc,service,1442334565370,1442334729049,"26187,10007,com.google.android.gms.unstable,com.google.android.gms/.droidguard.DroidGuardService",10007`,
+							`Activity Manager Proc,service,1442334575654,1442334731261,"26297,10003,android.process.acore,com.android.providers.contacts/.PackageIntentReceiver",10003`,
+						}, "\n"),
+						StartMs: 1442334565370,
+					},
+				},
 			},
 		},
-
 		{
 			desc: "Different timezone",
 			input: []string{
@@ -73,11 +77,16 @@ func TestParse(t *testing.T) {
 				``,
 				`[persist.sys.timezone]: [Europe/Dublin]`,
 			},
-			wantCSV: []string{
-				`Activity Manager Proc,service,1437652660883,1437652663546,18230~10068~com.google.android.apps.plus~com.google.android.apps.plus/.service.PackagesMediaMonitor,10068`,
-			},
-			wantGroupToLogStart: map[string]int64{
-				"Activity Manager Proc": 1437652660883,
+			wantLogsData: LogsData{
+				Logs: map[string]*Log{
+					EventLogSection: &Log{
+						CSV: strings.Join([]string{
+							csv.FileHeader,
+							`Activity Manager Proc,service,1437652660883,1437652663546,"18230,10068,com.google.android.apps.plus,com.google.android.apps.plus/.service.PackagesMediaMonitor",10068`,
+						}, "\n"),
+						StartMs: 1437652660883,
+					},
+				},
 			},
 		},
 		{
@@ -91,11 +100,16 @@ func TestParse(t *testing.T) {
 				``,
 				`[persist.sys.timezone]: [Europe/Dublin]`,
 			},
-			wantCSV: []string{
-				`Activity Manager Proc,service,1437652660883,0,18230~10068~com.google.android.apps.plus~com.google.android.apps.plus/.service.PackagesMediaMonitor,10068`,
-			},
-			wantGroupToLogStart: map[string]int64{
-				"Activity Manager Proc": 1437652660883,
+			wantLogsData: LogsData{
+				Logs: map[string]*Log{
+					EventLogSection: &Log{
+						CSV: strings.Join([]string{
+							csv.FileHeader,
+							`Activity Manager Proc,service,1437652660883,-1,"18230,10068,com.google.android.apps.plus,com.google.android.apps.plus/.service.PackagesMediaMonitor",10068`,
+						}, "\n"),
+						StartMs: 1437652660883,
+					},
+				},
 			},
 		},
 		{
@@ -109,11 +123,16 @@ func TestParse(t *testing.T) {
 				``,
 				`[persist.sys.timezone]: [Europe/Dublin]`,
 			},
-			wantCSV: []string{
-				`Activity Manager Proc,service,0,1437652663546,18230~~com.google.android.apps.plus~,`,
-			},
-			wantGroupToLogStart: map[string]int64{
-				"Activity Manager Proc": 1437652663546,
+			wantLogsData: LogsData{
+				Logs: map[string]*Log{
+					EventLogSection: &Log{
+						CSV: strings.Join([]string{
+							csv.FileHeader,
+							`Activity Manager Proc,service,-1,1437652663546,"18230,,com.google.android.apps.plus,",`,
+						}, "\n"),
+						StartMs: 1437652663546,
+					},
+				},
 			},
 		},
 		{
@@ -134,13 +153,18 @@ func TestParse(t *testing.T) {
 				`...`,
 				`[persist.sys.timezone]: [America/Los_Angeles]`,
 			},
-			wantCSV: []string{
-				`AM Low Memory,service,1422390753699,1422390753699,20,`,
-				`AM Low Memory,service,1422390779234,1422390779234,22,`,
-				`AM Low Memory,service,1422390805381,1422390805381,23,`,
-			},
-			wantGroupToLogStart: map[string]int64{
-				"AM Low Memory / ANR": 1422390753699,
+			wantLogsData: LogsData{
+				Logs: map[string]*Log{
+					EventLogSection: &Log{
+						CSV: strings.Join([]string{
+							csv.FileHeader,
+							`AM Low Memory,service,1422390753699,1422390753699,20,`,
+							`AM Low Memory,service,1422390779234,1422390779234,22,`,
+							`AM Low Memory,service,1422390805381,1422390805381,23,`,
+						}, "\n"),
+						StartMs: 1422390753699,
+					},
+				},
 			},
 		},
 		{
@@ -161,13 +185,53 @@ func TestParse(t *testing.T) {
 			pkgs: []*usagepb.PackageInfo{
 				{PkgName: proto.String("com.google.android.apps.photos"), Uid: proto.Int32(1)},
 			},
-			wantCSV: []string{
-				`ANR,service,1443411899609,1443411899609,2103~com.google.android.gms~-1194836283~executing service com.google.android.gms/.reminders.service.RemindersIntentService~,`,
-				`ANR,service,1443412028686,1443412028686,3503~com.google.android.gms~-1194836283~Broadcast of Intent { act=android.net.conn.CONNECTIVITY_CHANGE flg=0x4000010 cmp=com.google.android.gms/.kids.chimera.SystemEventReceiverProxy (has extras) }~,`,
-				`ANR,service,1443412028686,1443412028686,3503~com.google.android.apps.photos~-1194836283~Broadcast/stuff~1,`,
+			wantLogsData: LogsData{
+				Logs: map[string]*Log{
+					EventLogSection: &Log{
+						CSV: strings.Join([]string{
+							csv.FileHeader,
+							`ANR,service,1443411899609,1443411899609,"0,2103,com.google.android.gms,-1194836283,executing service com.google.android.gms/.reminders.service.RemindersIntentService",`,
+							`ANR,service,1443412028686,1443412028686,"0,3503,com.google.android.gms,-1194836283,Broadcast of Intent { act=android.net.conn.CONNECTIVITY_CHANGE flg=0x4000010 cmp=com.google.android.gms/.kids.chimera.SystemEventReceiverProxy (has extras) }",`,
+							`ANR,service,1443412028686,1443412028686,"0,3503,com.google.android.apps.photos,-1194836283,Broadcast/stuff",1`,
+						}, "\n"),
+						StartMs: 1443411899609,
+					},
+				},
 			},
-			wantGroupToLogStart: map[string]int64{
-				"AM Low Memory / ANR": 1443411899609,
+		},
+		{
+			desc: "Event log header appears twice",
+			input: []string{
+				`========================================================`,
+				`== dumpstate: 2015-09-27 21:04:31`,
+				`========================================================`,
+				`...`,
+				`------ EVENT LOG (logcat -b events -v threadtime -d *:v) ------`,
+				`09-27 20:44:59.609   808   822 I am_anr  : [0,2103,com.google.android.gms,-1194836283,executing service com.google.android.gms/.reminders.service.RemindersIntentService]`,
+				`09-27 20:47:08.686   808   822 I am_anr  : [0,3503,com.google.android.gms,-1194836283,Broadcast of Intent { act=android.net.conn.CONNECTIVITY_CHANGE flg=0x4000010 cmp=com.google.android.gms/.kids.chimera.SystemEventReceiverProxy (has extras) }]`,
+				`------ EVENT LOG (logcat -b events -v threadtime -d *:v) ------`,
+				`09-27 20:47:08.686   808   822 I am_anr  : [0,3503,com.google.android.apps.photos,-1194836283,Broadcast/stuff]`,
+				`...`,
+				`[persist.sys.timezone]: [America/Los_Angeles]`,
+			},
+			pkgs: []*usagepb.PackageInfo{
+				{PkgName: proto.String("com.google.android.apps.photos"), Uid: proto.Int32(1)},
+			},
+			wantLogsData: LogsData{
+				Logs: map[string]*Log{
+					EventLogSection: &Log{
+						CSV: strings.Join([]string{
+							csv.FileHeader,
+							`ANR,service,1443411899609,1443411899609,"0,2103,com.google.android.gms,-1194836283,executing service com.google.android.gms/.reminders.service.RemindersIntentService",`,
+							`ANR,service,1443412028686,1443412028686,"0,3503,com.google.android.gms,-1194836283,Broadcast of Intent { act=android.net.conn.CONNECTIVITY_CHANGE flg=0x4000010 cmp=com.google.android.gms/.kids.chimera.SystemEventReceiverProxy (has extras) }",`,
+							`ANR,service,1443412028686,1443412028686,"0,3503,com.google.android.apps.photos,-1194836283,Broadcast/stuff",1`,
+						}, "\n"),
+						StartMs: 1443411899609,
+					},
+				},
+				Errs: []error{
+					errors.New(`section "EVENT LOG" encountered more than once`),
+				},
 			},
 		},
 		{
@@ -183,11 +247,16 @@ func TestParse(t *testing.T) {
 				`...`,
 				`[persist.sys.timezone]: [America/Los_Angeles]`,
 			},
-			wantCSV: []string{
-				`ANR,service,1451623499609,1451623499609,2103~com.google.android.gms~-1194836283~reason~,`,
-			},
-			wantGroupToLogStart: map[string]int64{
-				"AM Low Memory / ANR": 1451623499609,
+			wantLogsData: LogsData{
+				Logs: map[string]*Log{
+					EventLogSection: &Log{
+						CSV: strings.Join([]string{
+							csv.FileHeader,
+							`ANR,service,1451623499609,1451623499609,"0,2103,com.google.android.gms,-1194836283,reason",`,
+						}, "\n"),
+						StartMs: 1451623499609,
+					},
+				},
 			},
 		},
 		{
@@ -203,11 +272,16 @@ func TestParse(t *testing.T) {
 				`...`,
 				`[persist.sys.timezone]: [America/Los_Angeles]`,
 			},
-			wantCSV: []string{
-				`ANR,service,1451709899609,1451709899609,2103~com.google.android.gms~-1194836283~reason~,`,
-			},
-			wantGroupToLogStart: map[string]int64{
-				"AM Low Memory / ANR": 1451709899609,
+			wantLogsData: LogsData{
+				Logs: map[string]*Log{
+					EventLogSection: &Log{
+						CSV: strings.Join([]string{
+							csv.FileHeader,
+							`ANR,service,1451709899609,1451709899609,"0,2103,com.google.android.gms,-1194836283,reason",`,
+						}, "\n"),
+						StartMs: 1451709899609,
+					},
+				},
 			},
 		},
 		{
@@ -222,11 +296,16 @@ func TestParse(t *testing.T) {
 				`...`,
 				`[persist.sys.timezone]: [America/Los_Angeles]`,
 			},
-			wantCSV: []string{
-				`AM Low Memory,service,1445358923423,1445358923423,37,`,
-			},
-			wantGroupToLogStart: map[string]int64{
-				"AM Low Memory / ANR": 1445358923423,
+			wantLogsData: LogsData{
+				Logs: map[string]*Log{
+					EventLogSection: &Log{
+						CSV: strings.Join([]string{
+							csv.FileHeader,
+							`AM Low Memory,service,1445358923423,1445358923423,37,`,
+						}, "\n"),
+						StartMs: 1445358923423,
+					},
+				},
 			},
 		},
 		{
@@ -243,11 +322,16 @@ func TestParse(t *testing.T) {
 				`...`,
 				`[persist.sys.timezone]: [America/Los_Angeles]`,
 			},
-			wantCSV: []string{
-				`Activity Manager Proc,service,1451626165370,1451709899609,26187~10007~com.google.android.gms.unstable~com.google.android.gms/.droidguard.DroidGuardService,10007`,
-			},
-			wantGroupToLogStart: map[string]int64{
-				"Activity Manager Proc": 1451626165370,
+			wantLogsData: LogsData{
+				Logs: map[string]*Log{
+					EventLogSection: &Log{
+						CSV: strings.Join([]string{
+							csv.FileHeader,
+							`Activity Manager Proc,service,1451626165370,1451709899609,"26187,10007,com.google.android.gms.unstable,com.google.android.gms/.droidguard.DroidGuardService",10007`,
+						}, "\n"),
+						StartMs: 1451626165370,
+					},
+				},
 			},
 		},
 		{
@@ -265,19 +349,24 @@ func TestParse(t *testing.T) {
 				``,
 				`[persist.sys.timezone]: [America/Los_Angeles]`,
 			},
-			wantCSV: []string{
-				`Activity Manager Proc,service,1442334575654,1442334731261,26297~10003~android.process.acore~com.android.providers.contacts/.PackageIntentReceiver,10003`,
-			},
-			wantGroupToLogStart: map[string]int64{
-				"Activity Manager Proc": 1442334565370,
-			},
-			wantWarnings: []string{
-				"am_proc_start: got 7 parts, expected 6",
-				"am_proc_died: got 4 parts, expected 3",
-			},
-			wantErrors: []error{
-				errors.New("am_proc_start: got 5 parts, want 6"),
-				errors.New("am_proc_died: got 2 parts, want 3"),
+			wantLogsData: LogsData{
+				Logs: map[string]*Log{
+					EventLogSection: &Log{
+						CSV: strings.Join([]string{
+							csv.FileHeader,
+							`Activity Manager Proc,service,1442334575654,1442334731261,"26297,10003,android.process.acore,com.android.providers.contacts/.PackageIntentReceiver",10003`,
+						}, "\n"),
+						StartMs: 1442334565370,
+					},
+				},
+				Warnings: []string{
+					"am_proc_start: got 7 parts, expected 6",
+					"am_proc_died: got 4 parts, expected 3",
+				},
+				Errs: []error{
+					errors.New("am_proc_start: got 5 parts, want 6"),
+					errors.New("am_proc_died: got 2 parts, want 3"),
+				},
 			},
 		},
 		{
@@ -293,17 +382,22 @@ func TestParse(t *testing.T) {
 				`...`,
 				`[persist.sys.timezone]: [America/Los_Angeles]`,
 			},
-			wantCSV: []string{
-				`ANR,service,1443411899609,1443411899609,2103~com.google.android.gms~-1194836283~executing service com.google.android.gms/.reminders.service.RemindersIntentService~,`,
-			},
-			wantGroupToLogStart: map[string]int64{
-				"AM Low Memory / ANR": 1443411899609,
-			},
-			wantWarnings: []string{
-				"am_anr: got 6 parts, expected 5",
-			},
-			wantErrors: []error{
-				errors.New("am_anr: got 3 parts, want 5"),
+			wantLogsData: LogsData{
+				Logs: map[string]*Log{
+					EventLogSection: &Log{
+						CSV: strings.Join([]string{
+							csv.FileHeader,
+							`ANR,service,1443411899609,1443411899609,"0,2103,com.google.android.gms,-1194836283,executing service com.google.android.gms/.reminders.service.RemindersIntentService,extrafield",`,
+						}, "\n"),
+						StartMs: 1443411899609,
+					},
+				},
+				Warnings: []string{
+					"am_anr: got 6 parts, expected 5",
+				},
+				Errs: []error{
+					errors.New("am_anr: got 3 parts, want 5"),
+				},
 			},
 		},
 		{
@@ -313,7 +407,6 @@ func TestParse(t *testing.T) {
 				`== dumpstate: 2015-08-06 15:30:45`,
 				`========================================================`,
 				`...`,
-				`------ SYSTEM LOG (logcat -v threadtime -d *:v) ------`,
 				`------ SYSTEM LOG (logcat -v threadtime -d *:v) ------`,
 				`08-05 22:58:11.751 10686 10707 E AndroidRuntime: FATAL EXCEPTION: AsyncTask #1`,
 				`08-05 22:58:11.751 10686 10707 E AndroidRuntime: Process: com.google.android.volta, PID: 10686`,
@@ -332,13 +425,58 @@ func TestParse(t *testing.T) {
 			pkgs: []*usagepb.PackageInfo{
 				{PkgName: proto.String("com.google.android.volta"), Uid: proto.Int32(1)},
 			},
-			wantCSV: []string{
-				`Crashes,service,1438840691751,1438840691751,com.google.android.volta: AsyncTask #1,1`,
-				`Crashes,service,1438846550774,1438846550774,com.google.android.volta: AsyncTask #2,1`,
-				`Crashes,service,1438846550774,1438846550774,com.android.vending: main,`,
+			wantLogsData: LogsData{
+				Logs: map[string]*Log{
+					SystemLogSection: &Log{
+						CSV: strings.Join([]string{
+							csv.FileHeader,
+							`Crashes,service,1438840691751,1438840691751,com.google.android.volta: AsyncTask #1,1`,
+							`Crashes,service,1438846550774,1438846550774,com.google.android.volta: AsyncTask #2,1`,
+							`Crashes,service,1438846550774,1438846550774,com.android.vending: main,`,
+						}, "\n"),
+						StartMs: 1438840691751,
+					},
+				},
 			},
-			wantGroupToLogStart: map[string]int64{
-				"Crashes": 1438840691751,
+		},
+		{
+			desc: "Native crash",
+			input: []string{
+				`========================================================`,
+				`== dumpstate: 2016-02-29 15:45:37`,
+				`========================================================`,
+				`...`,
+				`------ SYSTEM LOG (logcat -v threadtime -v printable -d *:v) ------`,
+				`02-29 07:04:15.063  3624  3788 F libc    : Fatal signal 11 (SIGSEGV), code 1, fault addr 0x58 in tid 3788 (RenderThread)`,
+				`02-29 07:04:15.216 11706 11706 F DEBUG   : *** *** *** *** *** *** *** *** *** *** *** *** *** *** *** ***`,
+				`02-29 07:04:15.216 11706 11706 F DEBUG   : Build fingerprint: 'google/angler/angler:N/NRC56F/2640559:userdebug/dev-keys'`,
+				`02-29 07:04:15.216 11706 11706 F DEBUG   : Revision: '0'`,
+				`02-29 07:04:15.216 11706 11706 F DEBUG   : ABI: 'arm64'`,
+				`02-29 07:04:15.216 11706 11706 F DEBUG   : pid: 3624, tid: 3788, name: RenderThread  >>> com.android.systemui <<<`,
+				`02-29 07:04:15.216 11706 11706 F DEBUG   : signal 11 (SIGSEGV), code 1 (SEGV_MAPERR), fault addr 0x58`,
+				`02-29 07:04:15.217 11706 11706 F DEBUG   :     x0   00000070d09c0820  x1   00000070d2dab89c  x2   0000000000000000  x3   0000000000000000`,
+				`02-29 07:04:15.217 11706 11706 F DEBUG   :     x4   00000070c87e84fc  x5   fffffffffffffffe  x6   0000000000015786  x7   00000070c858f130`,
+				`02-29 07:04:15.217 11706 11706 F DEBUG   :     x8   0000000000000000  x9   000000000000018c  x10  000000000000018c  x11  00000070d07e52a0`,
+				`02-29 07:04:15.217 11706 11706 F DEBUG   :     x12  00000000000000ca  x13  000000000000001b  x14  000000000000001b  x15  00000000000000f0`,
+				`02-29 07:04:15.217 11706 11706 F DEBUG   :     x16  00000070efbd6ef8  x17  00000070efb7fc04  x18  00000070c9cbedc4  x19  00000070c9d2bdc0`,
+				`02-29 07:04:15.217 11706 11706 F DEBUG   :     x20  00000070d09c0820  x21  00000070d09c0818  x22  00000070c9d2bdc0  x23  b5c7870e1bcc88af`,
+				`02-29 07:04:15.217 11706 11706 F DEBUG   :     x24  b5c7870e1bcc88af  x25  00000070f1f8618c  x26  00000070d2dabe68  x27  00000070d2dabe60`,
+				`02-29 07:04:15.217 11706 11706 F DEBUG   :     x28  00000070eebd41f8  x29  00000070d2dab8e0  x30  00000070efba9ab8`,
+				`02-29 07:04:15.217 11706 11706 F DEBUG   :     sp   00000070d2dab890  pc   00000070efba9acc  pstate 0000000080000000`,
+				`02-29 08:04:15.216 11706 11706 F DEBUG   : *** *** *** *** *** *** *** *** *** *** *** *** *** *** *** ***`, // Spurious line
+				`...`,
+				`[persist.sys.timezone]: [America/Los_Angeles]`,
+			},
+			wantLogsData: LogsData{
+				Logs: map[string]*Log{
+					SystemLogSection: &Log{
+						CSV: strings.Join([]string{
+							csv.FileHeader,
+							`Native crash,service,1456758255216,1456758255216,com.android.systemui: RenderThread,`,
+						}, "\n"),
+						StartMs: 1456758255063,
+					},
+				},
 			},
 		},
 		{
@@ -359,13 +497,18 @@ func TestParse(t *testing.T) {
 				`    PID #784: ProcessRecord{b2760e2 784:system/1000}`,
 				`    PID #17745: ProcessRecord{4fe996a 17745:gbis.gbandroid/u0a105}`,
 			},
-			wantCSV: []string{
-				`Bluetooth Scan,service,1446733154095,1446733154095,Unknown PID 1691 (PID: 1691),`,
-				`Bluetooth Scan,service,1446733155815,1446733155815,Unknown PID 1691 (PID: 1691),`,
-				`Bluetooth Scan,service,1446733210417,1446733210417,gbis.gbandroid (PID: 17745),10105`,
-			},
-			wantGroupToLogStart: map[string]int64{
-				"Bluetooth Scan": 1446733154095,
+			wantLogsData: LogsData{
+				Logs: map[string]*Log{
+					SystemLogSection: &Log{
+						CSV: strings.Join([]string{
+							csv.FileHeader,
+							`Bluetooth Scan,service,1446733154095,1446733154095,Unknown PID 1691 (PID: 1691),`,
+							`Bluetooth Scan,service,1446733155815,1446733155815,Unknown PID 1691 (PID: 1691),`,
+							`Bluetooth Scan,service,1446733210417,1446733210417,gbis.gbandroid (PID: 17745),10105`,
+						}, "\n"),
+						StartMs: 1446733154095,
+					},
+				},
 			},
 		},
 		{
@@ -391,15 +534,24 @@ func TestParse(t *testing.T) {
 				`    PID #784: ProcessRecord{b2760e2 784:system/1000}`,
 				`    PID #17745: ProcessRecord{4fe996a 17745:gbis.gbandroid/u0a105}`,
 			},
-			wantCSV: []string{
-				`Bluetooth Scan,service,1446733154095,1446733154095,Unknown PID 1691 (PID: 1691),`,
-				`ANR,service,1446732921609,1446732921609,2103~com.google.android.gms~-1194836283~executing service com.google.android.gms/.reminders.service.RemindersIntentService~,`,
-				`Logcat misc,string,1446733775969,1446733775969,bug report collection triggered,`,
-			},
-			wantGroupToLogStart: map[string]int64{
-				"AM Low Memory / ANR": 1446700749047,
-				"Bluetooth Scan":      1446726057356,
-				"Logcat misc":         1446726057356,
+			wantLogsData: LogsData{
+				Logs: map[string]*Log{
+					EventLogSection: &Log{
+						CSV: strings.Join([]string{
+							csv.FileHeader,
+							`ANR,service,1446732921609,1446732921609,"0,2103,com.google.android.gms,-1194836283,executing service com.google.android.gms/.reminders.service.RemindersIntentService",`,
+						}, "\n"),
+						StartMs: 1446700749047,
+					},
+					SystemLogSection: &Log{
+						CSV: strings.Join([]string{
+							csv.FileHeader,
+							`Bluetooth Scan,service,1446733154095,1446733154095,Unknown PID 1691 (PID: 1691),`,
+							`Logcat misc,string,1446733775969,1446733775969,bug report collection triggered,`,
+						}, "\n"),
+						StartMs: 1446726057356,
+					},
+				},
 			},
 		},
 		{
@@ -419,12 +571,23 @@ func TestParse(t *testing.T) {
 				``,
 				`[persist.sys.timezone]: [America/Los_Angeles]`,
 			},
-			wantCSV: []string{
-				`Activity Manager Proc,service,1442334565370,0,26187~10007~com.google.android.gms.unstable~com.google.android.gms/.droidguard.DroidGuardService,10007`,
-				`Activity Manager Proc,service,1442334575654,0,26297~10003~android.process.acore~com.android.providers.contacts/.PackageIntentReceiver,10003`,
-			},
-			wantGroupToLogStart: map[string]int64{
-				"Activity Manager Proc": 1442333990539,
+			wantLogsData: LogsData{
+				Logs: map[string]*Log{
+					EventLogSection: &Log{
+						CSV: strings.Join([]string{
+							csv.FileHeader,
+							`Activity Manager Proc,service,1442334565370,-1,"26187,10007,com.google.android.gms.unstable,com.google.android.gms/.droidguard.DroidGuardService",10007`,
+						}, "\n"),
+						StartMs: 1442334350539,
+					},
+					LastLogcatSection: &Log{
+						CSV: strings.Join([]string{
+							csv.FileHeader,
+							`Activity Manager Proc,service,1442334575654,-1,"26297,10003,android.process.acore,com.android.providers.contacts/.PackageIntentReceiver",10003`,
+						}, "\n"),
+						StartMs: 1442333990539,
+					},
+				},
 			},
 		},
 		{
@@ -440,41 +603,47 @@ func TestParse(t *testing.T) {
 				``,
 				`[persist.sys.timezone]: [America/Los_Angeles]`,
 			},
-			wantCSV: []string{
-				`Activity Manager Proc,service,1442334565370,0,26187~10007~com.google.android.gms.unstable~com.google.android.gms/.droidguard.DroidGuardService,10007`,
-			},
-			wantGroupToLogStart: map[string]int64{
-				"Activity Manager Proc": 1442334565370,
-			},
-			wantErrors: []error{
-				fmt.Errorf("expect log timestamps in sorted order, got section start: 1442334650539, event timestamp: 1442334565370"),
+			wantLogsData: LogsData{
+				Logs: map[string]*Log{
+					EventLogSection: &Log{
+						CSV: strings.Join([]string{
+							csv.FileHeader,
+							`Activity Manager Proc,service,1442334565370,-1,"26187,10007,com.google.android.gms.unstable,com.google.android.gms/.droidguard.DroidGuardService",10007`,
+						}, "\n"),
+						StartMs: 1442334565370,
+					},
+				},
+				Errs: []error{
+					fmt.Errorf("expect log timestamps in sorted order, got section start: 1442334650539, event timestamp: 1442334565370"),
+				},
 			},
 		},
 	}
 	for _, test := range tests {
-		output := Parse(test.pkgs, strings.Join(test.input, "\n"))
-
-		got := normalizeCSV(output.CSV)
-		want := normalizeCSV(strings.Join(test.wantCSV, "\n"))
+		got := Parse(test.pkgs, strings.Join(test.input, "\n"))
+		want := test.wantLogsData
+		normalizeLogsData(&got)
+		normalizeLogsData(&want)
 		if !reflect.DeepEqual(got, want) {
-			t.Errorf("%v: Parse(%v)\n outputted csv = %v\n want: %v", test.desc, test.input, strings.Join(got, "\n"), strings.Join(want, "\n"))
+			t.Errorf("%v: Parse(%v)\n got: %v\n\n want: %v", test.desc, strings.Join(test.input, "\n"), got, want)
 		}
-		if !reflect.DeepEqual(output.Errs, test.wantErrors) {
-			t.Errorf("%v: Parse(%v)\n unexpected errors = %v\n want: %v", test.desc, test.input, output.Errs, test.wantErrors)
-		}
-		if !reflect.DeepEqual(output.Warnings, test.wantWarnings) {
-			t.Errorf("%v: Parse(%v)\n unexpected warnings = %v\n want: %v", test.desc, test.input, output.Warnings, test.wantWarnings)
-		}
-		if !reflect.DeepEqual(output.GroupToLogStart, test.wantGroupToLogStart) {
-			t.Errorf("%v: Parse(%v)\n outputted group log time map = %v\n want: %v", test.desc, test.input, output.GroupToLogStart, test.wantGroupToLogStart)
+	}
+}
+
+func normalizeLogsData(ld *LogsData) {
+	for _, l := range ld.Logs {
+		// l is a pointer to the log. It shouldn't ever be nil, but add a check just in case.
+		if l != nil {
+			l.CSV = normalizeCSV(l.CSV)
 		}
 	}
 }
 
 // Removes trailing space at the end of the string, then splits by new line and sorts alphabetically.
-func normalizeCSV(text string) []string {
+// Returns CSV in string format.
+func normalizeCSV(text string) string {
 	strs := strings.Split(strings.TrimSpace(text), "\n")
 	// Order of outputted CSV does not matter and order may vary due to iteration of maps in printing the CSV.
 	sort.Strings(strs)
-	return strs
+	return strings.Join(strs, "\n")
 }

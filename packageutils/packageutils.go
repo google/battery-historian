@@ -32,9 +32,9 @@ const (
 	// Defined in frameworks/base/core/java/android/os/UserHandle.java.
 	perUserRange = 100000
 
-	// Defines the start of a range of UIDs (and GIDs), going from this number to LAST_APPLICATION_UID
-	// (which is 19999) that are reserved for assigning to applications. Both constants are defined in
-	// frameworks/base/core/java/android/os/Process.java.
+	// FirstApplicationUID defines the start of a range of UIDs (and GIDs), going from this number to
+	// LAST_APPLICATION_UID (which is 19999) that are reserved for assigning to applications. Both
+	// constants are defined in frameworks/base/core/java/android/os/Process.java.
 	FirstApplicationUID = 10000
 	// First uid used for fully isolated sandboxed processes (with no permissions of their own).
 	// Defined in frameworks/base/core/java/android/os/Process.java.

@@ -196,8 +196,13 @@ func TestParseMetaInfo(t *testing.T) {
 				`APDS-9930/QPDS-T930 Proximity & Light| Avago     | version=2 |android.sensor.proximity| 0x00000024 | "" | type=8 | on-change | maxDelay=0us |minDelay=0us |no batching | wakeUp | last=<> `,
 				`APDS-9930/QPDS-T930 Proximity & Light| Avago     | version=2 |android.sensor.light| 0x00000001 | "" | type=5 | on-change | maxDelay=0us |minDelay=0us |FifoMax=240 events | non-wakeUp | last 10 events = < 1)   8.2,  0.0,  0.0,159312324052923 16:15:19 2)   8.7,  0.0,  0.0,159312374406927 16:15:19 3)   9.0,  0.0,  0.0,159312424760931 16:15:19 4)   9.2,  0.0,  0.0,159315748125189 16:15:22 5)   9.7,  0.0,  0.0,159315798479193 16:15:22 6)  10.2,  0.0,  0.0,159315848833197 16:15:22 7)  10.7,  0.0,  0.0,159315899187201 16:15:22 8)  11.0,  0.0,  0.0,159315949541205 16:15:22 9)  11.2,  0.0,  0.0,159316050249212 16:15:22 10)  11.7,  0.0,  0.0,159316100603216 16:15:22 >`,
 				// L format
-				`Accelerometer Sensor| HTC Group Ltd.| android.sensor.accelerometer| 0x00000000 | "" | type=1 | continuous | minRate=5.00Hz | maxRate=100.00Hz | FifoMax=1220 events | non-wakeUp | last=<  0.2, -0.0,  9.7, 2340745539166063>`,
+				`Accelerometer Sensor| HTC Group Ltd.| android.sensor.accelerometer| 0x00000002 | "" | type=1 | continuous | minRate=5.00Hz | maxRate=100.00Hz | FifoMax=1220 events | non-wakeUp | last=<  0.2, -0.0,  9.7, 2340745539166063>`,
 				`Gyroscope Sensor (WAKE_UP)| HTC Group Ltd.| android.sensor.gyroscope| 0x0000000c | "" | type=4 | continuous | minRate=5.00Hz | maxRate=100.00Hz | FifoMax=1220 events | wakeUp | last=<  0.0,  0.0,  0.0, 0>`,
+				// Format as of NRD42C. Sensor 0 doesn't have 0x.
+				`0000000000) CrosEC Compass            | Google          | ver: 1 | type: android.sensor.magnetic_field(2) | perm: n/a`,
+				`	 continuous | minRate=5.00Hz | maxRate=25.00Hz | FIFO (max,reserved) = (1365, 0) events | non-wakeUp | |`,
+				`0x00000101) CrosEC Significant Motion | Google          | ver: 1 | type: android.sensor.significant_motion(17) | perm: n/a`,
+				`	 one-shot | maxDelay=0us | minDelay=-1us | no batching | wakeUp | |`,
 			}, "\n"),
 			want: &MetaInfo{
 				DeviceID:         `123456789012345678`,
@@ -210,16 +215,22 @@ func TestParseMetaInfo(t *testing.T) {
 						Number: -10000,
 					},
 					0: {
-						Name:    `Accelerometer Sensor`,
+						Name:    `CrosEC Compass`,
 						Number:  0,
-						Version: 0,
-						Type:    `android.sensor.accelerometer`,
+						Version: 1,
+						Type:    `android.sensor.magnetic_field`,
 					},
 					1: {
 						Name:    `APDS-9930/QPDS-T930 Proximity & Light`,
 						Number:  1,
 						Version: 2,
 						Type:    `android.sensor.light`,
+					},
+					2: {
+						Name:    `Accelerometer Sensor`,
+						Number:  2,
+						Version: 0,
+						Type:    `android.sensor.accelerometer`,
 					},
 					11: {
 						Name:    `AK8963 Magnetometer Uncalibrated`,
@@ -244,6 +255,12 @@ func TestParseMetaInfo(t *testing.T) {
 						Number:  36,
 						Version: 2,
 						Type:    `android.sensor.proximity`,
+					},
+					257: {
+						Name:    `CrosEC Significant Motion`,
+						Number:  257,
+						Version: 1,
+						Type:    `android.sensor.significant_motion`,
 					},
 				},
 			},
@@ -310,10 +327,10 @@ func TestParseMetaInfo(t *testing.T) {
 	for _, test := range tests {
 		meta, err := ParseMetaInfo(test.input)
 		if err != nil {
-			t.Errorf("%v: ParseMetaInfo(%v) error: %q", test.name, test.input, err)
+			t.Errorf("%v: error: %q", test.name, err)
 		}
 		if !reflect.DeepEqual(meta, test.want) {
-			t.Errorf("%v--ParseMetaInfo(%v):\n  got: %v\n  want: %v", test.name, test.input, meta, test.want)
+			t.Errorf("%v:\n  got: %v\n  want: %v", test.name, meta, test.want)
 		}
 	}
 }

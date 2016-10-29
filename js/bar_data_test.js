@@ -20,6 +20,9 @@ goog.setTestOnly('historian.barDataTest');
 goog.require('goog.testing.FunctionMock');
 goog.require('goog.testing.jsunit');
 goog.require('historian.BarData');
+goog.require('historian.color');
+goog.require('historian.data');
+goog.require('historian.historianV2Logs');
 goog.require('historian.metrics.Csv');
 
 
@@ -63,7 +66,8 @@ var setUp = function() {
     historian.metrics.Csv.BATTERY_LEVEL
   ];
 
-  barData = new historian.BarData(groups, defaultHiddenGroups, order, false);
+  barData = new historian.BarData(
+      null, groups, defaultHiddenGroups, order, false);
 };
 
 
@@ -220,25 +224,66 @@ var testGenerateIndexes = function() {
   //   historian.metrics.Csv.BATTERY_LEVEL
   // The earlier the group appears in the order array, the higher the index.
   var data = barData.getData();
-  assertTrue('default visible groups', data.length == 2);
+  assertEquals('default visible groups', 2, data.length);
   assertEquals('default groups: temperature index', 1, data[0].index);
   assertEquals('default groups: battery level index', 0, data[1].index);
 
   barData.addGroup(historian.metrics.Csv.VOLTAGE);
   var data = barData.getData();
-  assertTrue('added voltage group', data.length == 3);
+  assertEquals('added voltage group', 3, data.length);
   assertEquals('added voltage: temperature index', 2, data[0].index);
   assertEquals('added voltage: battery level index', 0, data[1].index);
   assertEquals('added voltage: voltage index', 1, data[2].index);
 
   barData.removeGroup(historian.metrics.Csv.TEMPERATURE);
   var data = barData.getData();
-  assertTrue('removed temperature group', data.length == 2);
+  assertEquals('removed temperature group', 2, data.length);
   assertEquals('removed temperature: battery level index', 0, data[0].index);
   assertEquals('removed temperature: voltage index', 1, data[1].index);
 
   barData.removeGroup(historian.metrics.Csv.BATTERY_LEVEL);
   var data = barData.getData();
-  assertTrue('removed battery level group', data.length == 1);
+  assertEquals('removed battery level group', 1, data.length);
   assertEquals('removed battery level: voltage index', 0, data[0].index);
+};
+
+
+/**
+ * Tests the generation of help legends.
+ */
+var testGenerateLegends = function() {
+  var csv =
+      'metric,type,start_time,end_time,value,opt\n' +
+      historian.metrics.Csv.MOBILE_RADIO_ON + ',bool,1000,2000,true\n' +
+      historian.metrics.Csv.WIFI_SIGNAL_STRENGTH + ',string,1200,3000,good\n';
+  var logs = [{
+    source: historian.historianV2Logs.Sources.BATTERY_HISTORY,
+    csv: csv
+  }];
+
+  var wantLegends = {};
+  // Colors defined in historian.color.
+  wantLegends[historian.metrics.Csv.MOBILE_RADIO_ON] = [
+    {color: 'white', value: 'Off'},
+    {color: '#fa531b', value: 'On'}
+  ];
+
+  wantLegends[historian.metrics.Csv.WIFI_SIGNAL_STRENGTH] = [
+    {color: 'white', value: 'none'},
+    {color: 'red', value: 'poor'},
+    {color: 'orange', value: 'moderate'},
+    {color: 'yellow', value: 'good'},
+    {color: 'green', value: 'great'}
+  ];
+
+  var historianData =
+      historian.data.processHistorianV2Data(logs, 2300, {}, '', true);
+  historian.color.generateSeriesColors(historianData.nameToBarGroup);
+  var barData = new historian.BarData(
+      null, historianData.nameToBarGroup, {}, [], false);
+
+  for (var group in wantLegends) {
+    assertArrayEquals('Legend for group ' + group,
+        wantLegends[group], barData.getLegend(group));
+  }
 };

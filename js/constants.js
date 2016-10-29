@@ -41,3 +41,10 @@ exports.NUM_SCREEN_DIMENSIONS = 2;
  * @const {number}
  */
 exports.TRANSITION_DURATION = 250;
+
+
+/**
+ * Unknown start or end time for an event.
+ * @const {number}
+ */
+exports.UNKNOWN_TIME = -1;

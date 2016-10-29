@@ -19,10 +19,29 @@ package csv
 import (
 	"errors"
 	"fmt"
+	"sort"
 	"strconv"
+	"strings"
 
 	"github.com/google/battery-historian/checkinutil"
 )
+
+// sortByStartTime sorts events in ascending order of startTimeMs.
+type sortByStartTime []Event
+
+func (a sortByStartTime) Len() int      { return len(a) }
+func (a sortByStartTime) Swap(i, j int) { a[i], a[j] = a[j], a[i] }
+func (a sortByStartTime) Less(i, j int) bool {
+	return a[i].Start < a[j].Start
+}
+
+// max function for int64.
+func max(a int64, b int64) int64 {
+	if a >= b {
+		return a
+	}
+	return b
+}
 
 // Event stores the details contained in a CSV line.
 type Event struct {
@@ -30,10 +49,12 @@ type Event struct {
 	Start, End int64
 	Value      string
 	Opt        string
+	AppName    string // For populating from package info.
 }
 
 // ExtractEvents returns all events matching any of the given metrics names.
 // If a metric has no matching events, the map will contain a nil slice for that metric.
+// If the metrics slice is nil, all events will be extracted.
 // Errors encountered during parsing will be collected into an errors slice and will continue parsing remaining events.
 func ExtractEvents(csvInput string, metrics []string) (map[string][]Event, []error) {
 	records := checkinutil.ParseCSV(csvInput)
@@ -48,12 +69,13 @@ func ExtractEvents(csvInput string, metrics []string) (map[string][]Event, []err
 
 	var errs []error
 	for i, parts := range records {
-		if len(parts) == 0 {
+		// Skip CSV header.
+		if len(parts) == 0 || strings.Join(records[i], ",") == FileHeader {
 			continue
 		}
 		desc := parts[0]
 		metricEvents, ok := events[desc]
-		if !ok {
+		if metrics != nil && !ok {
 			// Ignore non matching metrics.
 			continue
 		}
@@ -88,4 +110,24 @@ func eventFromRecord(parts []string) (Event, error) {
 		Value: parts[4],
 		Opt:   parts[5],
 	}, nil
+}
+
+// MergeEvents merges all overlapping events.
+func MergeEvents(events []Event) []Event {
+	// Need to sort the events by start time here,
+	// because the following algorithm relies on sorted events.
+	sort.Sort(sortByStartTime(events))
+
+	var res []Event
+	prev := events[0]
+	for _, cur := range events[1:] {
+		if prev.End < cur.Start {
+			res = append(res, prev)
+			prev = cur
+		} else {
+			prev = Event{Start: prev.Start, End: max(prev.End, cur.End)}
+		}
+	}
+	res = append(res, prev)
+	return res
 }

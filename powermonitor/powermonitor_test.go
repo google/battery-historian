@@ -19,6 +19,8 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+
+	"github.com/google/battery-historian/csv"
 )
 
 // Tests the generating of CSV entries from a powermonitor file.
@@ -36,6 +38,7 @@ func TestParse(t *testing.T) {
 				`1433786060 0.004262`,
 			}, "\n"),
 			strings.Join([]string{
+				csv.FileHeader,
 				`Powermonitor,int,1433786060000,1433786061000,4.262,`,
 			}, "\n"),
 			true,
@@ -47,6 +50,7 @@ func TestParse(t *testing.T) {
 				`1433786060 4`,
 			}, "\n"),
 			strings.Join([]string{
+				csv.FileHeader,
 				`Powermonitor,int,1433786060000,1433786061000,4000.000,`,
 			}, "\n"),
 			true,
@@ -61,6 +65,7 @@ func TestParse(t *testing.T) {
 				`1433786062 0.053441`,
 			}, "\n"),
 			strings.Join([]string{
+				csv.FileHeader,
 				`Powermonitor,int,1433786060000,1433786061000,4.262,`,
 				`Powermonitor,int,1433786061000,1433786061500,4.737,`,
 				`Powermonitor,int,1433786061500,1433786062000,6.574,`,
@@ -77,6 +82,7 @@ func TestParse(t *testing.T) {
 				`1433786061 0.003809`,
 			}, "\n"),
 			strings.Join([]string{
+				csv.FileHeader,
 				`Powermonitor,int,1433786060000,1433786060500,4.486,`,
 				`Powermonitor,int,1433786060500,1433786061000,3.793,`,
 				`Powermonitor,int,1433786061000,1433786062000,3.809,`,
@@ -92,6 +98,7 @@ func TestParse(t *testing.T) {
 				`1433786061 0.003809`,
 			}, "\n"),
 			strings.Join([]string{
+				csv.FileHeader,
 				`Powermonitor,int,1433786060000,1433786061000,4.486,`,
 				`Powermonitor,int,1433786061000,1433786061500,3.793,`,
 				`Powermonitor,int,1433786061500,1433786062000,3.809,`,
@@ -109,6 +116,7 @@ func TestParse(t *testing.T) {
 				`1433786062 0.004479`,
 			}, "\n"),
 			strings.Join([]string{
+				csv.FileHeader,
 				`Powermonitor,int,1433786060000,1433786060500,3.802,`,
 				`Powermonitor,int,1433786060500,1433786061000,3.810,`,
 				`Powermonitor,int,1433786061000,1433786061500,3.810,`,
@@ -127,6 +135,7 @@ func TestParse(t *testing.T) {
 				`1433786063 0.005186`,
 			}, "\n"),
 			strings.Join([]string{
+				csv.FileHeader,
 				`Powermonitor,int,1433786061000,1433786061500,3.811,`,
 				`Powermonitor,int,1433786061500,1433786062000,3.791,`,
 				`Powermonitor,int,1433786062000,1433786063000,17.514,`,
@@ -147,6 +156,7 @@ func TestParse(t *testing.T) {
 				`1433786062 0.003810`,
 			}, "\n"),
 			strings.Join([]string{
+				csv.FileHeader,
 				`Powermonitor,int,1433786060000,1433786060500,3.811,`,
 				`Powermonitor,int,1433786060500,1433786061000,3.791,`,
 				`Powermonitor,int,1433786061000,1433786061500,3.811,`,
@@ -173,6 +183,7 @@ func TestParse(t *testing.T) {
 				`1433786061 0.003791`,
 			}, "\n"),
 			strings.Join([]string{
+				csv.FileHeader,
 				`Powermonitor,int,1433786060000,1433786060200,4.262,`,
 				`Powermonitor,int,1433786060200,1433786060400,4.737,`,
 				`Powermonitor,int,1433786060400,1433786060600,6.574,`,
@@ -194,6 +205,7 @@ func TestParse(t *testing.T) {
 				`1433786060 0.004737 0.004499`,
 			}, "\n"),
 			strings.Join([]string{
+				csv.FileHeader,
 				`Powermonitor,int,1433786060000,1433786060500,4.262,`,
 				`Powermonitor,int,1433786060500,1433786061000,4.737,`,
 			}, "\n"),
@@ -207,6 +219,7 @@ func TestParse(t *testing.T) {
 				`1433786060 0.004737 -0.004499`,
 			}, "\n"),
 			strings.Join([]string{
+				csv.FileHeader,
 				`Powermonitor,int,1433786060000,1433786060500,-4.262,`,
 				`Powermonitor,int,1433786060500,1433786061000,4.737,`,
 			}, "\n"),
@@ -222,6 +235,7 @@ func TestParse(t *testing.T) {
 				`1433786060.3 0.005678`,
 			}, "\n"),
 			strings.Join([]string{
+				csv.FileHeader,
 				`Powermonitor,int,1433786060000,1433786060100,4.262,`,
 				`Powermonitor,int,1433786060100,1433786060200,4.737,`,
 				`Powermonitor,int,1433786060200,1433786060300,1.234,`,
@@ -237,6 +251,7 @@ func TestParse(t *testing.T) {
 				`1433786060 badstring`,
 			}, "\n"),
 			strings.Join([]string{
+				csv.FileHeader,
 				`Powermonitor,int,1433786060000,1433786061000,4.262,`,
 			}, "\n"),
 			true,
@@ -250,6 +265,7 @@ func TestParse(t *testing.T) {
 				`1433786060 0.001234`,
 			}, "\n"),
 			strings.Join([]string{
+				csv.FileHeader,
 				`Powermonitor,int,1433786060000,1433786060500,4.262,`,
 				`Powermonitor,int,1433786060500,1433786061000,1.234,`,
 			}, "\n"),

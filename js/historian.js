@@ -18,6 +18,7 @@ goog.provide('historian');
 goog.provide('historian.Panel');
 goog.provide('historian.formData');
 
+goog.require('goog.asserts');
 goog.require('historian.HistorianV2');
 goog.require('historian.State');
 goog.require('historian.appstats');
@@ -26,6 +27,7 @@ goog.require('historian.constants');
 goog.require('historian.data');
 goog.require('historian.histogramstats');
 goog.require('historian.note');
+goog.forwardDeclare('historian.requests');
 goog.require('historian.tables');
 
 
@@ -127,14 +129,6 @@ historian.compareFormData = [];
 historian.MIN_PANEL_HEIGHT = 250;
 
 
-/** @type {?historian.HistorianV2} */
-historian.historianV2_;
-
-
-/** @type {?historian.HistorianV2} */
-historian.historianV2Two_;
-
-
 /** @private {!historian.State} */
 historian.state_;
 
@@ -146,34 +140,72 @@ historian.historianV1Requested = false;
 
 
 /**
- * Creates the historian graph from the csv data.
- * If the use case is comparison, calls render for both the files.
- * @param {!Array<!historian.HistorianV2Data>} data
- * @param {!historian.LevelSummaryData} levelSummaryData
- * @export
+ * Historian V2 timelines for the default single bug report analysis view.
+ * @private @const {!Array<!historian.HistorianV2.Timeline>}
  */
-historian.renderHistorianV2 = function(data, levelSummaryData) {
-  if (!historian.historianV2_) {
-    var powerStatsContainer =
-        (historian.metrics.Csv.POWERMONITOR in data[0].nameToBarGroup) ?
-            $(historian.panels_.powerstats.selector + ' .panel-body') : null;
-    historian.historianV2_ = new historian.HistorianV2(
-        $(historian.panels_.historian.selector + ' .panel-body'),
-        data[0], levelSummaryData, historian.state_,
-        powerStatsContainer);
+historian.singleView_ = [
+  {
+    panel: historian.panels_.historian.selector,
+    tabSelector: '#tab-historian-v2',
+    container: '#historian-v2',
+    barOrder: historian.metrics.BATTERY_HISTORY_ORDER,
+    barHidden: historian.metrics.BATTERY_HISTORY_HIDDEN
   }
-  historian.historianV2_.render();
+];
 
-  if (historian.usingComparison && data.length > 1) {
-    if (!historian.historianV2Two_) {
-      // Powermonitor is not supported for comparison view, so pass in a null
-      // container.
-      historian.historianV2Two_ = new historian.HistorianV2(
-          $(historian.panels_.historian2.selector + ' .panel-body'),
-          data[1], levelSummaryData, historian.state_, null);
-    }
-    historian.historianV2Two_.render();
+
+/**
+ * Historian V2 timelines for the comparison analysis view.
+ * @private @const {!Array<!historian.HistorianV2.Timeline>}
+ */
+historian.comparisonView_ = [
+  {
+    panel: historian.panels_.historian.selector,
+    container: '#historian-v2',
+    barOrder: historian.metrics.BATTERY_HISTORY_ORDER,
+    barHidden: historian.metrics.BATTERY_HISTORY_HIDDEN
+  },
+  {
+    panel: historian.panels_.historian2.selector,
+    container: '#historian-v2-2',
+    barOrder: historian.metrics.BATTERY_HISTORY_ORDER,
+    barHidden: historian.metrics.BATTERY_HISTORY_HIDDEN
   }
+];
+
+
+/**
+ * Creates and populates the HistorianV2 objects for each timeline.
+ * @param {!Array<!historian.HistorianV2.Timeline>} timelines Timeline
+ *     properties to use, and to populate with constructed HistorianV2 objects.
+ * @param {!Array<!historian.HistorianV2Data>} data Data for each timeline.
+ * @param {!historian.LevelSummaryData} levelSummaryData
+ * @param {boolean} hasPowermonitorData Whether powermonitor data is available
+ *     in the current report.
+ * @private
+ */
+historian.constructTimelines_ = function(
+    timelines, data, levelSummaryData, hasPowermonitorData) {
+  goog.asserts.assert(timelines.length == data.length);
+  timelines.forEach(function(timeline, idx) {
+    if (idx >= data.length) {
+      console.log('No data provided for timeline no. ' + idx);
+      return;
+    }
+    var isHidden = {};
+    timeline.barHidden.forEach(function(group) {
+      isHidden[group] = true;
+    });
+    // Only want to attach the power stats container to the first battery view,
+    // and only if powermonitor data is avaiable.
+    var powerStatsContainer = idx == 0 && hasPowermonitorData ?
+        $(historian.panels_.powerstats.selector + ' .panel-body') : null;
+
+    timeline.historian = new historian.HistorianV2(
+        $(timeline.container), data[idx], levelSummaryData,
+        historian.state_, powerStatsContainer,
+        $(timeline.panel + ' .panel-body'), isHidden, timeline.barOrder);
+  });
 };
 
 
@@ -374,28 +406,36 @@ historian.showOnlyHistorianV1 = function() {
 
 /**
  * Sets up the historian page once it is loaded.
- * @param {!Array<!historian.HistorianV2Data>} data
- * @param {!historian.LevelSummaryData} levelSummaryData
+ * @param {!Array<!historian.HistorianV2.Timeline>} timelines
  */
-historian.initHistorianTabs = function(data, levelSummaryData) {
-  $('#tab-historian-v2').on('shown.bs.tab', function() {
-    historian.renderHistorianV2(data, levelSummaryData);
+historian.initHistorianTabs = function(timelines) {
+  timelines.forEach(function(timeline) {
+    if (!timeline.historian || !timeline.tabSelector) {
+      return;
+    }
+    $(timeline.tabSelector).on('shown.bs.tab', function() {
+      timeline.historian.render();
+    });
+    // The tabs will already have their shown/hidden status by the time this
+    // function is called because they're shown/hidden immediately when the page
+    // loads, so we must manually call render() or setDisplayed(false) here.
+    if ($(timeline.tabSelector).hasClass('active')) {
+      timeline.historian.render();
+    } else {
+      timeline.historian.setDisplayed(false);
+    }
+    $(timeline.tabSelector).on('hide.bs.tab', function() {
+      // If tab change has been triggered, notify Historian v2 so it will
+      // ignore mouseover events that occur in the transitioning period.
+      timeline.historian.setDisplayed(false);
+    });
   });
-  $('#tab-historian-v2').on('hide.bs.tab', function() {
-    // If tab change has been triggered, notify Historian v2 so it will
-    // ignore mouseover events that occur in the transitioning period.
-    if (historian.historianV2_) {
-      historian.historianV2_.setDisplayed(false);
+  $('#tab-historian').on('shown.bs.tab', function() {
+    if (!historian.historianV1Requested) {
+      historian.historianV1Requested = true;
+      historian.loadHistorianV1();
     }
   });
-  if (!historian.usingComparison) {
-    $('#tab-historian').on('shown.bs.tab', function() {
-      if (!historian.historianV1Requested) {
-        historian.historianV1Requested = true;
-        historian.loadHistorianV1();
-      }
-    });
-  }
 };
 
 
@@ -463,22 +503,29 @@ historian.displaySelectedApp = function() {
 
 /**
  * Initializes all historian components.
- * @param {!Object} json JSON data object sent back from the server analyzer.
+ * @param {!historian.requests.JSONData} json JSON data object sent back from
+ *     the server analyzer.
  */
 historian.initialize = function(json) {
-  var levelSummaryCsv = json.UploadResponse[0].levelSummaryCsv;
-  historian.sdkVersion = json.UploadResponse[0].sdkVersion;
+  var data = json.UploadResponse;
+
+  var levelSummaryCsv = data[0].levelSummaryCsv;
+  historian.sdkVersion = data[0].sdkVersion;
   historian.usingComparison = json.usingComparison;
-  historian.criticalError = json.UploadResponse[0].criticalError;
+  historian.criticalError = data[0].criticalError;
+  historian.reportVersion = data[0].reportVersion;
+  if (data[0].note) {
+    historian.note.show(data[0].note);
+  }
 
   var displayPowermonitor = false;
   if (historian.usingComparison) {
-    if (json.UploadResponse[1].sdkVersion < historian.sdkVersion) {
-      historian.sdkVersion = json.UploadResponse[1].sdkVersion;
+    if (data[1].sdkVersion < historian.sdkVersion) {
+      historian.sdkVersion = data[1].sdkVersion;
     }
   } else {
-    historian.appstats.reportVersion = json.UploadResponse[0].reportVersion;
-    displayPowermonitor = json.UploadResponse[0].displayPowermonitor;
+    historian.deviceCapacity = data[0].deviceCapacity;
+    displayPowermonitor = data[0].displayPowermonitor;
     if (displayPowermonitor) {
       levelSummaryCsv = '';
     }
@@ -503,26 +550,36 @@ historian.initialize = function(json) {
       historian.note.show(historian.criticalError);
     }
     // Get the devices that are reporting zero battery capacity.
-    var badDevices = json.UploadResponse.reduce(function(devices, data, i) {
-      return data.deviceCapacity == 0 ? devices + i + ' ' : devices;
+    var badDevices = data.reduce(function(devices, datum, i) {
+      return datum.deviceCapacity == 0 ? devices + i + ' ' : devices;
     }, '');
     if (badDevices != '') {
       historian.note.show(
           'Device(s) ' + badDevices + 'reported battery capacity 0.');
     }
 
-    historianV2Data = json.UploadResponse.map(function(data) {
-      return historian.data.processHistorianV2Data(
-          data.historianV2Csv, parseInt(data.deviceCapacity, 10),
-          data.timeToDelta, data.location, data.displayPowermonitor,
-          data.groupToLogStart || {});
+    data.forEach(function(datum) {
+      if (datum.historianV2Logs) {
+        historianV2Data.push(historian.data.processHistorianV2Data(
+            datum.historianV2Logs, parseInt(datum.deviceCapacity, 10),
+            datum.timeToDelta, datum.location, datum.displayPowermonitor));
+      }
     });
     historian.tables.initialize();
 
     if (!historian.usingComparison) {
-      historian.appstats.initialize(json.UploadResponse[0].appStats);
+      historian.appstats.initialize(data[0].appStats);
 
       historian.initAppSelector();
+
+      var timelines = historian.singleView_;
+
+      var hasPowermonitorData =
+          historian.metrics.Csv.POWERMONITOR in historianV2Data[0].nameToBarGroup;
+
+      historian.constructTimelines_(
+          timelines, historianV2Data, levelSummaryData, hasPowermonitorData);
+      historian.initHistorianTabs(timelines);
 
       if (!displayPowermonitor) {
         // If no powermonitor file was uploaded, no power stats will be
@@ -533,16 +590,19 @@ historian.initialize = function(json) {
     } else {
       historian.comparison.initialize();
       historian.histogramstats.initialize(
-          json.UploadResponse[0].histogramStats,
-          json.UploadResponse[1].histogramStats, json.combinedCheckin,
-          json.UploadResponse[0].fileName, json.UploadResponse[1].fileName);
-      // TODO: Adding / removing metrics in comparison view is not
-      // currently handled, since the graphs can have different sets of metrics.
-      $('#historian-metrics').remove();
+          data[0].histogramStats,
+          data[1].histogramStats, json.combinedCheckin,
+          data[0].fileName, data[1].fileName);
+
+      historian.constructTimelines_(
+          historian.comparisonView_, historianV2Data, levelSummaryData, false);
+      historian.comparisonView_.forEach(function(timeline) {
+        if (timeline.historian) {
+          timeline.historian.render();
+        }
+      });
     }
-    historian.renderHistorianV2(historianV2Data, levelSummaryData);
   }
-  historian.initHistorianTabs(historianV2Data, levelSummaryData);
 
   // Visibility initialization goes after rendering.
   // Otherwise the plots would have zero size.

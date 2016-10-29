@@ -17,14 +17,10 @@
 goog.provide('historian.BarData');
 goog.provide('historian.BarData.Listener');
 
-goog.require('historian.metrics');
-
-
-/**
- * Function that is called on bar data change.
- * @typedef {function()}
- */
-historian.BarData.Listener;
+goog.require('goog.array');
+goog.require('historian.color');
+goog.require('historian.metrics.Csv');
+goog.require('historian.utils');
 
 
 
@@ -32,20 +28,27 @@ historian.BarData.Listener;
  * Stores all series groups parsed from the Historian v2 CSV, including those
  * which are configured to be ignored by default. Handles adding and removing
  * series groups and notifying listeners.
+ * @param {?jQuery} container The graph container this bar data is rendered in.
  * @param {!Object<!historian.SeriesGroup>} groups All the series groups.
- * @param {!Object<boolean>} hiddenMetrics Metrics hidden by default.
+ * @param {!Object<boolean>} hidden Groups hidden by default.
  * @param {!Array<string>} order Order for the groups to be displayed in.
  * @param {boolean} createList If true, creates and appends the list
  *     elements representing the bar data to the Historian menu bar.
  * @constructor
  * @struct
  */
-historian.BarData = function(groups, hiddenMetrics, order, createList) {
+historian.BarData = function(container, groups, hidden, order, createList) {
+  /** @private {?jQuery} */
+  this.container_ = container;
+
   /** @private {!Array<!historian.BarData.Listener>} */
   this.listeners_ = [];
 
   /** @private {!Object<!historian.SeriesGroup>} */
   this.groups_ = groups;
+
+  /** @private {!Object<!historian.BarData.Legend>} */
+  this.legends_ = this.generateLegends_();
 
   /**
    * Data to display as bars in Historian v2.
@@ -60,26 +63,60 @@ historian.BarData = function(groups, hiddenMetrics, order, createList) {
    */
   this.order_ = order;
 
-  this.generateDataToDisplay_(hiddenMetrics);
+  this.generateDataToDisplay_(hidden);
   // Assign a row index to each series group.
   this.generateIndexes();
   if (createList) {
-    this.constructSeriesGroupsList_(hiddenMetrics);
+    this.addSeriesSelector_(hidden);
   }
 };
 
 
 /**
+ * Function that is called on bar data change.
+ * @typedef {function()}
+ */
+historian.BarData.Listener;
+
+
+/**
+ * A single row in a legend.
+ * @typedef {{
+ *   color: string,
+ *   value: (string|number)
+ * }}
+ */
+historian.BarData.LegendEntry;
+
+
+/**
+ * The help legend for a series group.
+ * @typedef {!Array<!historian.BarData.LegendEntry>}
+ */
+historian.BarData.Legend;
+
+
+/**
  * Adds all non ignored metrics into the array of data to display.
- * @param {!Object<boolean>} hiddenMetrics Metrics hidden by default.
+ * @param {!Object<boolean>} hidden Groups hidden by default.
  * @private
  */
-historian.BarData.prototype.generateDataToDisplay_ = function(hiddenMetrics) {
-  for (var name in this.groups_) {
-    if (!(name in hiddenMetrics)) {
-      this.dataToDisplay_.push(this.groups_[name]);
+historian.BarData.prototype.generateDataToDisplay_ = function(hidden) {
+  this.order_.forEach(function(group) {
+    if ((group in this.groups_) && !(group in hidden)) {
+      this.dataToDisplay_.push(this.groups_[group]);
     }
-  }
+  }, this);
+};
+
+
+/**
+ * Returns the legend entries for a given series group.
+ * @param {string} group The name of the group.
+ * @return {!historian.BarData.Legend}
+ */
+historian.BarData.prototype.getLegend = function(group) {
+  return this.legends_[group] || [];
 };
 
 
@@ -122,65 +159,31 @@ historian.BarData.prototype.generateIndexes = function() {
 
 
 /** @private @const {string} */
-historian.BarData.LIST_CHECKBOX_CLASS_ = '.glyphicon';
-
-
-/** @private @const {string} */
-historian.BarData.METRIC_LIST_ITEM_CLASS_NAME_ = 'group';
-
-
-/** @private @const {string} */
-historian.BarData.METRICS_LIST_ID_ = '#historian-series-groups';
+historian.BarData.METRICS_SELECTOR_ = 'select.configure-metrics';
 
 
 /**
- * Creates the group selection list. Updates the list elements UI on selection
- * and deselection, and adds or removes the selected group based on the state.
- * @param {!Object<boolean>} hidden Metrics hidden by default.
+ * Creates the series selector for adding hidden groups.
+ * @param {!Object<boolean>} hidden Groups hidden by default.
  * @private
  */
-historian.BarData.prototype.constructSeriesGroupsList_ = function(hidden) {
-  var groupNames = Object.keys(this.groups_).sort();
-  var list = $(historian.BarData.METRICS_LIST_ID_ + ' ul');
-  groupNames.forEach(function(group) {
-    // Create a list item for the group.
-    var item = $('<li></li>')
-        .appendTo(list);
-    var link = $('<a href="#"></a>')
-        .appendTo(item);
-    // Create the checkbox.
-    $('<span></span>')
-        .attr('class', 'glyphicon glyphicon-ok glyphicon-inline-left')
-        .appendTo(link);
-    // Create the group name span.
-    $('<span></span')
-        .attr('class', historian.BarData.METRIC_LIST_ITEM_CLASS_NAME_)
-        .text(group)
-        .appendTo(link);
-
-    if (group in hidden) {
-      // Default state is unchecked if the series group is not being displayed.
-      link.children(historian.BarData.LIST_CHECKBOX_CLASS_).css('opacity', 0);
-    }
-    link.click(function(element, event) {
-      var checkbox = element.children(historian.BarData.LIST_CHECKBOX_CLASS_);
-      var metricClicked = element.children(
-          '.' + historian.BarData.METRIC_LIST_ITEM_CLASS_NAME_).text();
-
-      var isChecked = checkbox.css('opacity') > 0;
-      if (isChecked) {
-        this.removeGroup(metricClicked);
-      } else {
-        this.addGroup(metricClicked);
-      }
-      // Toggle the state of the checkbox.
-      element.children(historian.BarData.LIST_CHECKBOX_CLASS_)
-          .css('opacity', isChecked ? 0 : 1);
-
-      // Leave list open so they can select another if desired.
-      event.stopPropagation();
-    }.bind(this, link));
-  }, this);
+historian.BarData.prototype.addSeriesSelector_ = function(hidden) {
+  if (!this.container_) {
+    return;
+  }
+  var select = this.container_.find(historian.BarData.METRICS_SELECTOR_);
+  // Only allow the user to choose metrics that are currently not displayed.
+  // We can't just use the hidden metrics map as that may contain metrics
+  // not present in the groups data.
+  var series = Object.keys(this.groups_).filter(function(elem) {
+    return elem in hidden;
+  }).sort();
+  historian.utils.setupDropdown(select, series, 'Add Metrics');
+  select.on('change', function(event) {
+    this.addGroup(event.val);
+    select.find('option[value="' + event.val + '"]').remove();
+    select.select2('val', null);
+  }.bind(this));
 };
 
 
@@ -224,7 +227,7 @@ historian.BarData.prototype.addGroup = function(name) {
   }
   var found = this.dataToDisplay_.some(function(group) {
     return group.name == name;
-  }, this);
+  });
   // Only need to add the group if it's not already in the data to display.
   if (!found) {
     this.dataToDisplay_.push(this.groups_[name]);
@@ -243,13 +246,87 @@ historian.BarData.prototype.removeGroup = function(name) {
   if (!(name in this.groups_)) {
     return;
   }
-  this.dataToDisplay_.some(function(group, i) {
-    if (group.name == name) {
-      this.dataToDisplay_.splice(i, 1);
-      this.generateIndexes();
-      this.callListeners_();
-      return true;
+  var removed = goog.array.removeIf(this.dataToDisplay_, function(group) {
+    return group.name == name;
+  });
+  if (removed) {
+    this.generateIndexes();
+    this.callListeners_();
+
+    if (!this.container_) {
+      return;
     }
-    return false;
-  }, this);
+    // Add the removed group to the list of metrics that can be added.
+    var dropdown = this.container_.find(historian.BarData.METRICS_SELECTOR_);
+    var toInsert = $('<option></option>').val(name).html(name);
+    var inserted = false;
+    dropdown.find('option').each(function() {
+      // Insert alphabetically, ignoring case.
+      var existing = $(this).val();
+      if (existing.localeCompare(name, 'en', {'sensitivity': 'base'}) > 0) {
+        toInsert.insertBefore($(this));
+        inserted = true;
+        return false;
+      }
+    });
+    if (!inserted) {
+      toInsert.appendTo(dropdown);
+    }
+    dropdown.trigger('change');
+  }
+};
+
+
+/**
+ * Generates help legends for values and corresponding colors per series group.
+ * @return {!Object<!historian.BarData.Legend>} Map from group
+ *     name to legend entries.
+ * @private
+ */
+historian.BarData.prototype.generateLegends_ = function() {
+  var valueToLegendEntry = function(series, value) {
+    return {
+      color: series.color(value),
+      value: historian.color.valueFormatter(series.name, value).value
+    };
+  };
+
+  var seriesToLegendEntries = function(series) {
+    var entries = [];
+    if (series.type == 'bool') {
+      // Series with only 'true' values. Time during which there is no
+      // entry is considered 'false'.
+      entries = entries.concat([
+        {
+          color: 'white',
+          value: 'Off'
+        },
+        {
+          color: series.color('true'),
+          value: 'On'
+        }
+      ]);
+    } else if (series.color && typeof series.color.domain == 'function' &&
+        series.color.domain().length > 0) {
+      // Series which have a fixed set of domain values.
+      // e.g. PHONE_STATE has domain = ['in', 'out', 'off']
+      var domainValues = series.color.domain();
+      entries = entries.concat(
+          domainValues.map(valueToLegendEntry.bind(null, series)));
+    }
+    // TODO: handle other series types.
+    // TODO: consider prefixing the value with the series name if
+    // group has more than one series. e.g. AM Proc Start and Am Proc Died are
+    // rendered in the same row.
+    return entries;
+  };
+
+  var legends = {};
+  for (var group in this.groups_) {
+    legends[group] = [];
+    this.groups_[group].series.forEach(function(series) {
+      legends[group] = legends[group].concat(seriesToLegendEntries(series));
+    });
+  }
+  return legends;
 };

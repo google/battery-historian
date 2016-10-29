@@ -146,6 +146,14 @@ window.testParseTimeString = function() {
       expected: 0
     },
     {
+      input: '2.s',
+      expected: 0
+    },
+    {
+      input: '3.ms',
+      expected: 0
+    },
+    {
       input: 'h1s',
       expected: 0
     },

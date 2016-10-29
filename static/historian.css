@@ -90,10 +90,6 @@ rect.level-summary {
   pointer-events: none;
 }
 
-.level-line.powermonitor {
-  opacity: 0.3;
-}
-
 .powermonitor-overlay {
   fill: none;
   stroke: green;
@@ -133,6 +129,10 @@ rect.level-summary {
   fill: grey;
 }
 
+.series-label.app-specific {
+  font-weight: bold;
+}
+
 .threshold-label {
   padding-bottom: 20px;
   font-size: 14pt;
@@ -168,6 +168,10 @@ rect.bar, circle.bar {
   stroke-width: 7px;
 }
 
+rect.bar.unavailable {
+  stroke-width: 0;  /* Disable hover effect. */
+}
+
 rect.bar:hover, circle.bar:hover {
   stroke-opacity: 0.5;
 }
@@ -190,13 +194,55 @@ rect.bar:hover, circle.bar:hover {
 
 .help-icon-container {
   cursor: pointer;
+  /*
+     Opacity seems to cause the icons to be rendered wrongly and aren't visible.
+     Possibly related to: https://groups.google.com/a/chromium.org/forum/#!topic/chromium-reviews/hBIaYrnmiRA
+     TODO: revisit this later on.
   opacity: 0.5;
+  */
 }
 
 .help-icon-container:hover {
+  /*
+     Opacity seems to cause the icons to be rendered wrongly and aren't visible.
+     Possibly related to: https://groups.google.com/a/chromium.org/forum/#!topic/chromium-reviews/hBIaYrnmiRA
+     TODO: revisit this later on.
   opacity: 0.9;
+  */
 }
 
 .historian-tooltip.help-tooltip {
   white-space: pre-wrap;
+}
+
+.temperature {
+  background-color: #ffebcd;
+}
+
+.series-warning {
+  color: darkred;
+}
+
+.historian-v2.settings .settings-section, #historian-v2 .settings-section label {
+  margin-right: 5px;
+}
+
+.historian-v2.settings {
+  font-size: 0.9em;
+}
+
+.historian-v2.settings input[type="number"] {
+  display: inline;
+  font-size: 1em;
+  height: auto;
+  padding: 0px;
+  text-align: center;
+  width: 40px;
+}
+
+.legend-item {
+  display: inline-block;
+  height: 10px;
+  margin-right: 8px;
+  width: 10px;
 }
