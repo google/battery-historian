@@ -238,52 +238,57 @@ historian.Bars.prototype.renderLabels_ = function() {
   // static height.
   var iconSize = rowHeight * 0.9;
   var tooltip = null;
-  // foreignObject appears to be the only way to include a span in SVG, for the
-  // glyphicon help icon.
-  enterGroups.append('svg:foreignObject')
-      .attr('class', function(group) {
-        var hasLegend = this.barData_.getLegend(group.name).length > 0;
-        // Only show the help icon if there is a help legend or descriptor
-        // for the group.
-        return hasLegend || group.name in historian.metrics.descriptors ?
-            'help-icon-container' : 'hidden';
-      }.bind(this))
-      .attr('font-size', iconSize)  // Glyphicon size is set with font size.
-      .attr('x', historian.Bars.HELP_ICON_OFFSET_PX_)
-      .attr('y', (rowHeight - iconSize) / 2)  // To center it exactly.
-      .append('xhtml:span')
-      .attr('class', 'help-icon glyphicon glyphicon-info-sign')
-      .on('mouseover', function(group) {
-        var lines = [group.name];
-        var legend = this.barData_.getLegend(group.name);
-        var desc = historian.metrics.descriptors[group.name];
-        if (legend.length == 0 && !desc) {
-          // No legend or descriptor, don't display anything.
-          return;
-        }
-        if (desc) {
-          // Text help descriptor.
-          lines.push(desc);
-        }
-        // Display each legend entry on a separate row.
-        legend.forEach(function(entry) {
-          var rectHtml = $('<div/>', {
-            // Build errors if class is not quoted, as it's a reserved keyword.
-            'class': 'legend-item',
-            css: {
-              backgroundColor: entry.color
-            }
-          }).prop('outerHTML');  // Convert the div to HTML.
-          lines.push(rectHtml + entry.value);
-        });
-        tooltip = new historian.Tooltip(lines, this.state_, 'help-tooltip');
-      }.bind(this))
-      .on('mouseout', function() {
-        if (tooltip) {
-          tooltip.hide();
-        }
-      }.bind(this));
-
+  if (historian.utils.isForeignObjectSupported()) {
+    // foreignObject appears to be the only way to include a span in SVG, and
+    // it's used here for the glyphicon help icon. There are some browsers that
+    // don't support foreignObject (eg. IE 11 and below), so we have to check
+    // that the browser supports it, otherwise, the system will experience a
+    // null error if we try to use this on that browser.
+    enterGroups.append('svg:foreignObject')
+        .attr('class', function(group) {
+          var hasLegend = this.barData_.getLegend(group.name).length > 0;
+          // Only show the help icon if there is a help legend or descriptor
+          // for the group.
+          return hasLegend || group.name in historian.metrics.descriptors ?
+          'help-icon-container' : 'hidden';
+        }.bind(this))
+        .attr('font-size', iconSize)  // Glyphicon size is set with font size.
+        .attr('x', historian.Bars.HELP_ICON_OFFSET_PX_)
+        .attr('y', (rowHeight - iconSize) / 2)  // To center it exactly.
+        .append('xhtml:span')
+        .attr('class', 'help-icon glyphicon glyphicon-info-sign')
+        .on('mouseover', function(group) {
+          var lines = [group.name];
+          var legend = this.barData_.getLegend(group.name);
+          var desc = historian.metrics.descriptors[group.name];
+          if (legend.length == 0 && !desc) {
+            // No legend or descriptor, don't display anything.
+            return;
+          }
+          if (desc) {
+            // Text help descriptor.
+            lines.push(desc);
+          }
+          // Display each legend entry on a separate row.
+          legend.forEach(function(entry) {
+            var rectHtml = $('<div/>', {
+              // We'll get build errors if class isn't in quotes, because it's
+              // a reserved keyword.
+              'class': 'legend-item',
+              css: {
+                backgroundColor: entry.color
+              }
+            }).prop('outerHTML');  // Convert the div to HTML.
+            lines.push(rectHtml + entry.value);
+          });
+          tooltip = new historian.Tooltip(lines, this.state_, 'help-tooltip');
+        }.bind(this))
+        .on('mouseout', function() {
+          if (tooltip) {
+            tooltip.hide();
+          }
+        }.bind(this));
+  }
   // Render the group labels.
   enterGroups.append('text')
       .attr('name', function(group) {
@@ -325,20 +330,24 @@ historian.Bars.prototype.renderLabels_ = function() {
         return group.name;
       });
 
-  // Add buttons allowing users to remove individual series.
-  enterGroups.append('svg:foreignObject')
-      .attr('x', -historian.Bars.REMOVE_OFFSET_PX_)
-      .attr('y', rowHeight / 2)
-      .attr('font-size', '1.25em')
-      .style('line-height', 0)
-      .append('xhtml:span')
-      .html('&times')
-      .attr('class', historian.Bars.REMOVE_METRIC_CLASS_.slice(1))
-      .style('opacity', 0)  // Not shown until the series group is hovered on.
-      .on('click', function(group) {
-        this.barData_.removeGroup(group.name);
-      }.bind(this));
-
+  if (historian.utils.isForeignObjectSupported()) {
+    // Add buttons allowing users to remove individual series. There are some
+    // browsers that don't support foreignObject (eg. IE 11 and below), so we
+    // have to check that the browser supports it, otherwise, the system will
+    // experience a null error if we try to use this on that browser.
+    enterGroups.append('svg:foreignObject')
+        .attr('x', -historian.Bars.REMOVE_OFFSET_PX_)
+        .attr('y', rowHeight / 2)
+        .attr('font-size', '1.25em')
+        .style('line-height', 0)
+        .append('xhtml:span')
+        .html('&times')
+        .attr('class', historian.Bars.REMOVE_METRIC_CLASS_.slice(1))
+        .style('opacity', 0)  // Not shown until the series group is hovered on.
+        .on('click', function(group) {
+          this.barData_.removeGroup(group.name);
+        }.bind(this));
+  }
   // Show or hide the remove button depending on whether the series group
   // is being hovered on.
   enterGroups.on('mouseover', function(group) {

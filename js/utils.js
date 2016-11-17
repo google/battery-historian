@@ -30,14 +30,24 @@ var time = goog.require('historian.time');
 
 /**
  * Compute the relative coordinate of a jquery selection, corresponding to
- * its parent
+ * its parent.
  * @param {!Object} event
  * @param {!jQuery} jqThis
- * @return {!Array<number>} the offset computed
+ * @return {!Array<number>} The offset computed
  */
 exports.getOffset = function(event, jqThis) {
   var parentOffset = jqThis.parent().offset();
   return [event.pageX - parentOffset.left, event.pageY - parentOffset.top];
+};
+
+
+/**
+ * Checks to see if the browser supports the foreignObject SVG element.
+ * @return {boolean} True if the browser supports foreignObject, false otherwise
+ */
+exports.isForeignObjectSupported = function() {
+  return document.implementation.hasFeature(
+      'www.http://w3.org/TR/SVG11/feature#Extensibility', '1.1');
 };
 
 

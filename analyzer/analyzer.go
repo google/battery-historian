@@ -810,19 +810,19 @@ func (pd *ParsedData) parseBugReport(fnameA, contentsA, fnameB, contentsB string
 			go doSummaries(summariesCh, bsL, pkgsL)
 
 			checkinL = <-checkinLCh
+			errs = append(errs, checkinL.err...)
+			warnings = append(warnings, checkinL.warnings...)
 			if diff {
 				checkinE = <-checkinECh
+				errs = append(errs, checkinE.err...)
+				warnings = append(warnings, checkinE.warnings...)
 			}
 			if checkinL.batterystats == nil || (diff && checkinE.batterystats == nil) {
 				ce = "Could not parse aggregated battery stats."
+			} else if diff {
+				bsStats = checkindelta.ComputeDeltaFromSameDevice(checkinL.batterystats, checkinE.batterystats)
 			} else {
-				if diff {
-					bsStats = checkindelta.ComputeDeltaFromSameDevice(checkinL.batterystats, checkinE.batterystats)
-				} else {
-					bsStats = checkinL.batterystats
-				}
-				errs = append(errs, append(checkinL.err, checkinE.err...)...)
-				warnings = append(warnings, append(checkinL.warnings, checkinE.warnings...)...)
+				bsStats = checkinL.batterystats
 			}
 		}
 
