@@ -18,7 +18,7 @@ docker -- run -p <port>:9999 gcr.io/android-battery-historian:2.1 --port 9999
 For Linux and Mac OS X:
 
 * That's it, you're done! Historian will be available at
-  http://localhost:&lt;port>.
+  `http://localhost:<port>`.
 
 For Windows:
 
@@ -27,7 +27,7 @@ For Windows:
 
 * Once you start Docker, it should tell you the IP address of the machine it is
 using. If, for example, the IP address is 123.456.78.90, Historian will be
-available at http://123.456.78.90:&lt;port>.
+available at `http://123.456.78.90:<port>`.
 
 For more information about the port forwarding, see the [Docker
 documentation](<https://docs.docker.com/engine/reference/run/#/expose-incoming-ports>).
