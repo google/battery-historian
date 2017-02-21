@@ -217,7 +217,7 @@ Download the AOSP Monsoon Python script from <https://android.googlesource.com/p
 
 ```
 # Run the script.
-$ monsoon.py --serialno 2294 --hz 1 --samples 100000 -timestamp | tee monsoon.out
+$ monsoon.py --serialno 2294 --hz 1 --samples 100000 --timestamp | tee monsoon.out
 
 # ...let device run a while...
 
