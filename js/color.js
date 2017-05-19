@@ -20,10 +20,13 @@
  */
 goog.provide('historian.color');
 
+goog.require('goog.asserts');
 goog.require('goog.functions');
 goog.require('goog.string');
+goog.require('historian.historianV2Logs');
 goog.require('historian.metrics');
 goog.require('historian.metrics.Csv');
+goog.require('historian.time');
 
 
 /**
@@ -49,7 +52,79 @@ historian.color.colorMap_[historian.metrics.Csv.NATIVE_CRASHES] =
 
 
 /** @private {function(string): string} */
-historian.color.colorMap_[historian.metrics.Csv.BRIGHTNESS] = d3.scale.ordinal()
+historian.color.colorMap_[historian.metrics.Csv.DVM_LOCK_SAMPLE] =
+    goog.functions.constant('black');
+
+
+/** @private {function(string): string} */
+historian.color.colorMap_[historian.metrics.Csv.SELINUX_DENIAL] =
+    goog.functions.constant('black');
+
+
+/** @private {function(string): string} */
+historian.color.colorMap_[historian.metrics.Csv.STRICT_MODE_VIOLATION] =
+    goog.functions.constant('red');
+
+
+/** @private {function(string): string} */
+historian.color.colorMap_[historian.metrics.Csv.CHOREOGRAPHER_SKIPPED] =
+    goog.functions.constant('red');
+
+
+/** @private {function(string): string} */
+historian.color.colorMap_[historian.metrics.Csv.GC_PAUSE_BACKGROUND_PARTIAL] =
+    goog.functions.constant('orange');
+
+
+/** @private {function(string): string} */
+historian.color.colorMap_[historian.metrics.Csv.GC_PAUSE_BACKGROUND_STICKY] =
+    goog.functions.constant('red');
+
+
+/** @private {function(string): string} */
+historian.color.colorMap_[historian.metrics.Csv.GC_PAUSE_FOREGROUND] =
+    goog.functions.constant('maroon');
+
+
+/** @private {function(string): string} */
+historian.color.colorMap_[historian.metrics.Csv.BROADCAST_ENQUEUE_FOREGROUND] =
+    d3.scaleThreshold()
+        .domain([1000, 5000])
+        .range(['orange', 'maroon', 'black']);
+
+
+/** @private {function(string): string} */
+historian.color.colorMap_[historian.metrics.Csv.BROADCAST_DISPATCH_FOREGROUND] =
+    historian.color.colorMap_[
+        historian.metrics.Csv.BROADCAST_ENQUEUE_FOREGROUND];
+
+
+/** @private {function(string): string} */
+historian.color.colorMap_[historian.metrics.Csv.BROADCAST_ENQUEUE_BACKGROUND] =
+    historian.color.colorMap_[
+        historian.metrics.Csv.BROADCAST_ENQUEUE_FOREGROUND];
+
+
+/** @private {function(string): string} */
+historian.color.colorMap_[historian.metrics.Csv.BROADCAST_DISPATCH_BACKGROUND] =
+    historian.color.colorMap_[
+        historian.metrics.Csv.BROADCAST_ENQUEUE_FOREGROUND];
+
+
+/** @private {function(string): string} */
+historian.color.colorMap_[historian.metrics.Csv.ACTIVE_BROADCAST_FOREGROUND] =
+    historian.color.colorMap_[
+        historian.metrics.Csv.BROADCAST_ENQUEUE_FOREGROUND];
+
+
+/** @private {function(string): string} */
+historian.color.colorMap_[historian.metrics.Csv.ACTIVE_BROADCAST_BACKGROUND] =
+    historian.color.colorMap_[
+        historian.metrics.Csv.BROADCAST_ENQUEUE_FOREGROUND];
+
+
+/** @private {function(string): string} */
+historian.color.colorMap_[historian.metrics.Csv.BRIGHTNESS] = d3.scaleOrdinal()
     .domain([0, 1, 2, 3, 4])
     .range(['#addeed', '#415094', '#2c2782', '#060424', 'black']);
 
@@ -75,13 +150,32 @@ historian.color.colorMap_[
 
 
 /** @private {function(string): string} */
+historian.color.colorMap_[historian.metrics.Csv.LOW_MEMORY_KILLER] =
+    goog.functions.constant('orange');
+
+
+/** @private {function(string): string} */
 historian.color.colorMap_[historian.metrics.Csv.PHONE_SCANNING] =
     goog.functions.constant('#251dcc');
 
 
 /** @private {function(string): string} */
+historian.color.colorMap_[historian.metrics.Csv.APP_TRANSITIONS] =
+    d3.scaleOrdinal()
+        .domain(['Warm process start', 'Cold process start', 'Unknown'])
+        .range(['orange', 'lightblue', 'grey']);
+
+
+/** @private {function(string): string} */
+historian.color.colorMap_[historian.metrics.Csv.BACKGROUND_COMPILATION] =
+    d3.scaleOrdinal()
+        .domain(['Compilation', 'Verification', 'Other'])
+        .range(['red', 'orange', 'grey']);
+
+
+/** @private {function(string): string} */
 historian.color.colorMap_[
-    historian.metrics.Csv.CONNECTIVITY] = d3.scale.ordinal()
+    historian.metrics.Csv.CONNECTIVITY] = d3.scaleOrdinal()
     .domain([
       'TYPE_NONE', 'TYPE_MOBILE', 'TYPE_WIFI', 'TYPE_MOBILE_MMS',
       'TYPE_MOBILE_SUPL', 'TYPE_MOBILE_DUN', 'TYPE_MOBILE_HIPRI',
@@ -102,10 +196,10 @@ historian.color.colorMap_[
 
 /** @private {function(string): string} */
 historian.color.colorMap_[
-    historian.metrics.Csv.DATA_CONNECTION] = d3.scale.ordinal()
+    historian.metrics.Csv.DATA_CONNECTION] = d3.scaleOrdinal()
     .domain([
       'none', '1xrtt', 'cdma', 'edge', 'ehrpd', 'evdo_0',
-      'evdo_a', 'evdo_b', 'grps', 'hsdpa', 'hspa', 'hspap',
+      'evdo_a', 'evdo_b', 'gprs', 'hsdpa', 'hspa', 'hspap',
       'hsupa', 'iden', 'lte', 'umts', 'other', 'unknown'
     ])
     .range([
@@ -117,14 +211,14 @@ historian.color.colorMap_[
 
 /** @private {function(string): string} */
 historian.color.colorMap_[
-    historian.metrics.Csv.PHONE_STATE] = d3.scale.ordinal()
+    historian.metrics.Csv.PHONE_STATE] = d3.scaleOrdinal()
     .domain(['in', 'out', 'off'])
     .range(['black', 'orange', 'darkblue']);
 
 
 /** @private {function(string): string} */
 historian.color.colorMap_[
-    historian.metrics.Csv.MOBILE_RADIO_ON] = d3.scale.ordinal()
+    historian.metrics.Csv.MOBILE_RADIO_ON] = d3.scaleOrdinal()
     .domain(['true'])
     .range(['#fa531b']);
 
@@ -137,7 +231,7 @@ historian.color.colorMap_[
 
 /** @private {function(string): string} */
 historian.color.colorMap_[
-    historian.metrics.KERNEL_UPTIME] = d3.scale.ordinal()
+    historian.metrics.KERNEL_UPTIME] = d3.scaleOrdinal()
     .domain([
       historian.metrics.KERNEL_UPTIME_WITH_USERSPACE,
       historian.metrics.KERNEL_UPTIME_NO_USERSPACE]
@@ -146,47 +240,47 @@ historian.color.colorMap_[
 
 
 /** @private {function(string): string} */
-historian.color.colorMap_[historian.metrics.Csv.SCREEN_ON] = d3.scale.ordinal()
+historian.color.colorMap_[historian.metrics.Csv.SCREEN_ON] = d3.scaleOrdinal()
     .domain(['true'])
     .range(['red']);
 
 
 /** @private {function(string): string} */
-historian.color.colorMap_[historian.metrics.Csv.GPS_ON] = d3.scale.ordinal()
+historian.color.colorMap_[historian.metrics.Csv.GPS_ON] = d3.scaleOrdinal()
     .domain(['true'])
     .range(['red']);
 
 
 /** @private {function(string): string} */
 historian.color.colorMap_[
-    historian.metrics.Csv.IDLE_MODE_ON] = d3.scale.ordinal()
+    historian.metrics.Csv.IDLE_MODE_ON] = d3.scaleOrdinal()
     .domain(['off', 'light', 'full', '???'])
     .range(['white', 'orange', 'blue', 'black']);
 
 
 /** @private {function(string): string} */
 historian.color.colorMap_[
-    historian.metrics.Csv.SIGNAL_STRENGTH] = d3.scale.ordinal()
+    historian.metrics.Csv.SIGNAL_STRENGTH] = d3.scaleOrdinal()
     .domain(['none', 'poor', 'moderate', 'good', 'great'])
     .range(['white', 'red', 'orange', 'yellow', 'green']);
 
 
 /** @private {function(string): string} */
 historian.color.colorMap_[
-    historian.metrics.Csv.WIFI_SIGNAL_STRENGTH] = d3.scale.ordinal()
+    historian.metrics.Csv.WIFI_SIGNAL_STRENGTH] = d3.scaleOrdinal()
     .domain(['none', 'poor', 'moderate', 'good', 'great'])
     .range(['white', 'red', 'orange', 'yellow', 'green']);
 
 
 /** @private {function(string): string} */
-historian.color.colorMap_[historian.metrics.Csv.TEMPERATURE] = d3.scale.linear()
-    .domain([0, 200, 300, 450, 1000])
+historian.color.colorMap_[historian.metrics.Csv.TEMPERATURE] = d3.scaleLinear()
+    .domain([0, 20, 30, 45, 100])
     .range(['white', '#ffebcd', '#e2a76f', 'red', 'black']);
 
 
 /** @private {function(string): string} */
 historian.color.colorMap_[
-    historian.metrics.Csv.WIFI_SUPPLICANT] = d3.scale.ordinal()
+    historian.metrics.Csv.WIFI_SUPPLICANT] = d3.scaleOrdinal()
     .domain([
       'asced', 'ascing', 'auth', 'compl', 'dsc', 'dorm',
       '4-way', 'group', 'inact', 'dis', 'inv', 'scan',
@@ -199,7 +293,7 @@ historian.color.colorMap_[
 
 /** @private {function(string): string} */
 historian.color.colorMap_[historian.metrics.Csv.SYNC_APP] = function() {
-  var scale = d3.scale.ordinal()
+  var scale = d3.scaleOrdinal()
       .domain([0, 1, 2])
       .range(['white', '#ff6816', '#16a2ff']);
   return function(value) {
@@ -218,7 +312,7 @@ historian.color.colorMap_[historian.metrics.Csv.WAKE_LOCK_HELD] =
 
 /** @private {function(string): string} */
 historian.color.colorMap_[historian.metrics.Csv.WAKELOCK_IN] = function() {
-  var scale = d3.scale.ordinal()
+  var scale = d3.scaleOrdinal()
       .domain([0, 1, 2, 3, 4, 5])
       .range(['white', 'orange', 'red', 'green', 'blue', 'black']);
   return function(value) {
@@ -232,7 +326,7 @@ historian.color.colorMap_[historian.metrics.Csv.WAKELOCK_IN] = function() {
 
 /** @private {function(string): string} */
 historian.color.colorMap_[historian.metrics.Csv.WEARABLE_RPC] =
-    d3.scale.ordinal().domain(['direct', 'cloud', 'exception']).range([
+    d3.scaleOrdinal().domain(['direct', 'cloud', 'exception']).range([
       'green', 'blue', 'red'
     ]);
 
@@ -311,33 +405,89 @@ historian.color.valueTextMap_[historian.metrics.Csv.WIFI_SUPPLICANT] = {
  * defined in the valueTextMap_ above), otherwise returns the original value.
  *
  * @param {string} metric Name of metric.
- * @param {string|number} v Value to format.
- * @return {{value: (string|number), classes: (string|undefined)}}
+ * @param {!historian.Value} v Value to format.
+ * @param {boolean=} opt_shortForm Set to true if space is limted.
+ * @return {{value: !historian.Value, classes: (string|undefined)}}
  *     Formatted output, along with any HTMl classes to apply.
  */
-historian.color.valueFormatter = function(metric, v) {
-  if (metric == historian.metrics.Csv.TEMPERATURE) {
-    // Temperature values are in decaCelcius.
-    var celcius = v / 10;
-    var fahrenheit = celcius * 9 / 5 + 32;
-    var text = goog.string.subs('%s °C (%s °F)',
-        goog.string.htmlEscape(celcius.toFixed(1)),
-        goog.string.htmlEscape(fahrenheit.toFixed(1)));
-    return {value: text, classes: 'temperature'};
-  }
-
-  if (metric == historian.metrics.Csv.COULOMB_CHARGE) {
-    // Units are in mAh.
-    return {value: goog.string.subs('%s mAh', v)};
-  }
-
-  if (metric in historian.color.valueTextMap_) {
-    var formatted = historian.color.valueTextMap_[metric][v];
-    if (formatted) {
-      return {value: formatted};
-    }
+historian.color.valueFormatter = function(metric, v, opt_shortForm) {
+  switch (metric) {
+    case historian.metrics.KERNEL_UPTIME:
+      // The kernel uptime value can be a string, whereas the type is
+      // stored as a number. We only want to format the kernel uptime type.
+      if (typeof v == 'number') {
+        if (v == historian.metrics.KERNEL_UPTIME_WITH_USERSPACE) {
+          v = 'The corresponding CPU running event intersects with' +
+              ' a userspace wakelock event';
+        } else if (v == historian.metrics.KERNEL_UPTIME_NO_USERSPACE) {
+          v = 'The corresponding CPU running event only has kernel uptime';
+        }
+      }
+      return {value: v};
+    case historian.metrics.Csv.TEMPERATURE:
+      // Temperature values are stored in Celcius.
+      var fahrenheit = v * 9 / 5 + 32;
+      var text = goog.string.subs('%s °C (%s °F)',
+          goog.string.htmlEscape(v.toFixed(1)),
+          goog.string.htmlEscape(fahrenheit.toFixed(1)));
+      return {value: text, classes: 'temperature'};
+    case historian.metrics.Csv.COULOMB_CHARGE:
+      // Units are in mAh.
+      return {value: goog.string.subs('%s mAh', v)};
+    case historian.metrics.Csv.ACTIVE_BROADCAST_BACKGROUND:
+    case historian.metrics.Csv.ACTIVE_BROADCAST_FOREGROUND:
+    case historian.metrics.Csv.BROADCAST_ENQUEUE_BACKGROUND:
+    case historian.metrics.Csv.BROADCAST_DISPATCH_BACKGROUND:
+    case historian.metrics.Csv.BROADCAST_ENQUEUE_FOREGROUND:
+    case historian.metrics.Csv.BROADCAST_DISPATCH_FOREGROUND:
+      return {value: historian.time.formatDuration(/** @type {number} */ (v))};
+    default:
+      // If the metric originally had string values but was converted to
+      // numbers for displaying as a line, we want to convert it back to
+      // readable strings.
+      if (metric in historian.metrics.expectedStrings &&
+          typeof v == 'number') {
+        var idx = parseInt(v, 10);
+        var values = historian.metrics.expectedStrings[metric];
+        if (idx < values.length) {
+          // Don't return in case there is a mapping in the valueTextMap.
+          // e.g. PLUG_TYPE 'n' maps to 'none'.
+          v = values[idx];
+        }
+      }
+      if ((typeof v == 'string' || typeof v == 'number') &&
+          metric in historian.color.valueTextMap_ && !opt_shortForm) {
+        var formatted = historian.color.valueTextMap_[metric][v];
+        if (formatted) {
+          return {value: formatted};
+        }
+      }
   }
   return {value: v};
+};
+
+
+/**
+ * List of colors to use for graphed lines.
+ * TODO: make it possible to dynamically set the length, and switch to a
+ * random color generator
+ * @private {!Array<string>}
+ */
+historian.color.graphLineColors_ = ['black', 'red', 'yellow', 'pink', 'green',
+  'orange', 'blue', 'brown', 'silver', 'purple'];
+
+
+/**
+ * Returns a color that can be used for the level line.
+ *
+ * @param {number} i The index of the line. It should be consistent to have the
+ *     same line be colored the same.
+ * @return {string} A string that is a color.
+ */
+historian.color.getLineColor = function(i) {
+  goog.asserts.assert(i >= 0);
+  return historian.color.graphLineColors_[
+      i % historian.color.graphLineColors_.length];
 };
 
 
@@ -345,15 +495,13 @@ historian.color.valueFormatter = function(metric, v) {
  * Sets the color function for each series in each group.
  * This is either from the config file, or a linear scale if none exists.
  *
- * @param {!Object<!historian.SeriesGroup>} seriesData Map from series
- *     group name to series group object to set the color for.
+ * @param {!historian.metrics.DataHasher} groups Groups to generate colors for.
  */
-historian.color.generateSeriesColors = function(seriesData) {
-  var color = d3.scale.category20c();
+historian.color.generateSeriesColors = function(groups) {
+  var color = d3.scaleOrdinal(d3.schemeCategory20c);
 
-  for (var groupName in seriesData) {
-    var seriesGroup = seriesData[groupName];
-    seriesGroup.series.forEach(function(s) {
+  groups.getAll().forEach(function(group) {
+    group.series.forEach(function(s) {
       if (s.type == historian.metrics.ERROR_TYPE) {
         s.color = historian.color.error_;
 
@@ -361,20 +509,23 @@ historian.color.generateSeriesColors = function(seriesData) {
       } else if (s.name in historian.color.colorMap_) {
         s.color = historian.color.colorMap_[s.name];
 
+      } else if (s.source == historian.historianV2Logs.Sources.EVENT_LOG) {
+        s.color = goog.functions.constant('green');
+
       // Create a different color for each string name.
       } else if (s.type == 'string' || s.type == 'service') {
-        s.color = d3.scale.category20c();
+        s.color = d3.scaleOrdinal(d3.schemeCategory20c);
 
       // Bool series only need one color (no entries for 0 values).
       } else if (s.type == 'bool') {
         s.color = goog.functions.constant('green');
 
       // Create a linear color scale.
-      } else if (s.type == 'int') {
+      } else if (s.type == 'int' || s.type == 'float') {
         var extent = d3.extent(s.values, function(d) {
           return d.value;
         });
-        s.color = d3.scale.linear()
+        s.color = d3.scaleLinear()
             .domain([extent[0], extent[1]])
             .range(['#FFFFFF', color(s.name)]);
 
@@ -384,5 +535,5 @@ historian.color.generateSeriesColors = function(seriesData) {
         s.color = goog.functions.constant('black');
       }
     });
-  }
+  });
 };

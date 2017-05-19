@@ -32,8 +32,10 @@ import (
 )
 
 const (
-	closureCompilerZip = "compiler-20160208.zip"
-	closureCompilerURL = "http://dl.google.com/closure-compiler/" + closureCompilerZip
+	closureCompilerVersion = "20170409"
+	closureCompilerZip     = "compiler-" + closureCompilerVersion + ".zip"
+	closureCompilerJar     = "closure-compiler-v" + closureCompilerVersion + ".jar"
+	closureCompilerURL     = "http://dl.google.com/closure-compiler/" + closureCompilerZip
 
 	thirdPartyDir = "third_party"
 	compiledDir   = "compiled"
@@ -159,7 +161,7 @@ func main() {
 
 	if _, err := os.Stat(axisDir); os.IsNotExist(err) {
 		fmt.Println("\nDownloading 3rd-party JS files...")
-		runCommand("git", "clone", "https://github.com/xuanluo/flot-axislabels.git", axisDir)
+		runCommand("git", "clone", "https://github.com/markrcote/flot-axislabels.git", axisDir)
 	}
 
 	fmt.Println("\nGenerating JS runfiles...")
@@ -178,7 +180,7 @@ func main() {
 
 	fmt.Println("\nGenerating optimized JS runfiles...")
 	runCommand("java", "-jar",
-		path.Join(closureCompilerDir, "compiler.jar"),
+		path.Join(closureCompilerDir, closureCompilerJar),
 		"--closure_entry_point", "historian.upload",
 		"--js", "js/*.js",
 		"--js", path.Join(closureLibraryDir, "closure/goog/base.js"),

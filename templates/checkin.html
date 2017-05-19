@@ -21,7 +21,7 @@ specific language governing permissions and limitations under the License.
   <label for="show-low-metrics" style="font-weight:normal;">
     Show metrics with 0 values.<br>
   </label>
-  <table id="checkin" class="summary-content to-datatable no-paging no-ordering no-searching no-info">
+  <table id="checkin" class="summary-content to-datatable no-paging no-ordering no-searching no-info hidable-metrics">
     <thead>
       <tr>
         <th>Metric</th>
@@ -263,8 +263,14 @@ specific language governing permissions and limitations under the License.
         <th>Uid</th>
         <th class="duration">Duration / Hr</th>
         <th>Count / Hr</th>
-        <th class="duration" title="When wakelocks are held at the same time, the time is split evenly between them, so the time shown here is a lower bound of the total duration the named wakelock was held for.">
-          Minimum Duration
+        <th data-feature="partial_wakelock_time" class="duration"
+          {{if ge $.CheckinSummary.ReportVersion 21}}
+          title="The total time this wake lock was held by the app.">
+          Total Duration
+          {{else}}
+          title="When wakelocks are held at the same time, the time is split evenly between them, so the time shown here is a lower bound of the total duration the named wakelock was held for.">
+          Minimum Total Duration
+          {{end}}
         </th>
         <th>Total Count</th>
       </tr>
@@ -277,7 +283,20 @@ specific language governing permissions and limitations under the License.
         <td>{{$wl.UID}}</td>
         <td class="to-norm-timeval">{{$wl.Duration}}</td>
         <td class="to-norm-val">{{$wl.Count}}</td>
-        <td>{{$wl.Duration}}</td>
+        <td
+          {{if ge $.CheckinSummary.ReportVersion 20}}
+          title="Longest individual wakelock duration: {{$wl.MaxDuration}}"
+          {{end}}
+        >
+          {{if ge $.CheckinSummary.ReportVersion 21}}
+            {{$wl.TotalDuration}}
+          <!-- Take the larger of the two values to show as the minimum total duration. -->
+          {{else if and (ge $.CheckinSummary.ReportVersion 20) (gt $wl.MaxDuration $wl.Duration)}}
+            {{$wl.MaxDuration}}
+          {{else}}
+            {{$wl.Duration}}
+          {{end}}
+        </td>
         <td>{{$wl.Count}}</td>
       </tr>
       {{end}}
@@ -678,14 +697,22 @@ specific language governing permissions and limitations under the License.
   <span>Kernel Wakeup Reasons:</span>
 </div>
 <div class="summary-content sliding">
-  <table class="to-datatable">
+  <table id="kernel-wakeup-reasons" class="to-datatable">
     <colgroup>
       <col span="1" width="5%">
       <col span="1" width="45%">
+      {{if .HasBatteryStatsHistory}}
+      <col span="1" width="10%">
+      <col span="1" width="10%">
+      <col span="1" width="10%">
+      <col span="1" width="10%">
+      <col span="1" width="10%">
+      {{else}}
       <col span="1" width="12.5%">
       <col span="1" width="12.5%">
       <col span="1" width="12.5%">
       <col span="1" width="12.5%">
+      {{end}}
     </colgroup>
     <thead>
       <tr>
@@ -695,6 +722,9 @@ specific language governing permissions and limitations under the License.
         <th>Count / Hr</th>
         <th class="duration">Total Duration</th>
         <th>Total Count</th>
+        {{if .HasBatteryStatsHistory}}
+        <th title="Opens histogram of count vs time for the wakeup reason">Show Count vs Time</th>
+        {{end}}
       </tr>
     </thead>
     <tbody>
@@ -706,10 +736,23 @@ specific language governing permissions and limitations under the License.
         <td class="to-norm-val">{{$wr.Count}}</td>
         <td>{{$wr.Duration}}</td>
         <td>{{$wr.Count}}</td>
+        {{if $.HasBatteryStatsHistory}}
+        <td>
+          <button class="btn btn-default show-histogram">
+            <span class="glyphicon glyphicon-picture"></span>
+          </button>
+        </td>
+        {{end}}
       </tr>
       {{end}}
     </tbody>
   </table>
+  {{if .HasBatteryStatsHistory}}
+  <div class="wakeups-histogram" style="display:none;">
+    <h4 class="title"></h4>
+    <div class="plot"></div>
+  </div>
+  {{end}}
 </div>
 {{end}}
 

@@ -805,7 +805,7 @@ class BHEmitter(object):
   def process_event_name(self, event_name):
     event_name = self.annotate_event_name(event_name)
     event_name = self.abbreviate_event_name(event_name)
-    return event_name
+    return event_name.replace("'", r"\'")
 
   def track_event_parallelism_fn(self, start_time, time_this_quanta, time_dict):
     if start_time in time_dict:

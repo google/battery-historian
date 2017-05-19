@@ -12,7 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// local_checkin_parse parses checkin format of batterystats into a batterystats proto.
+// local_checkin_parse parses the checkin format of batterystats into a batterystats proto.
+//
+// Example Usage:
+//  ./local_checkin_parse -input=bugreport.txt -output=checkin.proto
+
 package main
 
 import (
@@ -32,7 +36,8 @@ import (
 )
 
 var (
-	inputFile = flag.String("input", "", "bugreport to be read")
+	inputFile  = flag.String("input", "", "Bugreport to be read")
+	outputFile = flag.String("output", "checkin.proto", "Raw proto file to write to")
 )
 
 func min(x, y int) int {
@@ -123,5 +128,5 @@ func main() {
 	if err != nil {
 		log.Fatalf("Error from proto.Marshal: %v", err)
 	}
-	ioutil.WriteFile("checkin.proto", data, 0600)
+	ioutil.WriteFile(*outputFile, data, 0600)
 }

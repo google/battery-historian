@@ -49,6 +49,15 @@ specific language governing permissions and limitations under the License.
           <li id="tab-historian-v2" class="active sdk-version-21" data-toggle="tooltip" title="Data visualization for history stats, version 2">
             <a href="#historian-v2" data-toggle="tab">Historian V2</a>
           </li>
+          <li id="tab-historian-system-health" class="sdk-version-21" data-toggle="tooltip" title="Data visualization for System Health events">
+            <a href="#historian-system-health" data-toggle="tab">System Health</a>
+          </li>
+          <li id="tab-historian-event-log" class="sdk-version-21" data-toggle="tooltip" title="Data visualization for event log events">
+            <a href="#historian-event-log" data-toggle="tab">Event Log</a>
+          </li>
+          <li id="tab-historian-custom" class="sdk-version-21" data-toggle="tooltip" title="Data visualization for choosing a custom set of events">
+            <a href="#historian-custom" data-toggle="tab">Custom</a>
+          </li>
           <li id="tab-historian" data-toggle="tooltip" title="Data visualization for history stats, version 1">
             <a href="#historian" data-toggle="tab">Historian</a>
           </li>
@@ -68,9 +77,21 @@ specific language governing permissions and limitations under the License.
             {{template "historianv2" .}}
              <div id="power-selector-container">
                <select id="power-selector" class="btn btn-default" data-toggle="tooltip">
-                 <br></br>
+                 <br><br>
                </select>
              </div>
+          </div>
+          <!-- System health tab -->
+          <div id="historian-system-health" class="tab-pane fade" >
+            {{template "historianv2" .}}
+          </div>
+          <!-- Event log tab -->
+          <div id="historian-event-log" class="tab-pane fade" >
+            {{template "historianv2" .}}
+          </div>
+          <!-- Custom tab -->
+          <div id="historian-custom" class="tab-pane fade" >
+            {{template "historianv2" .}}
           </div>
           <!-- historian v1 -->
           <div id="historian" class="tab-pane fade">

@@ -27,7 +27,7 @@ goog.forwardDeclare('batterystats.BatteryStats');
  *   sdkVersion: number,
  *   historianV2Logs: ?Array<!historian.historianV2Logs.Log>,
  *   levelSummaryCsv: string,
- *   displayPowermonitor: boolean,
+ *   displayPowerMonitor: boolean,
  *   reportVersion: number,
  *   appStats: !Array<!historian.AppStat>,
  *   batteryStats: !wireless_android_stats_battery_batterystats.BatteryStats,
@@ -38,6 +38,8 @@ goog.forwardDeclare('batterystats.BatteryStats');
  *   note: string,
  *   fileName: string,
  *   location: string,
+ *   overflowMs: number,
+ *   isDiff: boolean
  * }}
  */
 var UploadResponse;
@@ -50,6 +52,7 @@ var UploadResponse;
  *   html: string,
  *   usingComparison: boolean,
  *   combinedCheckin: !CombinedCheckinSummary,
+ *   systemUiDecoder: !Object<string>
  * }}
  */
 var JSONData;
@@ -65,7 +68,6 @@ var JSONData;
  *   TopMobileTrafficAppsCombined: !Array<!NetworkTrafficDataDiff>,
  *   TopWifiTrafficAppsCombined: !Array<!NetworkTrafficDataDiff>,
  *   DevicePowerEstimatesCombined: !Array<!PowerUseDataDiff>,
- *   LolaPowerPredictionsCombined: !Array<!PowerUseDataDiff>,
  *   WifiFullLockActivityCombined: !Array<!ActivityDataDiff>,
  *   GPSUseCombined: !Array<!ActivityDataDiff>,
  *   CameraUseCombined: !Array<!ActivityDataDiff>,
@@ -223,7 +225,12 @@ var CpuDataDiff;
 var CpuData;
 
 
-/** @typedef {!ActivityDataDiff|!NetworkTrafficDataDiff|!PowerUseDataDiff|!RateDataDiff|!AnrCrashDataDiff|!CpuDataDiff} */
+/**
+ * @typedef {
+ *   !ActivityDataDiff|!NetworkTrafficDataDiff|!PowerUseDataDiff|
+ *   !RateDataDiff|!AnrCrashDataDiff|!CpuDataDiff
+ * }
+ */
 exports.CombinedCheckinData;
 
 

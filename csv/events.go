@@ -24,6 +24,7 @@ import (
 	"strings"
 
 	"github.com/google/battery-historian/checkinutil"
+	"github.com/google/battery-historian/historianutils"
 )
 
 // sortByStartTime sorts events in ascending order of startTimeMs.
@@ -33,14 +34,6 @@ func (a sortByStartTime) Len() int      { return len(a) }
 func (a sortByStartTime) Swap(i, j int) { a[i], a[j] = a[j], a[i] }
 func (a sortByStartTime) Less(i, j int) bool {
 	return a[i].Start < a[j].Start
-}
-
-// max function for int64.
-func max(a int64, b int64) int64 {
-	if a >= b {
-		return a
-	}
-	return b
 }
 
 // Event stores the details contained in a CSV line.
@@ -114,6 +107,9 @@ func eventFromRecord(parts []string) (Event, error) {
 
 // MergeEvents merges all overlapping events.
 func MergeEvents(events []Event) []Event {
+	if len(events) == 0 {
+		return nil
+	}
 	// Need to sort the events by start time here,
 	// because the following algorithm relies on sorted events.
 	sort.Sort(sortByStartTime(events))
@@ -125,7 +121,7 @@ func MergeEvents(events []Event) []Event {
 			res = append(res, prev)
 			prev = cur
 		} else {
-			prev = Event{Start: prev.Start, End: max(prev.End, cur.End)}
+			prev = Event{Start: prev.Start, End: historianutils.MaxInt64(prev.End, cur.End)}
 		}
 	}
 	res = append(res, prev)

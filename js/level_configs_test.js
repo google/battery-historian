@@ -21,13 +21,14 @@ goog.require('goog.testing.jsunit');
 goog.require('historian.LevelConfigs');
 goog.require('historian.data');
 goog.require('historian.historianV2Logs');
+goog.require('historian.metrics.Csv');
 
 
 /**
  * Tests getting a config with data for a non default metric.
  */
 var testGetConfigWithData = function() {
-  var configs = new historian.LevelConfigs(1000, []);
+  var configs = new historian.LevelConfigs(1000, {});
   var data = [
     {
       value: 100
@@ -45,12 +46,16 @@ var testGetConfigWithData = function() {
     enableSampling: false,
     formatDischarge: null,
     formatLevel: null,
+    showExtraSummary: false,
+    ticksShortForm: false,
+    ticksAsFormattedInts: false,
     id: 'testmetric',
     name: name,
     legendText: name,
     levelDisplayText: name,
     yDomain: {min: 10, max: 200},
-    isRateOfChange: false
+    isRateOfChange: false,
+    opacity: 1
   };
   var got = configs.getConfig(name, false, data);
   assertObjectEquals(want, got);
@@ -61,7 +66,7 @@ var testGetConfigWithData = function() {
  * Tests getting a config for rate of change data.
  */
 var testGetRateOfChangeConfig = function() {
-  var configs = new historian.LevelConfigs(1000, []);
+  var configs = new historian.LevelConfigs(1000, {});
   var data = [
     {
       startTime: 0,
@@ -91,12 +96,16 @@ var testGetRateOfChangeConfig = function() {
     enableSampling: false,
     formatDischarge: null,
     formatLevel: null,
+    showExtraSummary: false,
+    ticksShortForm: false,
+    ticksAsFormattedInts: false,
     id: 'testrateofchangemetric',
     name: name,
     legendText: name,
     levelDisplayText: name,
     yDomain: {min: -200, max: 200},
-    isRateOfChange: true
+    isRateOfChange: true,
+    opacity: 1
   };
   var got = configs.getConfig(name, true, data);
   assertObjectEquals(want, got);
@@ -107,19 +116,23 @@ var testGetRateOfChangeConfig = function() {
  * Tests getting a config without passing in data for a non default metric.
  */
 var testGetConfigNoData = function() {
-  var configs = new historian.LevelConfigs(1000, []);
+  var configs = new historian.LevelConfigs(1000, {});
   var name = 'Test metric';
   var want = {
     displayPowerInfo: false,
     enableSampling: false,
     formatDischarge: null,
     formatLevel: null,
+    showExtraSummary: false,
+    ticksShortForm: false,
+    ticksAsFormattedInts: false,
     id: 'testmetric',
     name: name,
     legendText: name,
     levelDisplayText: name,
     yDomain: historian.LevelConfigs.DEFAULT_Y_DOMAIN_,
-    isRateOfChange: false
+    isRateOfChange: false,
+    opacity: 1
   };
   var got = configs.getConfig(name);
   assertObjectEquals(want, got);
@@ -127,34 +140,77 @@ var testGetConfigNoData = function() {
 
 
 /**
- * Tests the battery level config is returned if display powermonitor if false.
+ * Tests the battery level config is returned if display power monitor is
+ * false.
  */
 var testBatteryLevelConfig = function() {
   var data =
       historian.data.processHistorianV2Data([], 2300, {}, '', false, {});
-  assertObjectEquals(historian.LevelConfigs.batteryLevelConfig_(2300),
-      data.configs.getConfig(data.defaultLevelMetric));
+  var want = {
+    displayPowerInfo: false,
+    enableSampling: false,
+    formatDischarge:
+        historian.LevelConfigs.formatBatteryDischarge_.bind(undefined, 2300),
+    formatLevel:
+        historian.LevelConfigs.batteryPercentage_.bind(undefined, 2300),
+    showExtraSummary: true,
+    id: 'batterylevel',
+    name: historian.metrics.Csv.BATTERY_LEVEL,
+    legendText: 'Battery Level',
+    levelDisplayText: 'Battery Level',
+    yDomain: historian.LevelConfigs.DEFAULT_Y_DOMAIN_,
+    isRateOfChange: false,
+    opacity: 1
+  };
+  assertObjectEquals(want, data.configs.getConfig(data.defaultLevelMetric));
 };
 
 
 /**
- * Tests the powermonitor config is returned if display powermonitor if true.
+ * Tests the power monitor config is returned if display power monitor is true.
  */
-var testPowermonitorConfig = function() {
+var testPowerMonitorConfig = function() {
   var data =
       historian.data.processHistorianV2Data([], 2300, {}, '', true, {});
-  assertObjectEquals(historian.LevelConfigs.powermonitorConfig_([]),
+  assertObjectEquals(historian.LevelConfigs.powerMonitorConfig_([]),
       data.configs.getConfig(data.defaultLevelMetric));
 
   var csv = [
     'metric,type,start_time,end_time,value,opt',
-    'Powermonitor,int,1000,2000,-10',
-    'Powermonitor,int,2000,3000,1001'
+    historian.metrics.Csv.POWER_MONITOR + ',int,1000,2000,-10',
+    historian.metrics.Csv.POWER_MONITOR + ',int,2000,3000,1001'
   ].join('\n');
-  var logs = [
-    {source: historian.historianV2Logs.Sources.POWERMONITOR, csv: csv}];
+  var logs = [{
+    source: historian.historianV2Logs.Sources.POWER_MONITOR, csv: csv
+  }];
   // Non default y domain.
   data = historian.data.processHistorianV2Data(logs, 2300, {}, '', true, {});
   assertObjectEquals({min: -10, max: 1001},
       data.configs.getConfig(data.defaultLevelMetric).yDomain);
+};
+
+
+/**
+ * Tests other predefined configs are set correctly.
+ */
+var testPredefinedConfigs = function() {
+  var csv = [
+    'metric,type,start_time,end_time,value,opt',
+    'Temperature,int,100,2000,100,',
+    'Temperature,int,2000,3000,111,',
+    'Temperature,int,3000,5000,193,',
+    'Temperature,int,5000,9000,53,'
+  ].join('\n');
+
+  var logs = [
+    {
+      source: historian.historianV2Logs.Sources.BATTERY_HISTORY,
+      csv: csv
+    }
+  ];
+
+  var data =
+      historian.data.processHistorianV2Data(logs, 2300, {}, '', true, {});
+  assertObjectEquals({min: 5.3, max: 19.3},
+      data.configs.getConfig(historian.metrics.Csv.TEMPERATURE).yDomain);
 };

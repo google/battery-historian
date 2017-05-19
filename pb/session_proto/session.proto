@@ -25,32 +25,32 @@ import "github.com/google/battery-historian/pb/usagestats_proto/android_package_
 
 // Aggregated checkin stats that we will use to compute deltas.
 message Checkin {
-        optional int64 android_id = 1;
+  optional int64 android_id = 1;
 
-        // Build fingerprint
-        optional string build_fingerprint = 2;
+  // Build fingerprint
+  optional string build_fingerprint = 2;
 
-        // Device
-        optional string device = 3;
+  // Device
+  optional string device = 3;
 
-        // Timestamp of measurement
-        optional int64 bucket_snapshot_msec = 4;
+  // Timestamp of measurement
+  optional int64 bucket_snapshot_msec = 4;
 
-        // Duration of the collection
-        optional int64 bucket_duration_msec = 5;
+  // Duration of the collection
+  optional int64 bucket_duration_msec = 5;
 
-        // Checkin
-        optional string checkin = 6;
+  // Checkin
+  optional string checkin = 6;
 
-        // Installed packages
-        repeated usagestats.PackageInfo packages = 7;
+  // Installed packages
+  repeated usagestats.PackageInfo packages = 7;
 
-        // Checkin/OTA groups for the device
-        //    e.g. auto.droidfood, auto.googlefood.lmp
-        repeated string groups = 10;
+  // Checkin/OTA groups for the device
+  //    e.g. auto.droidfood, auto.googlefood.lmp
+  repeated string groups = 10;
 
-        // System info uploaded directly from the device.
-        optional usagestats.SystemInfo system_info = 8;
+  // System info uploaded directly from the device.
+  optional usagestats.SystemInfo system_info = 8;
 
-        // Next tag = 9 (skip 10)
+  // Next tag = 9 (skip 10)
 }

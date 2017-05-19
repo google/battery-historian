@@ -93,6 +93,22 @@ message BatteryStats {
   optional AggregationType aggregation_type = 25;
 
   // Data collected about a single UID.
+  //
+  // In some cases, times are 'apportioned' (i.e. refer to the blame apportioned
+  // to this app amongst all apps) rather than the actual time spent. For
+  // example, if two apps hold wakelocks simultaneously, the time apportioned to
+  // a single app is actually only part of the time it spent holding the
+  // wakelock, estimating how much of the device's total wakelock time can be
+  // blamed on this app. Other times are 'actual', meaning that they
+  // do not take into account usage by other apps.
+  // For example, suppose app A is holding wakelock w for 10 minutes and, in the
+  // middle of those 10 minutes, app B holds wakelock w for 4 minutes. Then
+  // App A actual wakelock time is 10 minutes.
+  // App B actual wakelock time is 4 minutes.
+  // App A apportioned wakelock time might be (10-4) + 4/2 = 8 minutes.
+  // App B apportioned wakelock time might be 4/2 = 2 minutes.
+  // Note that the sum of the apportioned times is 10 minutes, which is the
+  // length of the time period that wakelock w was held.
   message App {
     // e.g., com.google.android.gms.
     optional string name = 1;
@@ -146,10 +162,27 @@ message BatteryStats {
 
     // Bluetooth misc data.
     message BluetoothMisc {
-      // Duration spent BLE scanning.
+      // Duration spent BLE scanning blamed on this App (i.e. apportioned to
+      // this app amongst all apps doing BLE scanning; see explanation of
+      // 'apportioned' in App's comment).
       optional int64 ble_scan_time_msec = 1;
       // BLE scan count.
       optional int32 ble_scan_count = 2;
+      // # of BLE scans when app is in background. (Included in ble_scan_count.)
+      optional int32 ble_scan_count_bg = 3;
+      // Duration spent BLE scanning in total (irrespective of whether other
+      // apps were also simultaneously scanning; see explanation of
+      // 'apportioned' vs. 'actual' in App's comment).
+      // Includes both foreground + background use.
+      optional int64 ble_scan_actual_time_msec = 4;
+      // Duration spent BLE scanning when app is in background (irrespective of
+      // whether other apps were also simultaneously scanning; see explanation
+      // of 'apportioned' vs. 'actual' in App's comment).
+      // (Subtracting from ble_scan_actual_time_msec will yield
+      // foreground usage.)
+      optional int64 ble_scan_actual_time_msec_bg = 5;
+      // Count of results returned by BLE scanning.
+      optional int32 ble_scan_result_count = 6;
     }
     optional BluetoothMisc bluetooth_misc = 28; // blem
 
@@ -196,13 +229,13 @@ message BatteryStats {
     optional ControllerActivity modem_controller = 26; // mcd.
 
     message Network {
-      // Mobile data traffic.
+      // Mobile data traffic (total, background + foreground).
       optional float mobile_bytes_rx = 1;
       optional float mobile_bytes_tx = 2;
-      // Wifi data traffic.
+      // Wifi data traffic (total, background + foreground).
       optional float wifi_bytes_rx = 3;
       optional float wifi_bytes_tx = 4;
-      // In packets.
+      // In packets (total, background + foreground).
       optional float mobile_packets_rx = 5;
       optional float mobile_packets_tx = 6;
       optional float wifi_packets_rx = 7;
@@ -216,6 +249,17 @@ message BatteryStats {
       optional int32 mobile_wakeup_count = 13;
       // Number of times the app woke up the wifi radio.
       optional int32 wifi_wakeup_count = 14;
+      // Mobile data traffic in the background only, included in total above.
+      optional int64 mobile_bytes_bg_rx = 15;
+      optional int64 mobile_bytes_bg_tx = 16;
+      // Wifi data traffic in the background only, included in total above.
+      optional int64 wifi_bytes_bg_rx = 17;
+      optional int64 wifi_bytes_bg_tx = 18;
+      // In packets (background only, included in total packets above).
+      optional int64 mobile_packets_bg_rx = 19;
+      optional int64 mobile_packets_bg_tx = 20;
+      optional int64 wifi_packets_bg_rx = 21;
+      optional int64 wifi_packets_bg_tx = 22;
     };
     optional Network network = 6; // nt.
 
@@ -246,20 +290,39 @@ message BatteryStats {
 
     message ScheduledJob {
       optional string name = 1;
-      // Duration of use.
+      // Duration of use. Includes both foreground + background use.
       optional float total_time_msec = 2;
       // #times of use.
       optional float count = 3;
+      // Duration of use when app is in background.
+      // (Subtracting from total_time_msec will yield foreground usage.)
+      optional int64 background_time_msec = 4;
+      // #times of use when in background. (This is included in count above.)
+      optional int32 background_count = 5;
     };
     repeated ScheduledJob scheduled_job = 14; // jb.
 
     message Sensor {
       // e.g., 24 (significant motion detector).
       optional int32 number = 1;
-      // Duration of use.
+      // Duration of use blamed on this App (i.e. apportioned to this app
+      // amongst all apps using this sensor; see explanation of
+      // 'apportioned' in App's comment).
       optional float total_time_msec = 2;
       // #times of use.
       optional float count = 3;
+      // #times of use when in background. This is included in count above.
+      optional int32 background_count = 4;
+      // Duration of use (irrespective of whether other apps were also
+      // simultaneously using the sensor; see explanation of
+      // 'apportioned' vs. 'actual' in App's comment).
+      // Includes both foreground + background use.
+      optional int64 actual_time_msec = 5;
+      // Duration of use when app is in background (irrespective of
+      // whether other apps were also simultaneously using the sensor; see
+      // explanation of 'apportioned' vs. 'actual' in App's comment).
+      // (Subtracting from actual_time_msec will yield foreground usage.)
+      optional int64 background_actual_time_msec = 6;
     };
     repeated Sensor sensor = 9; // sr.
 
@@ -289,7 +352,7 @@ message BatteryStats {
       optional int64 foreground_service_time_msec = 5;
       // Time the uid had any process that is top while the device was sleeping,
       // but none in the "foreground service" or better state.
-      // Sleeping is mostly screen off, but also includes the the time when the
+      // Sleeping is mostly screen off, but also includes the time when the
       // screen is on but the device has not yet been unlocked.
       optional int64 top_sleeping_time_msec = 6;
       // Time the uid had any process in an active background state, but none in
@@ -300,10 +363,15 @@ message BatteryStats {
 
     message Sync {
       optional string name = 1;
-      // Duration of use.
+      // Duration of use. Includes both foreground + background use.
       optional float total_time_msec = 2;
       // #times of use.
       optional float count = 3;
+      // Duration of use when app is in background.
+      // (Subtracting from total_time_msec will yield foreground usage.)
+      optional int64 background_time_msec = 4;
+      // #times of use when in background. (This is included in count above.)
+      optional int32 background_count = 5;
     };
     repeated Sync sync = 16; // sy.
 
@@ -346,20 +414,27 @@ message BatteryStats {
       // Full wakelocks keep the screen on. Based on
       // PowerManager.SCREEN_BRIGHT_WAKE_LOCK (deprecated in API 13) and
       // PowerManager.SCREEN_DIM_WAKE_LOCK (deprecated in API 17).
+      // If multiple full wakelocks are held at the same time, the total time
+      // is split evenly between them, so this value (full_time_msec) may not
+      // constitute the complete duration the wakelock was held. That is, this
+      // value is 'apportioned' in the sense described in App's comment.
       optional float full_time_msec = 2;
       optional float full_count = 3;
-      // Currently (as of their introduction in v19), current and max durations
-      // are only tracked while the screen is off and the device is on battery,
-      // so they are not currently tracked for full wakelocks, and -1 will
-      // always be printed out for them.
+      // Currently, current and max (as of their introduction in v19) and total
+      // (as of its introduction in v21) durations are not tracked for
+      // full wakelocks, and 0 or -1 will always be printed out for them.
       optional int64 full_current_duration_msec = 8;
       optional int64 full_max_duration_msec = 9;
+      optional int64 full_total_duration_msec = 14;
 
       // Partial wakelocks ensure the CPU is running while allowing the screen
       // to turn off. Based on PowerManager.PARTIAL_WAKE_LOCK.
+      // Partial wakelock metrics are only recorded when the device is unplugged
+      // *and* the screen is off.
       // If multiple partial wakelocks are held at the same time, the total time
       // is split evenly between them, so this value (partial_time_msec) may not
-      // constitute the complete duration the wakelock was held.
+      // constitute the complete duration the wakelock was held. That is, this
+      // value is 'apportioned' in the sense described in App's comment.
       optional float partial_time_msec = 4;
       optional float partial_count = 5;
       // If the wakelock was being held at the time of the report, this will be
@@ -371,18 +446,27 @@ message BatteryStats {
       // partial_time_msec, this duration is not split between wakelocks and so
       // constitutes the complete maximum wakelock duration.
       optional int64 partial_max_duration_msec = 11;
+      // The total duration the wakelock had been held for. Unlike
+      // partial_time_msec, this duration is not split between wakelocks and so
+      // constitutes the complete total wakelock duration. That is, this
+      // value is 'actual' in the sense described in App's comment.
+      optional int64 partial_total_duration_msec = 15;
 
       // Window wakelocks keep the screen on.
+      // If multiple window wakelocks are held at the same time, the total time
+      // is split evenly between them, so this value (window_time_msec) may not
+      // constitute the complete duration the wakelock was held. That is, this
+      // value is 'apportioned' in the sense described in App's comment.
       optional float window_time_msec = 6;
       optional float window_count = 7;
-      // Currently (as of their introduction in v19), current and max durations
-      // are only tracked while the screen is off and the device is on battery,
-      // so they are not currently tracked for window wakelocks, and -1 will
-      // always be printed out for them.
+      // Currently, current and max (as of their introduction in v19) and total
+      // (as of its introduction in v21) durations are not tracked for
+      // window wakelocks, and 0 or -1 will always be printed out for them.
       optional int64 window_current_duration_msec = 12;
       optional int64 window_max_duration_msec = 13;
+      optional int64 window_total_duration_msec = 16;
 
-      // Next tag = 14
+      // Next tag = 17
     };
     repeated Wakelock wakelock = 11; // wl.
 
@@ -398,7 +482,9 @@ message BatteryStats {
     message Wifi {
       // Duration holding Wifi-lock.
       optional float full_wifi_lock_time_msec = 1;
-      // Duration performing Wifi-scan.
+      // Duration performing Wifi-scan blamed on this App (i.e. apportioned to
+      // this app amongst all apps doing Wifi-scanning; see explanation of
+      // 'apportioned' in App's comment).
       optional float scan_time_msec = 2;
       // Duration running Wifi.
       optional float running_time_msec = 3;
@@ -406,6 +492,19 @@ message BatteryStats {
       optional float idle_time_msec = 5 [deprecated = true]; // Moved to wifi_controller data.
       optional float rx_time_msec = 6 [deprecated = true]; // Moved to wifi_controller data.
       optional float tx_time_msec = 7 [deprecated = true]; // Moved to wifi_controller data.
+      // #scans performed when app is in background. (Included in scan_count.)
+      optional int32 scan_count_bg = 8;
+      // Duration performing Wifi-scan in total (irrespective of whether other
+      // apps were also simultaneously scanning; see explanation of
+      // 'apportioned' vs. 'actual' in App's comment).
+      // Includes both foreground + background use.
+      optional int64 scan_actual_time_msec = 9;
+      // Duration performing Wifi-scan when app is in background (irrespective
+      // of whether other apps were also simultaneously scanning; see
+      // explanation of 'apportioned' vs. 'actual' in App's comment).
+      // (Subtracting from scan_actual_time_msec will yield foreground
+      // usage.)
+      optional int64 scan_actual_time_msec_bg = 10;
     };
     optional Wifi wifi = 12; // wfl.
 
@@ -456,6 +555,10 @@ message BatteryStats {
       // The estimated real battery capacity, which may be less than the
       // declared battery capacity (for example, because of battery aging).
       optional int64 estimated_battery_capacity_mah = 9;
+      // The minimum learned battery capacity in uAh.
+      optional int64 min_learned_battery_capacity_uah = 10;
+      // The maximum learned battery capacity in uAh.
+      optional int64 max_learned_battery_capacity_uah = 11;
     };
     optional Battery battery = 1; // bt.
 
@@ -647,6 +750,8 @@ message BatteryStats {
     };
 
     // Similar to Wakelock.
+    // Kernel wakelock metrics are only recorded when the device is unplugged
+    // *and* the screen is off.
     message KernelWakelock {
       optional string name = 1;
       optional float time_msec = 2;

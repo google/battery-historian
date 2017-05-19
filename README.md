@@ -12,13 +12,13 @@ Run the Battery Historian image. Choose a port number and replace `<port>` with
 that number in the commands below:
 
 ```
-docker -- run -p <port>:9999 gcr.io/android-battery-historian:2.1 --port 9999
+docker -- run -p <port>:9999 gcr.io/android-battery-historian/stable:3.0 --port 9999
 ```
 
 For Linux and Mac OS X:
 
 * That's it, you're done! Historian will be available at
-  http://localhost:&lt;port>.
+  `http://localhost:<port>`.
 
 For Windows:
 
@@ -27,14 +27,14 @@ For Windows:
 
 * Once you start Docker, it should tell you the IP address of the machine it is
 using. If, for example, the IP address is 123.456.78.90, Historian will be
-available at http://123.456.78.90:&lt;port>.
+available at `http://123.456.78.90:<port>`.
 
 For more information about the port forwarding, see the [Docker
 documentation](<https://docs.docker.com/engine/reference/run/#/expose-incoming-ports>).
 
 #### Building from source code
 
-If you are new to the Go programming language:
+Make sure you have at least Golang version 1.8.1:
 
 * Follow the instructions available at <http://golang.org/doc/install> for downloading and installing the Go compilers, tools, and libraries.
 * Create a workspace directory according to the instructions at
@@ -192,24 +192,32 @@ there are different scripts for each device, with the only difference being
 the device-specific dmesg log it tries to find. These scripts have been
 integrated into the Battery Historian tool itself.
 
-##### Powermonitor analysis
+##### Power monitor analysis
 
-Powermonitor files should have the following format per line:
+Lines in power monitor files should have one of the following formats, and the
+format should be consistent throughout the entire file:
 
 ```
-<timestamp in epoch seconds> <amps>
+<timestamp in epoch seconds, with a fractional component> <amps> <optional_volts>
 ```
 
-Entries from the powermonitor file will be overlaid on top of the timeline plot.
+OR
 
-To ensure the powermonitor and bug report timelines are somewhat aligned,
-please reset the batterystats before running any powermonitor logging:
+```
+<timestamp in epoch milliseconds> <milliamps> <optional_millivolts>
+```
+
+Entries from the power monitor file will be overlaid on top of the timeline
+plot.
+
+To ensure the power monitor and bug report timelines are somewhat aligned,
+please reset the batterystats before running any power monitor logging:
 
 ```
 adb shell dumpsys batterystats --reset
 ```
 
-And take a bug report soon after stopping powermonitor logging.
+And take a bug report soon after stopping power monitor logging.
 
 If using a Monsoon:
 
@@ -262,7 +270,7 @@ $ go run cmd/checkin-delta/local_checkin_delta.go --input=bugreport_1.txt,bugrep
 
 - G+ Community (Discussion Thread: Battery Historian): https://plus.google.com/b/108967384991768947849/communities/114791428968349268860
 
-If you've found an error in this sample, please file an issue:
+If you've found an error in this project, please file an issue:
 <https://github.com/google/battery-historian/issues>
 
 ## License

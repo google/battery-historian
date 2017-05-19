@@ -16,11 +16,12 @@
 
 
 goog.module('historian.power.Event');
+
 var utils = goog.require('historian.utils');
 
 
 /**
- * Container for a running event and the associated powermonitor events.
+ * Container for a running event and the associated power monitor events.
  */
 exports = goog.defineClass(null, {
   /**
@@ -33,11 +34,11 @@ exports = goog.defineClass(null, {
     this.runningEvent_ = runningEvent;
 
     /**
-     * The powermonitor events which overlap with the running event.
-     * Each powermonitor event has a power value.
+     * The power monitor events which overlap with the running event.
+     * Each power monitor event has a power value.
      * @private {!Array<!historian.Entry>}
      */
-    this.powermonitorEvents_ = [];
+    this.powerMonitorEvents_ = [];
   },
 
   /** @return {number} */
@@ -46,65 +47,65 @@ exports = goog.defineClass(null, {
   },
 
   /** @return {!Array<!historian.Entry>} */
-  getPowermonitorEvents: function() {
-    return this.powermonitorEvents_;
+  getPowerMonitorEvents: function() {
+    return this.powerMonitorEvents_;
   },
 
   /** @param {!historian.Entry} event */
-  addPowermonitorEvent: function(event) {
-    this.powermonitorEvents_.push(event);
+  addPowerMonitorEvent: function(event) {
+    this.powerMonitorEvents_.push(event);
   },
 
   /** @return {number} */
   getPowerDuration: function() {
-    var count = this.powermonitorEvents_.length;
-    return (count == 0) ? 0 : this.powermonitorEvents_[count - 1].endTime -
-        this.powermonitorEvents_[0].startTime;
+    var count = this.powerMonitorEvents_.length;
+    return (count == 0) ? 0 : this.powerMonitorEvents_[count - 1].endTime -
+        this.powerMonitorEvents_[0].startTime;
   },
 
   /** @return {number} */
   getAverageCurrent: function() {
-    return (this.powermonitorEvents_.length == 0) ? 0 :
-        this.powermonitorEvents_.reduce(function(total, event) {
+    return (this.powerMonitorEvents_.length == 0) ? 0 :
+        this.powerMonitorEvents_.reduce(function(total, event) {
           return total + event.value;
-        }, 0) / this.powermonitorEvents_.length;
+        }, 0) / this.powerMonitorEvents_.length;
   },
 
   /**
    * Returns the total power consumed by this event.
-   * @param {?number} lastEndTimeMs End time of last powermonitor event for the
+   * @param {?number} lastEndTimeMs End time of last power monitor event for the
    *     preceeding wakeup event.
    * @return {number} Total power in mAh.
    */
   getPower: function(lastEndTimeMs) {
-    if (this.powermonitorEvents_.length == 0) {
+    if (this.powerMonitorEvents_.length == 0) {
       return 0;
     }
-    // It's possible multiple running events share the same powermonitor event.
+    // It's possible multiple running events share the same power monitor event.
     // To avoid double counting for a wakeup type, check whether the first
-    // powermonitor event is the same event of another wakeup event.
-    var events = this.powermonitorEvents_;
-    if (lastEndTimeMs == this.powermonitorEvents_[0].endTime) {
-      events = this.powermonitorEvents_.slice(1);
+    // power monitor event is the same event of another wakeup event.
+    var events = this.powerMonitorEvents_;
+    if (lastEndTimeMs == this.powerMonitorEvents_[0].endTime) {
+      events = this.powerMonitorEvents_.slice(1);
     }
     return utils.calculateTotalCharge(events);
   },
 
   /**
    * Returns the time range over which this event occurs, which is the time
-   * range of the powermonitor events.
+   * range of the power monitor events.
    * @return {?{start: number, end: number}} The start time of the first
-   *     powermonitor event, and end time of the last powermonitor event.
+   *     power monitor event, and end time of the last power monitor event.
    *     Null if there are no events.
    */
   getTimeRange: function() {
-    var numEvents = this.powermonitorEvents_.length;
+    var numEvents = this.powerMonitorEvents_.length;
     if (numEvents == 0) {
       return null;
     }
     return {
-      start: this.powermonitorEvents_[0].startTime,
-      end: this.powermonitorEvents_[numEvents - 1].endTime
+      start: this.powerMonitorEvents_[0].startTime,
+      end: this.powerMonitorEvents_[numEvents - 1].endTime
     };
   }
 });

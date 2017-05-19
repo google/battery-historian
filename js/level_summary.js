@@ -141,7 +141,7 @@ historian.LevelSummaryData = function(opt_csv) {
  * @private
  */
 historian.LevelSummaryData.prototype.parseCsv_ = function(csv) {
-  var lines = d3.csv.parseRows(csv);
+  var lines = d3.csvParseRows(csv);
   if (!lines.length)
     return;
   var dimNames = lines.splice(0, 1)[0]; // Get header line of csv

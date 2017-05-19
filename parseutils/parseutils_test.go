@@ -1052,6 +1052,506 @@ func TestWakeLockInParse(t *testing.T) {
 	}
 }
 
+// TestWakeupReasonParsing tests the parsing of wakeup reason entries in a history log.
+func TestWakeupReasonParsing(t *testing.T) {
+	tests := []struct {
+		name        string
+		input       string
+		wantSummary *ActivitySummary
+		wantCSV     string
+	}{
+		{
+			name: "Kernel only, no userspace wakelock",
+			input: strings.Join([]string{
+				`9,0,i,vers,12,116,LMY47D,LMY47D`,
+				`9,hsp,17,1010054,"com.google.android.apps.docs.editors.punch/com.google/noogler@google.com"`,
+				`9,hsp,48,0,"289:bcmsdh_sdmmc:200:qcom,smd-rpm:240:msmgpio"`,
+				`9,hsp,90,0,"200:qcom,smd-rpm"`,
+				`9,h,0:RESET:TIME:1423000000000`,
+				`9,h,5000,+r,wr=48`,
+				`9,h,5000,-r`,
+			}, "\n"),
+			wantSummary: &ActivitySummary{
+				StartTimeMs:     1423000000000,
+				EndTimeMs:       1423000010000,
+				WakeLockSummary: map[string]Dist{},
+				WakeupReasonSummary: map[string]Dist{
+					`"289:bcmsdh_sdmmc:200:qcom,smd-rpm:240:msmgpio"`: Dist{
+						Num:           1,
+						TotalDuration: 5000 * time.Millisecond,
+						MaxDuration:   5000 * time.Millisecond,
+					},
+				},
+			},
+			wantCSV: strings.Join([]string{
+				csv.FileHeader,
+				`CPU running,string,1423000005000,1423000010000,"1423000005000~1423000010000~289:bcmsdh_sdmmc:200:qcom,smd-rpm:240:msmgpio",`,
+			}, "\n"),
+		},
+		{
+			name: "Userspace wakelock at the same time as CPU starts running",
+			input: strings.Join([]string{
+				`9,0,i,vers,12,116,LMY47D,LMY47D`,
+				`9,hsp,17,1010054,"com.google.android.apps.docs.editors.punch/com.google/noogler@google.com"`,
+				`9,hsp,48,0,"289:bcmsdh_sdmmc:200:qcom,smd-rpm:240:msmgpio"`,
+				`9,hsp,90,0,"200:qcom,smd-rpm"`,
+				`9,h,0:RESET:TIME:1423000000000`,
+				`9,h,5000,+r,wr=48,+w=17`,
+				`9,h,5000,-r,-w`,
+			}, "\n"),
+			wantSummary: &ActivitySummary{
+				StartTimeMs: 1423000000000,
+				EndTimeMs:   1423000010000,
+				WakeLockSummary: map[string]Dist{
+					`"com.google.android.apps.docs.editors.punch/com.google/XXX@google.com"`: Dist{
+						Num:           1,
+						TotalDuration: 5000 * time.Millisecond,
+						MaxDuration:   5000 * time.Millisecond,
+					},
+				},
+				WakeupReasonSummary: map[string]Dist{
+					`"289:bcmsdh_sdmmc:200:qcom,smd-rpm:240:msmgpio"`: Dist{
+						Num:           1,
+						TotalDuration: 0, // Userspace wakelock was acquired as soon as the CPU started running.
+						MaxDuration:   0,
+					},
+				},
+			},
+			wantCSV: strings.Join([]string{
+				csv.FileHeader,
+				`CPU running,string,1423000005000,1423000010000,"1423000005000~289:bcmsdh_sdmmc:200:qcom,smd-rpm:240:msmgpio",`,
+				`Partial wakelock,service,1423000005000,1423000010000,com.google.android.apps.docs.editors.punch/com.google/XXX@google.com,`,
+			}, "\n"),
+		},
+		{
+			name: "Userspace wakelock starts shortly after CPU starts running",
+			input: strings.Join([]string{
+				`9,0,i,vers,12,116,LMY47D,LMY47D`,
+				`9,hsp,17,1010054,"com.google.android.apps.docs.editors.punch/com.google/noogler@google.com"`,
+				`9,hsp,48,0,"289:bcmsdh_sdmmc:200:qcom,smd-rpm:240:msmgpio"`,
+				`9,hsp,90,0,"200:qcom,smd-rpm"`,
+				`9,h,0:RESET:TIME:1423000000000`,
+				`9,h,5000,+r,wr=48`,
+				`9,h,5000,+w=17`,
+				`9,h,5000,-r,-w`,
+			}, "\n"),
+			wantSummary: &ActivitySummary{
+				StartTimeMs: 1423000000000,
+				EndTimeMs:   1423000015000,
+				WakeLockSummary: map[string]Dist{
+					`"com.google.android.apps.docs.editors.punch/com.google/XXX@google.com"`: Dist{
+						Num:           1,
+						TotalDuration: 5000 * time.Millisecond,
+						MaxDuration:   5000 * time.Millisecond,
+					},
+				},
+				WakeupReasonSummary: map[string]Dist{
+					`"289:bcmsdh_sdmmc:200:qcom,smd-rpm:240:msmgpio"`: Dist{
+						Num:           1,
+						TotalDuration: 5000 * time.Millisecond,
+						MaxDuration:   5000 * time.Millisecond,
+					},
+				},
+			},
+			wantCSV: strings.Join([]string{
+				csv.FileHeader,
+				`CPU running,string,1423000005000,1423000015000,"1423000005000~1423000010000~289:bcmsdh_sdmmc:200:qcom,smd-rpm:240:msmgpio",`,
+				`Partial wakelock,service,1423000010000,1423000015000,com.google.android.apps.docs.editors.punch/com.google/XXX@google.com,`,
+			}, "\n"),
+		},
+		{
+			// This does appear in real bug reports.
+			name: "Userspace wakelock ends before CPU stops running",
+			input: strings.Join([]string{
+				`9,0,i,vers,12,116,LMY47D,LMY47D`,
+				`9,hsp,17,1010054,"com.google.android.apps.docs.editors.punch/com.google/noogler@google.com"`,
+				`9,hsp,48,0,"289:bcmsdh_sdmmc:200:qcom,smd-rpm:240:msmgpio"`,
+				`9,hsp,90,0,"200:qcom,smd-rpm"`,
+				`9,h,0:RESET:TIME:1423000000000`,
+				`9,h,5000,+r,wr=48`,
+				`9,h,5000,+w=17`,
+				`9,h,5000,-w`,
+				`9,h,5000,-r`,
+			}, "\n"),
+			wantSummary: &ActivitySummary{
+				StartTimeMs: 1423000000000,
+				EndTimeMs:   1423000020000,
+				WakeLockSummary: map[string]Dist{
+					`"com.google.android.apps.docs.editors.punch/com.google/XXX@google.com"`: Dist{
+						Num:           1,
+						TotalDuration: 5000 * time.Millisecond,
+						MaxDuration:   5000 * time.Millisecond,
+					},
+				},
+				WakeupReasonSummary: map[string]Dist{
+					`"289:bcmsdh_sdmmc:200:qcom,smd-rpm:240:msmgpio"`: Dist{
+						Num:           1,
+						TotalDuration: 5000 * time.Millisecond,
+						MaxDuration:   5000 * time.Millisecond,
+					},
+				},
+			},
+			wantCSV: strings.Join([]string{
+				csv.FileHeader,
+				`CPU running,string,1423000005000,1423000020000,"1423000005000~1423000010000~289:bcmsdh_sdmmc:200:qcom,smd-rpm:240:msmgpio",`,
+				`Partial wakelock,service,1423000010000,1423000015000,com.google.android.apps.docs.editors.punch/com.google/XXX@google.com,`,
+			}, "\n"),
+		},
+		{
+			// I don't know if this actually happens in reports.
+			name: "Userspace wakelock starts shortly after CPU starts running, wakeup reason specified after wakelock acquired",
+			input: strings.Join([]string{
+				`9,0,i,vers,12,116,LMY47D,LMY47D`,
+				`9,hsp,17,1010054,"com.google.android.apps.docs.editors.punch/com.google/noogler@google.com"`,
+				`9,hsp,48,0,"289:bcmsdh_sdmmc:200:qcom,smd-rpm:240:msmgpio"`,
+				`9,hsp,90,0,"200:qcom,smd-rpm"`,
+				`9,h,0:RESET:TIME:1423000000000`,
+				`9,h,5000,+r`,
+				`9,h,5000,+w=17`,
+				`9,h,5000,wr=48`, // Wakeup reason is logged after userspace wakelock is acquired...Assuming it was meant to be for the +r.
+				`9,h,5000,-r,-w`,
+			}, "\n"),
+			wantSummary: &ActivitySummary{
+				StartTimeMs: 1423000000000,
+				EndTimeMs:   1423000020000,
+				WakeLockSummary: map[string]Dist{
+					`"com.google.android.apps.docs.editors.punch/com.google/XXX@google.com"`: Dist{
+						Num:           1,
+						TotalDuration: 10000 * time.Millisecond,
+						MaxDuration:   10000 * time.Millisecond,
+					},
+				},
+				WakeupReasonSummary: map[string]Dist{
+					`"289:bcmsdh_sdmmc:200:qcom,smd-rpm:240:msmgpio"`: Dist{
+						Num:           1,
+						TotalDuration: 5000 * time.Millisecond,
+						MaxDuration:   5000 * time.Millisecond,
+					},
+				},
+			},
+			wantCSV: strings.Join([]string{
+				csv.FileHeader,
+				`CPU running,string,1423000005000,1423000020000,"1423000005000~1423000010000~289:bcmsdh_sdmmc:200:qcom,smd-rpm:240:msmgpio",`,
+				`Partial wakelock,service,1423000010000,1423000020000,com.google.android.apps.docs.editors.punch/com.google/XXX@google.com,`,
+			}, "\n"),
+		},
+		{
+			// I don't know if this actually happens in reports.
+			name: "Userspace wakelock starts shortly after CPU starts running, wakeup reason specified after wakelock released",
+			input: strings.Join([]string{
+				`9,0,i,vers,12,116,LMY47D,LMY47D`,
+				`9,hsp,17,1010054,"com.google.android.apps.docs.editors.punch/com.google/noogler@google.com"`,
+				`9,hsp,48,0,"289:bcmsdh_sdmmc:200:qcom,smd-rpm:240:msmgpio"`,
+				`9,hsp,96,0,"Abort:some device prevented suspend :("`,
+				`9,h,0:RESET:TIME:1423000000000`,
+				`9,h,5000,+r,wr=48`,
+				`9,h,5000,+w=17`,
+				`9,h,5000,-w`,
+				`9,h,5000,wr=96`, // Wakeup reason is logged after userspace wakelock ends...Assuming it was essentially an "abort" (preventing suspend). It should be marked as causing the CPU run from the very end of the userspace wakelock.
+				`9,h,10000,-r`,
+			}, "\n"),
+			wantSummary: &ActivitySummary{
+				StartTimeMs: 1423000000000,
+				EndTimeMs:   1423000030000,
+				WakeLockSummary: map[string]Dist{
+					`"com.google.android.apps.docs.editors.punch/com.google/XXX@google.com"`: Dist{
+						Num:           1,
+						TotalDuration: 5000 * time.Millisecond,
+						MaxDuration:   5000 * time.Millisecond,
+					},
+				},
+				WakeupReasonSummary: map[string]Dist{
+					`"289:bcmsdh_sdmmc:200:qcom,smd-rpm:240:msmgpio"`: Dist{
+						Num:           1,
+						TotalDuration: 5000 * time.Millisecond,
+						MaxDuration:   5000 * time.Millisecond,
+					},
+					`"Abort:some device prevented suspend :("`: Dist{
+						Num:           1,
+						TotalDuration: 15000 * time.Millisecond,
+						MaxDuration:   15000 * time.Millisecond,
+					},
+				},
+			},
+			wantCSV: strings.Join([]string{
+				csv.FileHeader,
+				`CPU running,string,1423000005000,1423000030000,"1423000005000~1423000010000~289:bcmsdh_sdmmc:200:qcom,smd-rpm:240:msmgpio|1423000015000~1423000030000~Abort:some device prevented suspend :(",`,
+				`Partial wakelock,service,1423000010000,1423000015000,com.google.android.apps.docs.editors.punch/com.google/XXX@google.com,`,
+			}, "\n"),
+		},
+		{
+			// This does actually occur in reports.
+			name: "Multiple wakeup reasons, one after -r",
+			input: strings.Join([]string{
+				`9,0,i,vers,12,116,LMY47D,LMY47D`,
+				`9,hsp,17,1010054,"com.google.android.apps.docs.editors.punch/com.google/noogler@google.com"`,
+				`9,hsp,48,0,"289:bcmsdh_sdmmc:200:qcom,smd-rpm:240:msmgpio"`,
+				`9,hsp,96,0,"Abort:some device prevented suspend :("`,
+				`9,h,0:RESET:TIME:1423000000000`,
+				`9,h,5000,+r,wr=48`,
+				`9,h,10000,-r,wr=96`, // Wakeup reason should have count incremented, but not duration
+				`9,h,5000,+r,wr=48`,
+				`9,h,5000,-r`,
+			}, "\n"),
+			wantSummary: &ActivitySummary{
+				StartTimeMs:     1423000000000,
+				EndTimeMs:       1423000025000,
+				WakeLockSummary: map[string]Dist{},
+				WakeupReasonSummary: map[string]Dist{
+					`"289:bcmsdh_sdmmc:200:qcom,smd-rpm:240:msmgpio"`: Dist{
+						Num:           2,
+						TotalDuration: 15000 * time.Millisecond,
+						MaxDuration:   10000 * time.Millisecond,
+					},
+					`"Abort:some device prevented suspend :("`: Dist{
+						Num:           1,
+						TotalDuration: 0 * time.Millisecond,
+						MaxDuration:   0 * time.Millisecond,
+					},
+				},
+			},
+			wantCSV: strings.Join([]string{
+				csv.FileHeader,
+				`CPU running,string,1423000005000,1423000015000,"1423000005000~1423000015000~289:bcmsdh_sdmmc:200:qcom,smd-rpm:240:msmgpio|1423000015000~Abort:some device prevented suspend :(",`,
+				`CPU running,string,1423000020000,1423000025000,"1423000020000~1423000025000~289:bcmsdh_sdmmc:200:qcom,smd-rpm:240:msmgpio",`,
+			}, "\n"),
+		},
+		{
+			// In my sample set of looking at <3% of 1 report, I did not see this actually happen.
+			name: "No wakeup reason",
+			input: strings.Join([]string{
+				`9,0,i,vers,12,116,LMY47D,LMY47D`,
+				`9,hsp,17,1010054,"com.google.android.apps.docs.editors.punch/com.google/noogler@google.com"`,
+				`9,hsp,48,0,"289:bcmsdh_sdmmc:200:qcom,smd-rpm:240:msmgpio"`,
+				`9,hsp,90,0,"200:qcom,smd-rpm"`,
+				`9,h,0:RESET:TIME:1423000000000`,
+				`9,h,5000,+r`,
+				`9,h,5000,-r`,
+			}, "\n"),
+			wantSummary: &ActivitySummary{
+				StartTimeMs:         1423000000000,
+				EndTimeMs:           1423000010000,
+				WakeLockSummary:     map[string]Dist{},
+				WakeupReasonSummary: map[string]Dist{},
+			},
+			wantCSV: strings.Join([]string{
+				csv.FileHeader,
+				`CPU running,string,1423000005000,1423000010000,1423000005000~1423000010000~` + csv.UnknownWakeup + `,`,
+			}, "\n"),
+		},
+		{
+			// This does appear in real bug reports.
+			name: "Multiple wakeup reasons within one +/-r block",
+			input: strings.Join([]string{
+				`9,0,i,vers,12,116,LMY47D,LMY47D`,
+				`9,hsp,17,1010054,"com.google.android.apps.docs.editors.punch/com.google/noogler@google.com"`,
+				`9,hsp,48,0,"289:bcmsdh_sdmmc:200:qcom,smd-rpm:240:msmgpio"`,
+				`9,hsp,90,0,"200:qcom,smd-rpm"`,
+				`9,h,0:RESET:TIME:1423000000000`,
+				`9,h,5000,+r,wr=48`,
+				`9,h,5000,wr=90`,
+				`9,h,5000,wr=90`,
+				`9,h,5000,wr=90`,
+				`9,h,5000,-r`,
+			}, "\n"),
+			wantSummary: &ActivitySummary{
+				StartTimeMs:     1423000000000,
+				EndTimeMs:       1423000025000,
+				WakeLockSummary: map[string]Dist{},
+				WakeupReasonSummary: map[string]Dist{
+					`"289:bcmsdh_sdmmc:200:qcom,smd-rpm:240:msmgpio"`: Dist{
+						Num:           1,
+						TotalDuration: 5000 * time.Millisecond,
+						MaxDuration:   5000 * time.Millisecond,
+					},
+					`"200:qcom,smd-rpm"`: Dist{
+						Num:           3,
+						TotalDuration: 15000 * time.Millisecond,
+						MaxDuration:   5000 * time.Millisecond,
+					},
+				},
+			},
+			wantCSV: strings.Join([]string{
+				csv.FileHeader,
+				`CPU running,string,1423000005000,1423000025000,"1423000005000~1423000010000~289:bcmsdh_sdmmc:200:qcom,smd-rpm:240:msmgpio|1423000010000~1423000015000~200:qcom,smd-rpm|1423000015000~1423000020000~200:qcom,smd-rpm|1423000020000~1423000025000~200:qcom,smd-rpm",`,
+			}, "\n"),
+		},
+		{
+			// Pulled from bug report and slightly simplified. wr #191 is the focus of this test.
+			name: "Multi-sequence, wr 191",
+			input: strings.Join([]string{
+				`9,0,i,vers,20,153,OPR1.170406.004,OPR1.170406.004`,
+				`9,hsp,13,0,"Abort:not important"`,
+				`9,hsp,16,1002,"bluetooth_timer"`,
+				`9,hsp,27,0,"Abort:other not important"`,
+				`9,hsp,34,10017,"GCM_READ"`,
+				`9,hsp,191,0,"Abort:important"`,
+				`9,h,0:RESET:TIME:1423000000000`,
+
+				// Block 1
+				`9,h,10000,+r,+w=34,wr=13`,
+				`9,h,500,-r,-w,wr=191`,
+
+				// Block 2
+				// Alternating between wakeup reasons that we don't necessarily care about until the end.
+				`9,h,20000,+r,+w=16,wr=13`,
+				`9,h,500,-w,wr=27`,
+				`9,h,500,wr=13`,
+				`9,h,500,wr=27`,
+				`9,h,500,+w=34`,
+				`9,h,500,-w`,
+				`9,h,500,wr=13`, // wr #13 covers gap between previous line (-w) and next one (-r)
+				`9,h,500,-r,wr=191`,
+
+				// Block 3
+				// Repeated wakelock acquisition and release.
+				`9,h,30000,+r,+w=16`,
+				`9,h,500,wr=13`,
+				`9,h,500,-w`,
+				`9,h,500,+w=34`,
+				`9,h,500,-w`,
+				`9,h,500,+w=34`,
+				`9,h,500,-w`,
+				`9,h,500,+w=34`,
+				`9,h,500,-r,-w,wr=191`,
+
+				// Block 4
+				// Wakeup reason after wakelock release.
+				`9,h,40000,+r,+w=34,wr=27`,
+				`9,h,500,-w,wr=13`,
+				`9,h,500,+w=16`,
+				`9,h,500,-w,wr=191`,
+				`9,h,500,+w=16`,
+				`9,h,500,-w`,
+				`9,h,500,-r`,
+
+				// Block 5
+				`9,h,50000,+r,+w=16,wr=13`,
+				`9,h,500,-w,wr=191`,
+				`9,h,500,-r,wr=13`,
+
+				// Block 6
+				`9,h,60000,+r,wr=13`,
+				`9,h,500,wr=191`,
+				`9,h,500,-r`,
+
+				// Block 7
+				`9,h,70000,+r,+w=34`,
+				`9,h,500,-w`,
+				`9,h,500,+w=16,wr=13`, // wr #13 covers gap between previous line (-w) and this one
+				`9,h,500,-w`,
+				`9,h,500,+w=16`,
+				`9,h,500,-w,wr=27`,
+				`9,h,500,+w=34,wr=191`,
+				`9,h,500,-w`,
+				`9,h,500,-r`,
+			}, "\n"),
+			wantSummary: &ActivitySummary{
+				StartTimeMs: 1423000000000,
+				EndTimeMs:   1423000297000,
+				WakeLockSummary: map[string]Dist{
+					`"bluetooth_timer"`: Dist{
+						Num:           7,
+						TotalDuration: 4000 * time.Millisecond,
+						MaxDuration:   1000 * time.Millisecond,
+					},
+					`"GCM_READ"`: Dist{
+						Num:           8,
+						TotalDuration: 4000 * time.Millisecond,
+						MaxDuration:   500 * time.Millisecond,
+					},
+				},
+				WakeupReasonSummary: map[string]Dist{
+					`"Abort:not important"`: Dist{
+						Num:           10,
+						TotalDuration: 3000 * time.Millisecond,
+						MaxDuration:   1000 * time.Millisecond,
+					},
+					`"Abort:other not important"`: Dist{
+						Num:           4,
+						TotalDuration: 1500 * time.Millisecond,
+						MaxDuration:   500 * time.Millisecond,
+					},
+					`"Abort:important"`: Dist{
+						Num:           7,
+						TotalDuration: 1500 * time.Millisecond,
+						MaxDuration:   500 * time.Millisecond,
+					},
+				},
+			},
+			wantCSV: strings.Join([]string{
+				csv.FileHeader,
+				// Block 1
+				`CPU running,string,1423000010000,1423000010500,1423000010000~Abort:not important|1423000010500~Abort:important,`,
+				`Partial wakelock,service,1423000010000,1423000010500,GCM_READ,`,
+				// Block 2
+				`CPU running,string,1423000030500,1423000034000,1423000030500~Abort:not important|1423000031000~1423000031500~Abort:other not important|1423000031500~1423000032000~Abort:not important|1423000032000~1423000032500~Abort:other not important|1423000033000~1423000034000~Abort:not important|1423000034000~Abort:important,`,
+				`Partial wakelock,service,1423000030500,1423000031000,bluetooth_timer,`,
+				`Partial wakelock,service,1423000032500,1423000033000,GCM_READ,`,
+				// Block 3
+				`CPU running,string,1423000064000,1423000068000,1423000064000~Abort:not important|1423000068000~Abort:important,`,
+				`Partial wakelock,service,1423000064000,1423000065000,bluetooth_timer,`,
+				`Partial wakelock,service,1423000065500,1423000066000,GCM_READ,`,
+				`Partial wakelock,service,1423000066500,1423000067000,GCM_READ,`,
+				`Partial wakelock,service,1423000067500,1423000068000,GCM_READ,`,
+				// Block 4
+				`CPU running,string,1423000108000,1423000111000,1423000108000~Abort:other not important|1423000108500~1423000109000~Abort:not important|1423000109500~1423000110000~Abort:important,`,
+				`Partial wakelock,service,1423000108000,1423000108500,GCM_READ,`,
+				`Partial wakelock,service,1423000109000,1423000109500,bluetooth_timer,`,
+				`Partial wakelock,service,1423000110000,1423000110500,bluetooth_timer,`,
+				// Block 5
+				`CPU running,string,1423000161000,1423000162000,1423000161000~Abort:not important|1423000161500~1423000162000~Abort:important|1423000162000~Abort:not important,`,
+				`Partial wakelock,service,1423000161000,1423000161500,bluetooth_timer,`,
+				// Block 6
+				`CPU running,string,1423000222000,1423000223000,1423000222000~1423000222500~Abort:not important|1423000222500~1423000223000~Abort:important,`,
+				// Block 7
+				`CPU running,string,1423000293000,1423000297000,1423000293500~1423000294000~Abort:not important|1423000295500~1423000296000~Abort:other not important|1423000296000~Abort:important,`,
+				`Partial wakelock,service,1423000293000,1423000293500,GCM_READ,`,
+				`Partial wakelock,service,1423000294000,1423000294500,bluetooth_timer,`,
+				`Partial wakelock,service,1423000295000,1423000295500,bluetooth_timer,`,
+				`Partial wakelock,service,1423000296000,1423000296500,GCM_READ,`,
+			}, "\n"),
+		},
+	}
+
+	for _, test := range tests {
+		// Include test name in output log so it's easier to debug problems.
+		fmt.Printf("Testing %s\n", test.name)
+
+		var b bytes.Buffer
+		result := AnalyzeHistory(&b, test.input, FormatTotalTime, emptyUIDPackageMapping, true)
+
+		if len(result.Errs) > 0 {
+			t.Errorf("%q: Errors encountered while analyzing history: %v", test.name, result.Errs)
+			continue
+		}
+		if len(result.Summaries) != 1 {
+			t.Errorf("%q: Incorrect number of summaries. Got %d, want: %d", test.name, len(result.Summaries), 1)
+			continue
+		}
+		s := result.Summaries[0]
+		want := test.wantSummary
+		if want.StartTimeMs != s.StartTimeMs {
+			t.Errorf("%q: Start times do not match. Got: %d, want: %d", test.name, want.StartTimeMs, s.StartTimeMs)
+		}
+		if want.EndTimeMs != s.EndTimeMs {
+			t.Errorf("%q: End times do not match. Got: %d, want: %d", test.name, want.EndTimeMs, s.EndTimeMs)
+		}
+		if !reflect.DeepEqual(want.WakeLockSummary, s.WakeLockSummary) {
+			t.Errorf("%q: Incorrect wake lock summary.\n Got: %v,\n want: %v", test.name, s.WakeLockSummary, want.WakeLockSummary)
+		}
+		if !reflect.DeepEqual(want.WakeupReasonSummary, s.WakeupReasonSummary) {
+			t.Errorf("%q: Incorrect wakeup reason summary.\n Got: %v,\n want: %v", test.name, s.WakeupReasonSummary, want.WakeupReasonSummary)
+		}
+
+		gotCSV := normalizeCSV(b.String())
+		wantCSV := normalizeCSV(test.wantCSV)
+		if !reflect.DeepEqual(wantCSV, gotCSV) {
+			t.Errorf("%q test generated incorrect csv:\n  Got: %q\n  Want: %q", test.name, gotCSV, wantCSV)
+		}
+	}
+}
+
 // TestUIDAndPackageNameMapping tests that mapping of UIDs to package names from the checkin log works properly.
 func TestUIDAndPackageNameMapping(t *testing.T) {
 	inputCheckin := strings.Join([]string{
@@ -1232,26 +1732,27 @@ func TestElwParsing(t *testing.T) {
 	wantSummary := map[string]Dist{
 		`"*net_scheduler*"`: {
 			Num:           2,
-			TotalDuration: 60000 * time.Millisecond,
+			TotalDuration: 120000 * time.Millisecond,
 			MaxDuration:   60000 * time.Millisecond,
 		},
 		`"hgn"`: {
 			Num:           1,
-			TotalDuration: 65000 * time.Millisecond,
-			MaxDuration:   65000 * time.Millisecond,
+			TotalDuration: 125000 * time.Millisecond,
+			MaxDuration:   125000 * time.Millisecond,
 		},
 		`"*sync*/com.google.android.gms.fitness/com.google/XXX@google.com"`: {
 			Num:           1,
-			TotalDuration: 67000 * time.Millisecond,
-			MaxDuration:   67000 * time.Millisecond,
+			TotalDuration: 127000 * time.Millisecond,
+			MaxDuration:   127000 * time.Millisecond,
 		},
 	}
 	wantCSV := normalizeCSV(strings.Join([]string{
 		csv.FileHeader,
+		// The wakelock was held at the beginning of the report, so the start time should be at the beginning of the report, not one minute before.
 		`Long Wakelocks,service,1469130000000,1469130060000,*net_scheduler*,10017`,
-		`Long Wakelocks,service,1469130091000,1469130156000,hgn,10191`,
-		`Long Wakelocks,service,1469130123000,1469130190000,*sync*/com.google.android.gms.fitness/com.google/XXX@google.com,10017`,
-		`Long Wakelocks,service,1469130250000,1469130250000,*net_scheduler*,10017`,
+		`Long Wakelocks,service,1469130031000,1469130156000,hgn,10191`,
+		`Long Wakelocks,service,1469130063000,1469130190000,*sync*/com.google.android.gms.fitness/com.google/XXX@google.com,10017`,
+		`Long Wakelocks,service,1469130190000,1469130250000,*net_scheduler*,10017`,
 	}, "\n"))
 
 	var b bytes.Buffer
@@ -1986,7 +2487,7 @@ func TestCSVRunningEntry(t *testing.T) {
 			wantCSV: strings.Join([]string{
 				csv.FileHeader,
 				`Wifi full lock,bool,1422620451917,1422620452917,true,`,
-				`CPU running,string,1422620451917,1422620454417,"1422620453417~57:qcom,smd-modem:200:qcom,smd-rpm",`,
+				`CPU running,string,1422620451917,1422620454417,"1422620451917~1422620454417~57:qcom,smd-modem:200:qcom,smd-rpm",`,
 				`Wifi full lock,bool,1422620453417,1422620454417,true,`,
 			}, "\n"),
 		},
@@ -2003,9 +2504,9 @@ func TestCSVRunningEntry(t *testing.T) {
 			wantNumSummaries: 1,
 			wantCSV: strings.Join([]string{
 				csv.FileHeader,
-				`Level,int,1432132601233,1432132605233,100,`,
-				`CPU running,string,1432132601233,1432132602233,1432132602233~` + csv.UnknownWakeup + `,`,
-				`CPU running,string,1432132604233,1432132605233,"1432132604233~57:qcom,smd-modem:200:qcom,smd-rpm",`,
+				`Battery Level,int,1432132601233,1432132605233,100,`,
+				`CPU running,string,1432132601233,1432132602233,1432132601233~1432132602233~` + csv.UnknownWakeup + `,`,
+				`CPU running,string,1432132604233,1432132605233,"1432132604233~1432132605233~57:qcom,smd-modem:200:qcom,smd-rpm",`,
 			}, "\n"),
 		},
 		{
@@ -2020,7 +2521,7 @@ func TestCSVRunningEntry(t *testing.T) {
 			wantNumSummaries: 1,
 			wantCSV: strings.Join([]string{
 				csv.FileHeader,
-				`CPU running,string,1432132602233,1432132604233,"1432132602233~57:qcom,smd-modem:200:qcom,smd-rpm|1432132604233~*walarm*:ALARM_WAKEUP_LOCATOR",`,
+				`CPU running,string,1432132602233,1432132604233,"1432132602233~1432132604233~57:qcom,smd-modem:200:qcom,smd-rpm|1432132604233~*walarm*:ALARM_WAKEUP_LOCATOR",`,
 			}, "\n"),
 		},
 		{
@@ -2050,8 +2551,8 @@ func TestCSVRunningEntry(t *testing.T) {
 			wantNumSummaries: 1,
 			wantCSV: strings.Join([]string{
 				csv.FileHeader,
-				`CPU running,string,1422620451417,1422620452417,1422620452417~` + csv.UnknownWakeup + `,`,
-				`CPU running,string,1422620453417,1422620454917,1422620454917~` + csv.UnknownWakeup + `,`,
+				`CPU running,string,1422620451417,1422620452417,1422620451417~1422620452417~` + csv.UnknownWakeup + `,`,
+				`CPU running,string,1422620453417,1422620454917,1422620453417~1422620454917~` + csv.UnknownWakeup + `,`,
 			}, "\n"),
 		},
 		{
@@ -2070,8 +2571,8 @@ func TestCSVRunningEntry(t *testing.T) {
 			wantNumSummaries: 1,
 			wantCSV: strings.Join([]string{
 				csv.FileHeader,
-				`CPU running,string,1422620451417,1422620453417,"1422620451417~57:qcom,smd-modem:200:qcom,smd-rpm|1422620452417~Abort:Some devices failed to suspend",`,
-				`CPU running,string,1422620454417,1422620455917,1422620455917~` + csv.UnknownWakeup + `,`,
+				`CPU running,string,1422620451417,1422620453417,"1422620451417~1422620452417~57:qcom,smd-modem:200:qcom,smd-rpm|1422620452417~1422620453417~Abort:Some devices failed to suspend",`,
+				`CPU running,string,1422620454417,1422620455917,1422620454417~1422620455917~` + csv.UnknownWakeup + `,`,
 			}, "\n"),
 		},
 		{
@@ -2087,9 +2588,9 @@ func TestCSVRunningEntry(t *testing.T) {
 			wantNumSummaries: 1,
 			wantCSV: strings.Join([]string{
 				csv.FileHeader,
-				`Level,int,1432132601233,1432132605233,100,`,
-				`CPU running,string,1432132601233,1432132602233,1432132602233~` + csv.UnknownWakeup + `,`,
-				`CPU running,string,1432132604233,1432132605233,1432132605233~` + csv.UnknownWakeup + `,`,
+				`Battery Level,int,1432132601233,1432132605233,100,`,
+				`CPU running,string,1432132601233,1432132602233,1432132601233~1432132602233~` + csv.UnknownWakeup + `,`,
+				`CPU running,string,1432132604233,1432132605233,1432132604233~1432132605233~` + csv.UnknownWakeup + `,`,
 			}, "\n"),
 		},
 		{
@@ -2103,7 +2604,7 @@ func TestCSVRunningEntry(t *testing.T) {
 			wantNumSummaries: 1,
 			wantCSV: strings.Join([]string{
 				csv.FileHeader,
-				`Level,int,1432132601233,1432132602233,100,`,
+				`Battery Level,int,1432132601233,1432132602233,100,`,
 				`CPU running,string,1432132602233,1432132602233,1432132602233~` + csv.UnknownWakeup + `,`,
 			}, "\n"),
 		},
@@ -2118,7 +2619,7 @@ func TestCSVRunningEntry(t *testing.T) {
 			wantNumSummaries: 1,
 			wantCSV: strings.Join([]string{
 				csv.FileHeader,
-				`Level,int,1432132601233,1432132602233,100,`,
+				`Battery Level,int,1432132601233,1432132602233,100,`,
 				`CPU running,string,1432132602233,1432132602233,"1432132602233~57:qcom,smd-modem:200:qcom,smd-rpm",`,
 			}, "\n"),
 		},
@@ -2151,7 +2652,7 @@ func TestCSVRunningEntry(t *testing.T) {
 			wantNumSummaries: 1,
 			wantCSV: strings.Join([]string{
 				csv.FileHeader,
-				`CPU running,string,1432132602233,1432132603233,1432132603233~` + csv.UnknownWakeup + `,`,
+				`CPU running,string,1432132602233,1432132603233,1432132602233~1432132603233~` + csv.UnknownWakeup + `,`,
 			}, "\n"),
 			wantErrs: []error{
 				errors.New("** Error in 9,h,1000,-r with -r : -r received without a corresponding +r"),
@@ -2171,8 +2672,8 @@ func TestCSVRunningEntry(t *testing.T) {
 			wantNumSummaries: 1,
 			wantCSV: strings.Join([]string{
 				csv.FileHeader,
-				`CPU running,string,1422620451917,1422620452417,"1422620451917~57:qcom,smd-modem:200:qcom,smd-rpm",`,
-				`CPU running,string,1422620453417,1422620454417,1422620453417~*walarm*:ALARM_WAKEUP_LOCATOR,`,
+				`CPU running,string,1422620451917,1422620452417,"1422620451917~1422620452417~57:qcom,smd-modem:200:qcom,smd-rpm",`,
+				`CPU running,string,1422620453417,1422620454417,1422620453417~1422620454417~*walarm*:ALARM_WAKEUP_LOCATOR,`,
 			}, "\n"),
 		},
 		{
@@ -2189,18 +2690,18 @@ func TestCSVRunningEntry(t *testing.T) {
 			wantNumSummaries: 1,
 			wantCSV: strings.Join([]string{
 				csv.FileHeader,
-				`CPU running,string,1422620451917,1422620452417,"1422620451917~57:qcom,smd-modem:200:qcom,smd-rpm",`,
+				`CPU running,string,1422620451917,1422620452417,"1422620451917~1422620452417~57:qcom,smd-modem:200:qcom,smd-rpm",`,
 				`CPU running,string,1422620453417,1422620454417,1422620454417~*walarm*:ALARM_WAKEUP_LOCATOR,`,
 			}, "\n"),
 		},
 		{
 			desc: "Multiple wake up reasons",
 			input: strings.Join([]string{
-				`9,h,0:RESET:TIME:1000`,
 				`9,hsp,20,0,"Abort:Pending Wakeup Sources: ipc00000177_FLP Service Cal "`,
 				`9,hsp,21,0,"Abort:Pending Wakeup Sources: sh2ap_wakelock "`,
 				`9,hsp,22,0,"Abort:Some devices failed to suspend"`,
 				`9,hsp,28,0,"200:qcom,smd-rpm:222:fc4cf000.qcom,spmi"`,
+				`9,h,0:RESET:TIME:1000`,
 				`9,h,0,+r`,
 				`9,h,1000,wr=20`,
 				`9,h,500,wr=21`,
@@ -2213,17 +2714,17 @@ func TestCSVRunningEntry(t *testing.T) {
 			wantNumSummaries: 1,
 			wantCSV: strings.Join([]string{
 				csv.FileHeader,
-				`CPU running,string,1000,4600,2000~Abort:Pending Wakeup Sources: ipc00000177_FLP Service Cal |2500~Abort:Pending Wakeup Sources: sh2ap_wakelock |3500~Abort:Some devices failed to suspend|4500~Abort:Pending Wakeup Sources: sh2ap_wakelock ,`,
-				`CPU running,string,9500,10500,"9500~200:qcom,smd-rpm:222:fc4cf000.qcom,spmi",`,
+				`CPU running,string,1000,4600,1000~2500~Abort:Pending Wakeup Sources: ipc00000177_FLP Service Cal |2500~3500~Abort:Pending Wakeup Sources: sh2ap_wakelock |3500~4500~Abort:Some devices failed to suspend|4500~4600~Abort:Pending Wakeup Sources: sh2ap_wakelock ,`,
+				`CPU running,string,9500,10500,"9500~10500~200:qcom,smd-rpm:222:fc4cf000.qcom,spmi",`,
 			}, "\n"),
 		},
 		{
 			desc: "Reset in history",
 			input: strings.Join([]string{
-				`9,h,0:RESET:TIME:1000`,
 				`9,hsp,50,0,"Abort:Last active Wakeup Source: eventpoll"`,
 				`9,hsp,51,0,"Abort:Pending Wakeup Sources: sh2ap_wakelock "`,
 				`9,hsp,52,0,"57:qcom,smd-modem:200:qcom,smd-rpm"`,
+				`9,h,0:RESET:TIME:1000`,
 				`9,h,2000,+r`,
 				`9,h,1000:RESET:TIME:20000`, // No START line before RESET, most likely user caused.
 				`9,h,1000,+r`,
@@ -2235,7 +2736,7 @@ func TestCSVRunningEntry(t *testing.T) {
 				csv.FileHeader,
 				// fixTimeline will change the timestamps based on the latest seen TIME values.
 				`CPU running,string,19000,19000,19000~` + csv.UnknownWakeup + `,`,
-				`CPU running,string,21000,27000,22000~Abort:Last active Wakeup Source: eventpoll|27000~Abort:Pending Wakeup Sources: sh2ap_wakelock ,`,
+				`CPU running,string,21000,27000,21000~27000~Abort:Last active Wakeup Source: eventpoll|27000~Abort:Pending Wakeup Sources: sh2ap_wakelock ,`,
 			}, "\n"),
 		},
 	}
@@ -2247,7 +2748,7 @@ func TestCSVRunningEntry(t *testing.T) {
 		got := normalizeCSV(b.String())
 		want := normalizeCSV(test.wantCSV)
 		if !reflect.DeepEqual(got, want) {
-			t.Errorf("%v: AnalyzeHistory(%v)\n outputted csv = %q\n want: %q", test.desc, test.input, got, want)
+			t.Errorf("%v: AnalyzeHistory(%v)\n  got csv = %q\n  want: %q", test.desc, test.input, got, want)
 		}
 		if !reflect.DeepEqual(test.wantErrs, result.Errs) {
 			t.Errorf("%v: AnalyzeHistory(%v,...)\n errs = %q\n want %q", test.desc, test.input, result.Errs, test.wantErrs)
@@ -4200,18 +4701,18 @@ func TestDPSTDCPUParse(t *testing.T) {
 	}
 	wantCSV := strings.Join([]string{
 		csv.FileHeader,
-		`Level,int,1422620451417,1422620452417,100,`,
-		`Level,int,1422620452417,1422620455417,99,`,
+		`Battery Level,int,1422620451417,1422620452417,100,`,
+		`Battery Level,int,1422620452417,1422620455417,99,`,
 		// 100->99 drop.
 		`Highest App CPU Usage,summary,1422620451417,1422620452417,ANDROID_SYSTEM~32.93s~19.83s,1000`,
 		`Highest App CPU Usage,summary,1422620451417,1422620452417,ROOT~9.85s~23.18s,0`,
 		`Highest App CPU Usage,summary,1422620451417,1422620452417,com.google.android.keep~21.72s~5.57s,10019`,
-		`Level,int,1422620455417,1422620460417,98,`,
+		`Battery Level,int,1422620455417,1422620460417,98,`,
 		// 99->98 drop.
 		`Highest App CPU Usage,summary,1422620452417,1422620455417,ANDROID_SYSTEM~9.865s~28.63s,1000`,
 		`Highest App CPU Usage,summary,1422620452417,1422620455417,ROOT~5.07s~15.025s,0`,
 		`Highest App CPU Usage,summary,1422620452417,1422620455417,UID 10010~357ms~3.2s,10010`,
-		`Level,int,1422620460417,1422620461417,97,`,
+		`Battery Level,int,1422620460417,1422620461417,97,`,
 		// None for the 98->97 drop.
 		`Screen,bool,1422620461417,1422620461417,true,unknown screen on reason`,
 	}, "\n")
@@ -4388,12 +4889,12 @@ func TestPowerStateParsing(t *testing.T) {
 				`9,0,i,vers,17,144,NRD32,NRD41`,
 				`9,h,0:RESET:TIME:1422620000000`,
 				`9,h,0,Bl=100`,
-				`9,h,1000,Bl=99`,
-				`9,h,0,Dpst=262180,124520,4950,8110,6200,181080,state_1 name=XO_shutdown time=0 count=0 voter_1 name=APSS time=100 count=50 voter_2 name=MPSS time=200 count=100 voter_3 name=LPASS time=300 count=150 state_2 name=VMIN time=150 count=75`,
-				`9,h,1000,Bl=98`,
-				`9,h,0,Dpst=262180,124520,4950,8110,6200,181080,state_1 name=XO_shutdown time=0 count=0 voter_1 name=APSS time=150 count=90 voter_2 name=MPSS time=260 count=140 voter_3 name=LPASS time=330 count=160 state_2 name=VMIN time=170 count=95`,
-				`9,h,1000,Bl=97`,
-				`9,h,0,Dpst=262180,124520,4950,8110,6200,181080,state_1 name=XO_shutdown time=0 count=0 voter_1 name=APSS time=250 count=100 voter_2 name=MPSS time=300 count=200 voter_3 name=LPASS time=400 count=200 state_2 name=VMIN time=200 count=100`,
+				`9,h,60000,Bl=99`,
+				`9,h,0,Dpst=262180,124520,4950,8110,6200,181080,state_1 name=XO_shutdown time=0 count=0 voter_1 name=APSS time=6000 count=50 voter_2 name=MPSS time=3000 count=100 voter_3 name=LPASS time=3000 count=150 state_2 name=VMIN time=1500 count=75`,
+				`9,h,60000,Bl=98`,
+				`9,h,0,Dpst=262180,124520,4950,8110,6200,181080,state_1 name=XO_shutdown time=0 count=0 voter_1 name=APSS time=12000 count=90 voter_2 name=MPSS time=6000 count=140 voter_3 name=LPASS time=4500 count=160 state_2 name=VMIN time=3000 count=95`,
+				`9,h,60000,Bl=97`,
+				`9,h,0,Dpst=262180,124520,4950,8110,6200,181080,state_1 name=XO_shutdown time=0 count=0 voter_1 name=APSS time=15000 count=100 voter_2 name=MPSS time=9000 count=200 voter_3 name=LPASS time=6000 count=200 state_2 name=VMIN time=6000 count=100`,
 			}, "\n"),
 			wantStatesTT: []states{
 				{
@@ -4401,7 +4902,7 @@ func TestPowerStateParsing(t *testing.T) {
 						// There won't be a log for the 100->99 discharge since the log started at 100.
 						{
 							batteryLevel: 99, // 99->98 step
-							start:        1422620001000,
+							start:        1422620060000,
 							Level:        1,
 							Name:         `XO_shutdown`,
 							Time:         0,
@@ -4409,32 +4910,32 @@ func TestPowerStateParsing(t *testing.T) {
 							Voters: []Voter{
 								{
 									Name:  `APSS`,
-									Time:  50 * time.Millisecond,
+									Time:  6000 * time.Millisecond,
 									Count: 40,
 								},
 								{
 									Name:  `LPASS`,
-									Time:  30 * time.Millisecond,
+									Time:  1500 * time.Millisecond,
 									Count: 10,
 								},
 								{
 									Name:  `MPSS`,
-									Time:  60 * time.Millisecond,
+									Time:  3000 * time.Millisecond,
 									Count: 40,
 								},
 							},
 						},
 						{
 							batteryLevel: 99, // 99->98 step
-							start:        1422620001000,
+							start:        1422620060000,
 							Level:        2,
 							Name:         `VMIN`,
-							Time:         20 * time.Millisecond,
+							Time:         1500 * time.Millisecond,
 							Count:        20,
 						},
 						{
 							batteryLevel: 98, // 98->97 step
-							start:        1422620002000,
+							start:        1422620120000,
 							Level:        1,
 							Name:         `XO_shutdown`,
 							Time:         0,
@@ -4442,27 +4943,27 @@ func TestPowerStateParsing(t *testing.T) {
 							Voters: []Voter{
 								{
 									Name:  `APSS`,
-									Time:  100 * time.Millisecond,
+									Time:  3000 * time.Millisecond,
 									Count: 10,
 								},
 								{
 									Name:  `LPASS`,
-									Time:  70 * time.Millisecond,
+									Time:  1500 * time.Millisecond,
 									Count: 40,
 								},
 								{
 									Name:  `MPSS`,
-									Time:  40 * time.Millisecond,
+									Time:  3000 * time.Millisecond,
 									Count: 60,
 								},
 							},
 						},
 						{
 							batteryLevel: 98, // 98->97 step
-							start:        1422620002000,
+							start:        1422620120000,
 							Level:        2,
 							Name:         `VMIN`,
-							Time:         30 * time.Millisecond,
+							Time:         3000 * time.Millisecond,
 							Count:        5,
 						},
 					},
@@ -4475,17 +4976,17 @@ func TestPowerStateParsing(t *testing.T) {
 							Voters: []Voter{
 								{
 									Name:  `APSS`,
-									Time:  150 * time.Millisecond,
+									Time:  9000 * time.Millisecond,
 									Count: 50,
 								},
 								{
 									Name:  `LPASS`,
-									Time:  100 * time.Millisecond,
+									Time:  3000 * time.Millisecond,
 									Count: 50,
 								},
 								{
 									Name:  `MPSS`,
-									Time:  100 * time.Millisecond,
+									Time:  6000 * time.Millisecond,
 									Count: 100,
 								},
 							},
@@ -4493,7 +4994,7 @@ func TestPowerStateParsing(t *testing.T) {
 						`VMIN`: {
 							Level: 2,
 							Name:  `VMIN`,
-							Time:  50 * time.Millisecond,
+							Time:  4500 * time.Millisecond,
 							Count: 25,
 						},
 					},
@@ -4508,7 +5009,7 @@ func TestPowerStateParsing(t *testing.T) {
 					detailed: []PowerState{
 						{
 							batteryLevel: 99, // 99->98 step
-							start:        1422620001000,
+							start:        1422620060000,
 							Level:        1,
 							Name:         `XO_shutdown`,
 							Time:         0,
@@ -4516,34 +5017,34 @@ func TestPowerStateParsing(t *testing.T) {
 							Voters: []Voter{
 								{
 									Name:  `APSS`,
-									Time:  50 * time.Millisecond,
+									Time:  6000 * time.Millisecond,
 									Count: 40,
 								},
 								{
 									Name:  `LPASS`,
-									Time:  30 * time.Millisecond,
+									Time:  1500 * time.Millisecond,
 									Count: 10,
 								},
 								{
 									Name:  `MPSS`,
-									Time:  60 * time.Millisecond,
+									Time:  3000 * time.Millisecond,
 									Count: 40,
 								},
 							},
 						},
 						{
 							batteryLevel: 99, // 99->98 step
-							start:        1422620001000,
+							start:        1422620060000,
 							Level:        2,
 							Name:         `VMIN`,
-							Time:         20 * time.Millisecond,
+							Time:         1500 * time.Millisecond,
 							Count:        20,
 						},
 					},
 					overall: map[string]PowerState{
 						`XO_shutdown`: {
 							batteryLevel: 99, // 99->98 step
-							start:        1422620001000,
+							start:        1422620060000,
 							Level:        1,
 							Name:         `XO_shutdown`,
 							Time:         0,
@@ -4551,27 +5052,27 @@ func TestPowerStateParsing(t *testing.T) {
 							Voters: []Voter{
 								{
 									Name:  `APSS`,
-									Time:  50 * time.Millisecond,
+									Time:  6000 * time.Millisecond,
 									Count: 40,
 								},
 								{
 									Name:  `LPASS`,
-									Time:  30 * time.Millisecond,
+									Time:  1500 * time.Millisecond,
 									Count: 10,
 								},
 								{
 									Name:  `MPSS`,
-									Time:  60 * time.Millisecond,
+									Time:  3000 * time.Millisecond,
 									Count: 40,
 								},
 							},
 						},
 						`VMIN`: {
 							batteryLevel: 99, // 99->98 step
-							start:        1422620001000,
+							start:        1422620060000,
 							Level:        2,
 							Name:         `VMIN`,
-							Time:         20 * time.Millisecond,
+							Time:         1500 * time.Millisecond,
 							Count:        20,
 						},
 					},
@@ -4580,7 +5081,7 @@ func TestPowerStateParsing(t *testing.T) {
 					detailed: []PowerState{
 						{
 							batteryLevel: 98, // 98->97 step
-							start:        1422620002000,
+							start:        1422620120000,
 							Level:        1,
 							Name:         `XO_shutdown`,
 							Time:         0,
@@ -4588,34 +5089,34 @@ func TestPowerStateParsing(t *testing.T) {
 							Voters: []Voter{
 								{
 									Name:  `APSS`,
-									Time:  100 * time.Millisecond,
+									Time:  3000 * time.Millisecond,
 									Count: 10,
 								},
 								{
 									Name:  `LPASS`,
-									Time:  70 * time.Millisecond,
+									Time:  1500 * time.Millisecond,
 									Count: 40,
 								},
 								{
 									Name:  `MPSS`,
-									Time:  40 * time.Millisecond,
+									Time:  3000 * time.Millisecond,
 									Count: 60,
 								},
 							},
 						},
 						{
 							batteryLevel: 98, // 98->97 step
-							start:        1422620002000,
+							start:        1422620120000,
 							Level:        2,
 							Name:         `VMIN`,
-							Time:         30 * time.Millisecond,
+							Time:         3000 * time.Millisecond,
 							Count:        5,
 						},
 					},
 					overall: map[string]PowerState{
 						`XO_shutdown`: {
 							batteryLevel: 98, // 98->97 step
-							start:        1422620002000,
+							start:        1422620120000,
 							Level:        1,
 							Name:         `XO_shutdown`,
 							Time:         0,
@@ -4623,27 +5124,27 @@ func TestPowerStateParsing(t *testing.T) {
 							Voters: []Voter{
 								{
 									Name:  `APSS`,
-									Time:  100 * time.Millisecond,
+									Time:  3000 * time.Millisecond,
 									Count: 10,
 								},
 								{
 									Name:  `LPASS`,
-									Time:  70 * time.Millisecond,
+									Time:  1500 * time.Millisecond,
 									Count: 40,
 								},
 								{
 									Name:  `MPSS`,
-									Time:  40 * time.Millisecond,
+									Time:  3000 * time.Millisecond,
 									Count: 60,
 								},
 							},
 						},
 						`VMIN`: {
 							batteryLevel: 98, // 98->97 step
-							start:        1422620002000,
+							start:        1422620120000,
 							Level:        2,
 							Name:         `VMIN`,
-							Time:         30 * time.Millisecond,
+							Time:         3000 * time.Millisecond,
 							Count:        5,
 						},
 					},
@@ -4651,14 +5152,28 @@ func TestPowerStateParsing(t *testing.T) {
 			},
 			wantCSV: strings.Join([]string{
 				csv.FileHeader,
-				`Level,int,1422620000000,1422620001000,100,`,
-				`Level,int,1422620001000,1422620002000,99,`,
-				`Low Power State,summary,1422620001000,1422620002000,XO_shutdown~` + zeroDuration + `~0,`,
-				`Low Power State,summary,1422620001000,1422620002000,VMIN~20ms~20,`,
-				`Level,int,1422620002000,1422620003000,98,`,
-				`Low Power State,summary,1422620002000,1422620003000,XO_shutdown~` + zeroDuration + `~0,`,
-				`Low Power State,summary,1422620002000,1422620003000,VMIN~30ms~5,`,
-				`Level,int,1422620003000,1422620003000,97,`,
+				`Battery Level,int,1422620000000,1422620060000,100,`,
+				`Battery Level,int,1422620060000,1422620120000,99,`,
+				// Make these instantaneous at the time that they increased.
+				// t0 = when battery changed to 99% (1422620060000) since that was when the first RPM stats line was printed. We zero at t0.
+				// t1 = the second RPM stats line (1422620120000) -- the first increase.
+				`Low Power State,summary,1422620120000,1422620120000,XO_shutdown~` + zeroDuration + `~0,`,
+				`Low Power State,summary,1422620120000,1422620120000,VMIN~1.5s~20,`,
+				`Battery Level,int,1422620120000,1422620180000,98,`,
+				`Low Power State,summary,1422620180000,1422620180000,XO_shutdown~` + zeroDuration + `~0,`,
+				`Low Power State,summary,1422620180000,1422620180000,VMIN~3s~5,`,
+				`VMIN,float,1422620120000,1422620120000,0.025,`,
+				`XO_shutdown,float,1422620120000,1422620120000,0.000,`,
+				`XO_shutdown(APSS),float,1422620120000,1422620120000,0.100,`,
+				`XO_shutdown(LPASS),float,1422620120000,1422620120000,0.025,`,
+				`XO_shutdown(MPSS),float,1422620120000,1422620120000,0.050,`,
+				`Battery Level,int,1422620180000,1422620180000,97,`,
+				`VMIN,float,1422620180000,1422620180000,0.075,`,
+				`XO_shutdown,float,1422620180000,1422620180000,0.000,`,
+				`XO_shutdown(APSS),float,1422620180000,1422620180000,0.150,`,
+				`XO_shutdown(LPASS),float,1422620180000,1422620180000,0.050,`,
+				`XO_shutdown(MPSS),float,1422620180000,1422620180000,0.100,`,
+				`RPM Stats,group,1422620000000,1422620000000,XO_shutdown|XO_shutdown(APSS)|XO_shutdown(MPSS)|XO_shutdown(LPASS)|VMIN,minutes`,
 			}, "\n"),
 		},
 		// TODO: add test for two discharge sessions
@@ -5462,5 +5977,65 @@ func TestTopAppMultipleSummaries(t *testing.T) {
 	wantCSVNormalized := normalizeCSV(wantCSV)
 	if !reflect.DeepEqual(gotCSV, wantCSVNormalized) {
 		t.Errorf("AnalyzeHistory(%s,...) generated incorrect csv:\n  got: %q\n  want: %q", input, gotCSV, wantCSVNormalized)
+	}
+}
+
+// TestOverflow tests the generation of dist summaries and CSV entries from battery history with overflow events.
+func TestOverflow(t *testing.T) {
+	input := strings.Join([]string{
+		"9,0,i,vers,12,116,LVX72L,LVY29G",
+		`9,hsp,94,10011,"com.google.android.gms.people/com.google/test@google.com"`,
+		"9,h,0:RESET:TIME:1400000030000", // The time should be changed to 1400000000000 in fixTimeline.
+		"9,h,0,Bl=52",
+		"9,h,2000,-Esy=94",
+		"9,h,5000,+Esy=94",
+		"9,h,0:*OVERFLOW*",
+		"9,h,1000,Bl=51,Bt=236,Bv=3820,Pss=3,w=14,wr=18,+Esy=10",
+		"9,h,2000,Bl=50,Bv=3791,-w=134,+Pr,Pcn=lte,Pss=2,wr=18,-Esy=94",
+		"9,h,0:TIME:1400000010000",
+		"9,h,2000,Bl=49,Bs=c,Bh=d,Bp=a,Bt=282,Bv=3706,+r,+BP,wr=203",
+		"9,h,0:*OVERFLOW*",
+		"9,h,3000,Bl=48,Bt=294,Bv=3785,-w=13,-s,-a,-S,Pss=3,Sb=0,Wss=2,Wsp=compl,wr=18,-Esy=94",
+	}, "\n")
+
+	wantCSV := strings.Join([]string{
+		csv.FileHeader,
+		`Battery Level,int,1400000000000,1400000008000,52,`,
+		`SyncManager,service,1400000000000,1400000002000,com.google.android.gms.people/com.google/test@google.com,10011`,
+		`SyncManager,service,1400000007000,1400000007000,com.google.android.gms.people/com.google/test@google.com,10011`,
+		`Battery Level,int,1400000008000,1400000010000,51,`,
+		`Battery Level,int,1400000010000,1400000012000,50,`,
+		`Battery Level,int,1400000012000,1400000015000,49,`,
+		`Battery Level,int,1400000015000,1400000015000,48,`,
+	}, "\n")
+
+	wantSummary := newActivitySummary(FormatTotalTime)
+	wantSummary.StartTimeMs = 1400000000000
+	wantSummary.EndTimeMs = 1400000007000
+	wantSummary.PerAppSyncSummary[`"com.google.android.gms.people/com.google/test@google.com"`] = Dist{
+		Num:           2,
+		TotalDuration: 2000 * time.Millisecond,
+		MaxDuration:   2000 * time.Millisecond,
+	}
+
+	var b bytes.Buffer
+	result := AnalyzeHistory(&b, input, FormatTotalTime, emptyUIDPackageMapping, false)
+	validateHistory(input, t, result, 0, 1)
+
+	s := result.Summaries[0]
+	if wantSummary.StartTimeMs != s.StartTimeMs {
+		t.Errorf("AnalyzeHistory(%s,...).Summaries[0].StartTimeMs = %d, want %d", input, s.StartTimeMs, wantSummary.StartTimeMs)
+	}
+	if wantSummary.EndTimeMs != s.EndTimeMs {
+		t.Errorf("AnalyzeHistory(%s,...).Summaries[0].EndTimeMs = %d, want %d", input, s.EndTimeMs, wantSummary.EndTimeMs)
+	}
+	if !reflect.DeepEqual(wantSummary.PerAppSyncSummary, s.PerAppSyncSummary) {
+		t.Errorf("AnalyzeHistory(%s,...).Summaries[0].PerAppSyncSummary output incorrect:\n  got %v\n  want %v", input, s.PerAppSyncSummary, wantSummary.PerAppSyncSummary)
+	}
+
+	got := normalizeCSV(b.String())
+	want := normalizeCSV(wantCSV)
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("AnalyzeHistory(%v) generated incorrect csv:\n  got: %q\n  want: %q", input, got, want)
 	}
 }

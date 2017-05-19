@@ -43,3 +43,29 @@ func TestScrubPII(t *testing.T) {
 		}
 	}
 }
+
+func TestParseDurationWithDays(t *testing.T) {
+	tests := []struct {
+		unparsedDur string
+		wantMs      int64
+		wantErr     bool
+	}{
+		{unparsedDur: "3d1ms", wantMs: 259200001},
+		{unparsedDur: "3d", wantMs: 259200000},
+		{unparsedDur: "d", wantErr: true},
+		{unparsedDur: "", wantErr: true},
+		{unparsedDur: "1h", wantMs: 3600000},
+	}
+
+	for _, test := range tests {
+		gotMs, err := ParseDurationWithDays(test.unparsedDur)
+		gotErr := err != nil
+		if gotErr != test.wantErr {
+			t.Errorf("ParseDuration(%s) got err: %v, want err %v", test.unparsedDur, gotErr, test.wantErr)
+			continue
+		}
+		if gotMs != test.wantMs {
+			t.Errorf("ParseDuration(%s) got ms: %d, want ms %d", test.unparsedDur, gotMs, test.wantMs)
+		}
+	}
+}

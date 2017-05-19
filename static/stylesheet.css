@@ -346,10 +346,45 @@ pre {
 
 #dialog .modal-body {
   margin-bottom: 5px;
+  word-wrap: break-word;  /** Stop text from overflowing horizontally. */
+}
+
+@media screen and (min-width: 1200px) {  /** This is 900/(width % below). */
+  #dialog .modal-lgify {
+    width: 75%;
+  }
 }
 
 .multi-line {
   white-space: pre-line;
+}
+
+.show-histogram {
+  padding: 3px 6px;
+}
+
+.wakeups-histogram .plot {
+  height: 300px;
+  width: 950px;
+}
+
+.wakeups-histogram .title {
+  text-align: center;
+}
+
+.wakeups-histogram div.xAxis div.tickLabel {
+  min-width: 110px;
+  /*
+    Align the date to the bottom of graph, regardless of text width.
+    Flot does not appear to have an option to set this.
+  */
+  text-align: right !important;
+  transform: rotate(-50deg) translate(-85px, 40px);
+  -ms-transform:rotate(-50deg) translate(-85px, 40px); /* IE 9 */
+  -moz-transform:rotate(-50deg) translate(-85px, 40px); /* Firefox */
+  -webkit-transform:rotate(-50deg) translate(-85px, 40px); /* Safari and Chrome */
+  -o-transform:rotate(-50deg) translate(-85px, 40px); /* Opera */
+  transform-origin: 0 0;
 }
 
 /* Firefox is...special. */

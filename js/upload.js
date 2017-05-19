@@ -77,21 +77,21 @@ historian.upload.hideKernelOption_ = function() {
 
 
 /**
- * Shows the extra file option for powermonitor file.
+ * Shows the extra file option for power monitor file.
  * @private
  */
-historian.upload.showPowermonitorOption_ = function() {
+historian.upload.showPowerMonitorOption_ = function() {
   $('#add-powermonitor').hide();
   $('#powermonitor-option').show();
-  $('#powermonitor-filename').text('Choose a Powermonitor File');
+  $('#powermonitor-filename').text('Choose a Power Monitor File');
 };
 
 
 /**
- * Hides the extra file option for powermonitor file.
+ * Hides the extra file option for power monitor file.
  * @private
  */
-historian.upload.hidePowermonitorOption_ = function() {
+historian.upload.hidePowerMonitorOption_ = function() {
   $('#add-powermonitor').show();
   $('#powermonitor-option').hide();
   $('#powermonitor').val('');
@@ -144,7 +144,7 @@ historian.upload.initialize = function() {
     historian.upload.showKernelOption_();
   });
   $('#add-powermonitor').click(function() {
-    historian.upload.showPowermonitorOption_();
+    historian.upload.showPowerMonitorOption_();
   });
   $('#add-comparison').click(function() {
     historian.upload.showComparisonOption_();
@@ -154,7 +154,7 @@ historian.upload.initialize = function() {
     historian.upload.hideKernelOption_();
   });
   $('#remove-powermonitor').click(function() {
-    historian.upload.hidePowermonitorOption_();
+    historian.upload.hidePowerMonitorOption_();
   });
   $('#remove-comparison').click(function() {
     historian.upload.hideComparisonOption_();

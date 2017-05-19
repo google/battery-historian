@@ -21,7 +21,6 @@
 goog.module('historian.utils');
 goog.module.declareLegacyNamespace();
 
-var Range = goog.require('goog.math.Range');
 var array = goog.require('goog.array');
 var asserts = goog.require('goog.asserts');
 var googString = goog.require('goog.string');
@@ -167,19 +166,42 @@ exports.toValidID = function(str) {
  * @return {number} The total mAh.
  */
 exports.calculateTotalCharge = function(data) {
+  var totals = calculateCumulativeChargeEntries(data);
+  return totals.length == 0 ? 0 :
+      /** @type {number} */ (totals[totals.length - 1].value);
+};
+
+
+/**
+ * Returns the cumulative charge (mAh) consumed up to each entry.
+ * @param {!Array<!historian.Entry>} data data.
+ * @param {number=} opt_precision Truncates the calculated values to the
+ *     specified number of decimal places.
+ * @return {!Array<!historian.Entry>} The total mAh.
+ */
+var calculateCumulativeChargeEntries = function(data, opt_precision) {
   var total = 0;
+  var res = [];
   data.forEach(function(d) {
     var durationMs = d.endTime - d.startTime;
     asserts.assert(durationMs >= 0,
         'Negative duration: start=' + d.startTime + ', end=' + d.endTime);
     // Since we're calculating it for only the visible data points, we might
     // be missing readings from a particular second, so can't use a constant hz.
-    var hz = (durationMs != 0) ? time.MSECS_IN_SEC / durationMs : 0;
-    total += d.value / hz;
+    if (durationMs > 0) {
+      var hz = (durationMs != 0) ? time.MSECS_IN_SEC / durationMs : 0;
+      // Save the total before dividing by 3600, to avoid floating point
+      // errors.
+      total += d.value / hz;
+      var value = total / (time.SECS_IN_MIN * time.MINS_IN_HOUR);
+      res.push({
+        startTime: d.startTime,
+        endTime: d.endTime,
+        value: opt_precision ? +value.toFixed(3) : value
+      });
+    }
   });
-  // After adding the mA readings per second, we calculate the mAh by dividing
-  // by the number of seconds in an hour.
-  return total / (time.SECS_IN_MIN * time.MINS_IN_HOUR);
+  return res;
 };
 
 
@@ -206,12 +228,38 @@ exports.calculateTotalChargeFormatted = function(data) {
  *     falling in the given time range.
  */
 exports.inTimeRangeMulti = function(startTime, endTime, data) {
-  var range = new Range(startTime, endTime);
-
   return data.filter(function(d) {
-    return Range.hasIntersection(range, new Range(d.startTime, d.endTime)) &&
-        endTime != d.startTime && startTime != d.endTime;
+    return dataOverlaps(startTime, endTime, [d]);
   });
+};
+
+
+/**
+ * Returns whether any data overlaps with the given time range.
+ * @param {number} startTime The start of the time range.
+ * @param {number} endTime The end of the time range.
+ * @param {!Array<historian.Entry|historian.AggregatedEntry>} data The events.
+ * @return {boolean}
+ */
+var dataOverlaps = function(startTime, endTime, data) {
+  if (array.isEmpty(data)) {
+    return false;
+  }
+  var first = data[0];
+  var last = data[data.length - 1];
+  // Requesting range that comes after last end time of data range or before
+  // first start time of data range.
+  if (startTime > last.endTime || endTime < first.startTime) {
+    return false;
+  }
+  // If an instant event lies on the time boundary it should be included.
+  // e.g. Time range is 2pm - 3pm, and a crash occurs at 2pm exactly.
+  // If a non instant event starts at the end of the time boundary, or ends
+  // at start o the time boundary, it shouldn't be included.
+  // e.g. screen on from 1pm - 2pm.
+  var isInstant = function(entry) { return entry.startTime == entry.endTime; };
+  return (((startTime != last.endTime) || isInstant(last)) &&
+      ((endTime != first.startTime) || isInstant(first)));
 };
 
 
@@ -228,16 +276,9 @@ exports.inTimeRangeMulti = function(startTime, endTime, data) {
  *     falling in the given time range.
  */
 exports.inTimeRange = function(startTime, endTime, data) {
-  if (array.isEmpty(data)) {
+  if (!dataOverlaps(startTime, endTime, data)) {
     return [];
   }
-  // Requesting range that comes after last end time of data range or before
-  // first start time of data range.
-  if (startTime >= data[data.length - 1].endTime ||
-      endTime <= data[0].startTime) {
-    return [];
-  }
-
   var startObj = {
     startTime: startTime
   };
@@ -275,12 +316,15 @@ exports.inTimeRange = function(startTime, endTime, data) {
  * @param {!Array<string|{val: string, html: string}>} options
  *     The strings to set as the option values and displayed html,
  *     or objects with the option values and displayed html.
- * @param {string} placeholder Displayed when no option is selected.
+ * @param {string=} opt_placeholder Displayed when no option is selected. If
+ *     undefined, no placeholder will be shown.
  */
-exports.setupDropdown = function(dropdown, options, placeholder) {
+exports.setupDropdown = function(dropdown, options, opt_placeholder) {
   dropdown.empty();
-  // Append an empty element, required for select2 placeholder to show.
-  dropdown.append($('<option></option>'));
+  if (opt_placeholder) {
+    // Append an empty element, required for select2 placeholder to show.
+    dropdown.append($('<option></option>'));
+  }
   options.forEach(function(option) {
     var isString = typeof option == 'string';
     var val = isString ? option : option.val;
@@ -291,9 +335,9 @@ exports.setupDropdown = function(dropdown, options, placeholder) {
     );
   });
   dropdown.select2({
-    placeholder: placeholder,
+    placeholder: opt_placeholder || '',
     allowClear: true,
-    width: 'resolve'
+    dropdownAutoWidth: true
   });
 };
 
@@ -321,3 +365,140 @@ exports.generateDerivative = function(data) {
   });
   return derivative;
 };
+
+
+/**
+ * Returns whether a regExp is valid.
+ * @param {string} regExp to check.
+ * @return {boolean} True if the regExp is valid, false otherwise.
+ */
+exports.isValidRegExp = function(regExp) {
+  var r = null;
+  try {
+    r = new RegExp(regExp);
+  } catch (e) {}
+  return r != null;
+};
+
+
+/**
+ * Copies the given string to the user's clipboard.
+ * @param {string} str String to copy.
+ */
+exports.copyToClipboard = function(str) {
+  var onCopy = function(event) {
+    event.clipboardData.clearData();
+    event.clipboardData.setData('text/plain', str);
+    event.preventDefault();
+    document.removeEventListener('copy', onCopy);
+  };
+  document.addEventListener('copy', onCopy);
+  document.execCommand('copy');
+};
+
+
+/**
+ * Returns the intersection of the two time ranges s1, e1 and s2, e2.
+ * @param {number} s1 Start time of the first range.
+ * @param {number} e1 End time of the first range.
+ * @param {number} s2 Start time of the second range.
+ * @param {number} e2 End time of the second range.
+ * @return {!Array<number>} The intersection, with at least duration 1 ms.
+ *     Returns an empty array if no intersection is found.
+ */
+var getIntersection = function(s1, e1, s2, e2) {
+  var start = Math.max(s1, s2);
+  var end = Math.min(e1, e2);
+  return start < end ? [start, end] : [];
+};
+
+
+/**
+ * Returns whether the event occurred mostly during screen off.
+ * @param {!historian.Entry} event The event to check.
+ * @param {!Array<!historian.Entry>} screenOnEvents Events indicating when the
+ *     screen was on.
+ * @return {boolean} True if 50% or more of the event's duration was during
+ *     screen off.
+ */
+exports.isMostlyScreenOffEvent = function(event, screenOnEvents) {
+  if (screenOnEvents.length == 0) {
+    return true;
+  }
+  var idx = array.binarySearch(screenOnEvents, event, function(d1, d2) {
+    return d1.startTime - d2.startTime;
+  });
+  // The result from binary search will be the index of the screen on event with
+  // the same start time if found, otherwise will be (-(insertion point) - 1).
+  var insertionPoint = idx;
+  if (insertionPoint < 0) {
+    insertionPoint = -(idx + 1);
+    if (insertionPoint != 0) {
+      // If the event starts when the screen is on, the insertion point will
+      // be after that screen on event, and needs to be decremented to point
+      // to that screen on event.
+      var screenOn = screenOnEvents[insertionPoint - 1];
+      if (screenOn.endTime > event.startTime) {
+        insertionPoint--;
+      }
+    }
+  }
+
+  var screenOnMs = 0;  // Easier to track screen on time rather than screen off.
+  for (var i = insertionPoint; i < screenOnEvents.length; i++) {
+    var screenOn = screenOnEvents[i];
+    var intersection = getIntersection(
+        event.startTime, event.endTime, screenOn.startTime, screenOn.endTime);
+    if (intersection.length == 0) {
+      break;
+    }
+    screenOnMs += intersection[1] - intersection[0];
+  }
+  return screenOnMs <= (event.endTime - event.startTime) / 2;
+};
+
+
+/**
+ * Modifies the value of each entry to be the average of its value and all
+ * adjacent entries' values from the same category, weighted by entry duration.
+ * @param {!Array<!historian.Entry>} entries
+ * @param {function(!historian.Entry)} getCategory Returns the category of the
+ *     entry. The category can be any type and will be compared with strict
+ *     equality.
+ */
+exports.avgByCategory = function(entries, getCategory) {
+  if (entries.length == 0) {
+    return;
+  }
+  // Averages the values of all entries between startIdx and endIdx
+  // (inclusive).
+  var avg = function(startIdx, endIdx) {
+    var totalValue = 0;
+    var totalMs = 0;
+    for (var i = startIdx; i <= endIdx; i++) {
+      var ms = entries[i].endTime - entries[i].startTime;
+      totalValue += entries[i].value * ms;
+      totalMs += ms;
+    }
+    var avg = totalValue / totalMs;
+    for (var i = startIdx; i <= endIdx; i++) {
+      entries[i].value = avg;
+    }
+  };
+  var startIdx = 0;
+  entries.forEach(function(entry, idx, arr) {
+    if (idx > 0 && getCategory(arr[idx - 1]) !== getCategory(arr[idx])) {
+      avg(startIdx, idx - 1);
+      startIdx = idx;
+    }
+  });
+  avg(startIdx, entries.length - 1);
+};
+
+
+/** Returns the cumulative charge (mAh) consumed up to each entry. */
+exports.calculateCumulativeChargeEntries = calculateCumulativeChargeEntries;
+
+
+/** Returns the intersection of the two time ranges s1, e1 and s2, e2. */
+exports.getIntersection = getIntersection;

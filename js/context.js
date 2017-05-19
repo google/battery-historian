@@ -16,7 +16,9 @@
 
 goog.provide('historian.Context');
 
+goog.require('historian.color');
 goog.require('historian.constants');
+goog.require('historian.historianV2Logs');
 goog.require('historian.time');
 
 
@@ -25,8 +27,8 @@ goog.require('historian.time');
  * Class containing the outer svg elements, axes, and scales.
  * Manages zoom events, calling redraw on registered objects.
  * @param {!jQuery} container Container containing the graph.
- * @param {{min: number, max: number}} xExtent Min and max startTime value of
- *     the data.
+ * @param {!historian.historianV2Logs.Extent} xExtent Min and max unix
+ *     millisecond timestamps for the graph extent.
  * @param {{min: number, max: number}} yDomain The input range for the y scale.
  * @param {!historian.BarData} barData The bar data used in Historian v2.
  * @param {!historian.LevelData} levelData The level data used in Historian v2.
@@ -42,25 +44,27 @@ historian.Context = function(container, xExtent, yDomain, barData, levelData,
     zoomHandler, location, panel) {
   /** @private @const {!jQuery} */
   this.panel_ = panel;
+
+  /** @private @const {!jQuery} */
+  this.container_ = container;
+
   /** @const {!jQuery} */
   this.graph = container.find('.graph');
 
   var xDomainSpan = xExtent.max - xExtent.min;
   var xDomainMargin = xDomainSpan * 0.05;
 
-  /** @private {!Array<number>} */
+  /** @private {!historian.historianV2Logs.Extent} */
+  this.xExtent_ = xExtent;
+
+  /**
+   * Extent with added margins.
+   * @private {!Array<number>}
+   */
   this.xDomain_ = [xExtent.min - xDomainMargin, xExtent.max + xDomainMargin];
 
-  /** @private {!Array<number>} */
-  this.zoomTranslate_ = [0, 0];
-  /** @private {number} */
-  this.zoomScale_ = 1.0;
-
-  // Saved zooming states so that a zoom operation could be cancelled.
-  /** @private {!Array<number>} */
-  this.zoomTranslateStart_ = [0, 0];
-  /** @private {number} */
-  this.zoomScaleStart_ = 1.0;
+  /** @private {!d3.zoomTransform} */
+  this.zoomTransform_ = d3.zoomIdentity;
 
   // Clear previous rendering.
   this.graph.children().remove();
@@ -76,7 +80,7 @@ historian.Context = function(container, xExtent, yDomain, barData, levelData,
 
   /**
    * The outer svg element.
-   * @type {!Object}
+   * @type {!d3.selection}
    */
   this.svg = d3.select(this.graph[0]).select('svg');
 
@@ -93,12 +97,23 @@ historian.Context = function(container, xExtent, yDomain, barData, levelData,
   this.visSize = [0, 0];
   this.getSizes_();
 
-  /** @type {!d3.scaleType} */
-  this.xScale = d3.time.scale.utc()
-      .domain(this.xDomain_)
+  /**
+   * The original scale that transforms can be applied to.
+   * @private {!d3.TimeScale}
+   */
+  this.xScaleUntransformed_ = d3.scaleUtc()
+      .domain(this.xDomain_.map(function(unix) { return new Date(unix); }))
       .range([0, this.visSize[historian.constants.WIDTH]]);
-  /** @type {!d3.scaleType} */
-  this.yScale = d3.scale.linear()
+
+  /**
+   * This is the above scale but will have transforms applied,
+   * and will be used to plot the data.
+   * @type {!d3.TimeScale}
+   */
+  this.xScale = this.xScaleUntransformed_;
+
+  /** @type {!d3.LinearScale} */
+  this.yScale = d3.scaleLinear()
       .domain([yDomain.min, yDomain.max])
       .range([this.visSize[historian.constants.HEIGHT], 0]);
 
@@ -114,9 +129,8 @@ historian.Context = function(container, xExtent, yDomain, barData, levelData,
    */
   this.location = location;
 
-  /** @private {!d3.axisType} */
-  this.xAxis_ = d3.svg.axis()
-      .scale(this.xScale);
+  /** @private {!d3.Axis} */
+  this.xAxis_ = d3.axisBottom(this.xScale);
 
   if (this.location) {
     var defaultTickFormatter = this.xScale.tickFormat();
@@ -131,26 +145,54 @@ historian.Context = function(container, xExtent, yDomain, barData, levelData,
       return defaultTickFormatter(new Date(date.getTime() + offsetMs));
     }.bind(this));
   }
-  /** @private {!d3.axisType} */
-  this.yAxis_ = d3.svg.axis()
-      .scale(this.yScale)
-      .orient('right');
+  /** @private {!d3.Axis} */
+  this.yAxis_ = d3.axisRight(this.yScale);
 
-  /**
-   * The main chart svg with an offset to the view
-   * @type {!d3.selection}
-   */
-  this.svgChart = this.svg.append('g')
-      .attr('class', 'svg-chart')
-      .attr('transform', 'translate(' + historian.Context.MARGINS.LEFT + ',' +
-            historian.Context.MARGINS.TOP + ')');
+  // Only shows the tick if it is of integer value.
+  var formattedInts = function(d) {
+    var config = this.levelData_.getConfig();
+    return Number.isInteger(d) ? historian.color.valueFormatter(
+        config.name, d, config.ticksShortForm).value : '';
+  }.bind(this);
+  this.yAxis_.tickFormat(function(d) {
+    var config = this.levelData_.getConfig();
+    if (config.ticksAsFormattedInts) {
+      return formattedInts(d);
+    } else if (Number.isInteger(d)) {
+      return d;
+    } else {
+      return d3.format('.1f')(d);  // Don't need much precision for the axis.
+    }
+  }.bind(this));
+
   /**
    * The series lines are rendered later on in bars.js, however we want
    * the lines to appear below everything else.
    * @type {!d3.selection}
    */
-  this.seriesLinesGroup = this.svgChart.append('g')
-      .attr('class', 'svg-divider-lines');
+  this.seriesLinesGroup = this.svg.append('g')
+      .attr('class', 'svg-divider-lines')
+      .attr('transform', 'translate(0,' + historian.Context.MARGINS.TOP + ')');
+
+  // We can't apply transform to svg elements directly, so need to have an
+  // extra group.
+  var transformed = this.svg.append('g')
+      .attr('transform', 'translate(' + historian.Context.MARGINS.LEFT + ',' +
+          historian.Context.MARGINS.TOP + ')');
+
+  /**
+   * The main chart svg displaying the timeline data.
+   * @type {!d3.selection}
+   */
+  this.svgChart = transformed.append('svg')
+      .attr('class', 'svg-chart');
+
+  // Ensure the inner svg gets passed mouse events first.
+  // Otherwise zooming fails for blank areas.
+  this.svgChart.append('rect')
+      .attr('width', this.visSize[historian.constants.WIDTH])
+      .attr('height', this.visSize[historian.constants.HEIGHT])
+      .attr('opacity', 0);
 
   // Create clip path for restricting region of chart.
   var clip = this.svgChart.append('svg:clipPath')
@@ -164,7 +206,8 @@ historian.Context = function(container, xExtent, yDomain, barData, levelData,
       .attr('x', 0)
       .attr('y', 0 - historian.Context.MARGINS.TOP)
       .attr('width', this.visSize[historian.constants.WIDTH])
-      .attr('height', this.svgSize[historian.constants.HEIGHT]);
+      .attr('height', this.visSize[historian.constants.HEIGHT] +
+          historian.Context.MARGINS.TOP);
 
   /**
    * The main chart area.
@@ -202,6 +245,12 @@ historian.Context = function(container, xExtent, yDomain, barData, levelData,
   this.svgLevel = this.svgClipped.append('g')
       .attr('class', 'level');
   /**
+   * Group for rendering the report taken line.
+   * @type {!d3.selection}
+   */
+  this.svgLevelEventMarkers = transformed.append('g')
+      .attr('class', 'svg-level-event-container');
+  /**
    * Group for rendering the level summaries.
    * @type {!d3.selection}
    */
@@ -218,23 +267,26 @@ historian.Context = function(container, xExtent, yDomain, barData, levelData,
 
   /**
    * Scale that maps each row to its y coordinate.
-   * @type {!d3.scaleType}
+   * @type {!d3.LinearScale}
    */
-  this.rowScale = d3.scale.linear()
+  this.rowScale = d3.scaleLinear()
       .range([this.visSize[historian.constants.HEIGHT], 0]);
 
   this.onSeriesChange();  // Set the row scale domain.
 
-  /** @type {!d3.zoomType} */
-  this.zoom = d3.behavior.zoom()
-      .x(this.xScale)
+  /** @type {!d3.Zoom} */
+  this.zoom = d3.zoom()
       .scaleExtent([1, 512])
-      .on('zoomstart', function() {
-        this.zoomTranslateStart_ = this.zoom.translate();
-        this.zoomScaleStart_ = this.zoom.scale();
-      }.bind(this))
+      .translateExtent([[0, 0], [this.svgSize[historian.constants.WIDTH], 0]])
       .on('zoom', zoomHandler);
-  this.svg.call(this.zoom.bind(this));
+  this.svgChart.call(this.zoom.bind(this))
+      .on('wheel', function() {
+        // d3 v4 ignores mouse wheel events past the scale extent and
+        // scrolling too much will scroll the page instead. This isn't
+        // desirable as usually to fully zoom out users just scroll a lot.
+        d3.event.preventDefault();
+      });
+
   this.barData_.registerListener(this.onSeriesChange.bind(this));
   this.levelData_.registerListener(this.onLevelSeriesChange.bind(this));
 };
@@ -246,9 +298,9 @@ historian.Context = function(container, xExtent, yDomain, barData, levelData,
  */
 historian.Context.MARGINS = {
   TOP: 10,
-  RIGHT: 70,
+  RIGHT: 95,
   BOTTOM: 55,
-  LEFT: 180
+  LEFT: 222
 };
 
 
@@ -279,7 +331,7 @@ historian.Context.TIME_ZONE_DISPLAY_PX_ = 10;
  * @return {number} Time in unix ms.
  */
 historian.Context.prototype.invertPosition = function(pos) {
-  return this.xScale.invert(pos);
+  return this.xScale.invert(pos).getTime();
 };
 
 
@@ -306,14 +358,26 @@ historian.Context.prototype.onLevelSeriesChange = function() {
 
 
 /**
- * Cancels the effect of the last zoom operation.
- * When the user is making time range selection, zoom is still active and its
- * scale and translate would be changed. This is undesired so we add this to
- * allow reverting the zoom state.
+ * Sets the domain.
+ * @param {!historian.historianV2Logs.Extent} xExtent
  */
-historian.Context.prototype.cancelZoom = function() {
-  this.zoom.translate(this.zoomTranslateStart_);
-  this.zoom.scale(this.zoomScaleStart_);
+historian.Context.prototype.setDomain = function(xExtent) {
+  var xDomainSpan = xExtent.max - xExtent.min;
+  var xDomainMargin = xDomainSpan * 0.05;
+  var newXDomain = [xExtent.min - xDomainMargin, xExtent.max + xDomainMargin];
+  if (newXDomain[0] == this.xDomain_[0] && newXDomain[1] == this.xDomain_[1]) {
+    // Don't want to modify zoom or translate if the new domain is the same.
+    // This can occur when adding / moving series from the same log, or
+    // toggling filter unimportant.
+    return;
+  }
+  this.xDomain_ = newXDomain;
+  this.xExtent_ = xExtent;
+
+  // Adjust x-scale to new domain.
+  this.xScaleUntransformed_
+      .domain(this.xDomain_.map(function(unix) { return new Date(unix); }))
+      .range([0, this.visSize[historian.constants.WIDTH]]);
 };
 
 
@@ -322,23 +386,36 @@ historian.Context.prototype.cancelZoom = function() {
  * Calls all registered objects to redraw themselves.
  */
 historian.Context.prototype.update = function() {
-  var translateX = this.zoom.translate()[historian.constants.WIDTH];
-  var translateY = this.zoom.translate()[historian.constants.HEIGHT];
+  var svgChartElem = this.svgChart.node();
+  if (!svgChartElem) {
+    return;
+  }
+  this.zoomTransform_ = d3.zoomTransform(svgChartElem);
+  this.xScale = this.zoomTransform_.rescaleX(this.xScaleUntransformed_);
 
-  // Limit panning to the left.
-  var scale = this.zoom.scale();
-  var limitedPan = this.visSize[historian.constants.WIDTH] * (1.0 - scale);
-  translateX = Math.max(limitedPan, translateX);
-  translateX = Math.min(0, translateX);
-
-  this.zoomTranslate_ = [translateX, translateY];
-  this.zoomScale_ = scale;
-
-  this.zoom.translate(this.zoomTranslate_);
-
-  this.svg.select('.x.axis').call(this.xAxis_.bind(this));
   this.renderAxes_();
   this.redrawTicks_();
+};
+
+
+/**
+ * Renders the y-axis if the level line is currently shown, otherwise it is
+ * removed.
+ */
+historian.Context.prototype.renderYAxis = function() {
+  this.svg.selectAll('.y.axis').remove();
+  var selected = this.container_.find(
+      historian.constants.Elements.LEVEL_SELECT + ' option:selected').val();
+  if (!selected) {
+    return;
+  }
+  var yAxisXOffset = historian.Context.MARGINS.LEFT +
+      this.visSize[historian.constants.WIDTH];
+  this.svg.append('svg:g')
+      .attr('class', 'y axis')
+      .attr('transform', 'translate(' + yAxisXOffset +
+          ', ' + historian.Context.MARGINS.TOP + ')')
+      .call(this.yAxis_);
 };
 
 
@@ -349,23 +426,20 @@ historian.Context.prototype.update = function() {
  * @private
  */
 historian.Context.prototype.renderAxes_ = function() {
-  this.svgBars.selectAll('.x.axis').remove();
-  this.svg.selectAll('.y.axis').remove();
+  this.svgChart.selectAll('.x.axis').remove();
   this.svg.selectAll('.x-legend').remove();
 
+  var svgElem = this.svg.node();
+  if (!svgElem) {
+    return;
+  }
   // Add axes.
-  this.svgBars.append('svg:g')
+  this.svgChart.append('svg:g')
       .attr('class', 'x axis')
       .attr('transform', 'translate(0, ' + this.visSize[1] + ')')
-      .call(this.xAxis_);
+      .call(this.xAxis_.scale(this.xScale));
 
-  var yAxisXOffset = historian.Context.MARGINS.LEFT +
-      this.visSize[historian.constants.WIDTH];
-  this.svg.append('svg:g')
-      .attr('class', 'y axis')
-      .attr('transform', 'translate(' + yAxisXOffset +
-          ', ' + historian.Context.MARGINS.TOP + ')')
-      .call(this.yAxis_);
+  this.renderYAxis();
 
   // Add text for x axis.
   var xLabel = 'Time';
@@ -402,7 +476,7 @@ historian.Context.prototype.getSizes_ = function() {
   // Calculate new sizes of the SVG and visualization.
   this.svgSize = [
     this.panel_.width(),
-    this.panel_.height() - this.panel_.find('.settings').height()
+    this.panel_.height() - this.container_.find('.settings').height()
   ];
   this.svgSize[historian.constants.WIDTH] = Math.max(
       this.svgSize[historian.constants.WIDTH],
@@ -437,41 +511,45 @@ historian.Context.prototype.resize = function() {
       x1 = this.xScale.invert(this.visSize[historian.constants.WIDTH]);
 
   this.getSizes_();
+  this.svgChart.select('rect')
+      .attr('width', this.visSize[historian.constants.WIDTH])
+      .attr('height', this.visSize[historian.constants.HEIGHT]);
 
+  this.zoom.translateExtent(
+      [[0, 0], [this.svgSize[historian.constants.WIDTH], 0]]);
   // Adjust scales and axis.
-  this.xScale = d3.time.scale()
-      .domain(this.xDomain_)
+  this.xScaleUntransformed_
+      .domain(this.xDomain_.map(function(unix) { return new Date(unix); }))
       .range([0, this.visSize[historian.constants.WIDTH]]);
-  this.yScale.range([this.visSize[historian.constants.HEIGHT], 0]);
-  this.rowScale.range([this.visSize[historian.constants.HEIGHT], 0]);
-  // Need to recalculate the row scale to prevent rows from becoming too tall.
-  this.onSeriesChange();
-  // Because the range is modified programatically,
-  // we need to call this.zoom.x again.
-  // However this would reset the scale to 1 and translate to [0, 0],
-  // which would affect further zooming.
-  this.zoom.x(this.xScale);
-  // Note that the container has different width now.
-  // We cannot just re-use our previous scale and translate values.
-  // So we have to compute the new scale and translate based on the
-  // current width.
-  x0 = this.xScale(x0);
-  x1 = this.xScale(x1);
-  var scale = this.visSize[historian.constants.WIDTH] / (x1 - x0);
-  this.zoomScale_ = scale;
-  this.zoomTranslate_ = [-x0 * scale,
-                         this.zoomTranslate_[historian.constants.HEIGHT]];
-  this.zoom.translate(this.zoomTranslate_);
-  this.zoom.scale(this.zoomScale_);
-
-  this.xAxis_.scale(this.xScale);
 
   this.clipRect_
       .attr('width', this.visSize[historian.constants.WIDTH])
       .attr('height', this.svgSize[historian.constants.HEIGHT]);
 
-  this.renderAxes_();
-  this.redrawTicks_();
+  this.yScale.range([this.visSize[historian.constants.HEIGHT], 0]);
+  this.rowScale.range([this.visSize[historian.constants.HEIGHT], 0]);
+  // Need to recalculate the row scale to prevent rows from becoming too tall.
+  this.onSeriesChange();
+  // Note that the container has different width now.
+  // We cannot just re-use our previous scale and translate values.
+  // So we have to compute the new scale and translate based on the
+  // current width.
+  x0 = this.xScaleUntransformed_(x0);
+  x1 = this.xScaleUntransformed_(x1);
+
+  // If no data is currently being displayed, it doesn't matter if we reset
+  // the zoom translate and scale, and we want to avoid divide by 0 errors.
+  // We still want to re-render the axes and ticks, so don't return early.
+  if (x1 - x0 != 0) {
+    var scale = this.visSize[historian.constants.WIDTH] / (x1 - x0);
+    this.zoomTransform_ = d3.zoomIdentity
+        .translate(-x0 * scale, this.zoomTransform_.y)
+        .scale(scale);
+
+    // This will trigger redrawing the bars, axes and ticks with the
+    // correct xScale.
+    this.zoom.transform(this.svgChart, this.zoomTransform_);
+  }
 };
 
 
@@ -482,7 +560,7 @@ historian.Context.prototype.resize = function() {
  */
 historian.Context.prototype.redrawTicks_ = function() {
   var ticks = this.svg.select('.x.axis')
-      .selectAll('.tick')[0];
+      .selectAll('.tick').nodes();
 
   for (var i = 0; i < ticks.length - 1; i++) {
     var left = ticks[i];
@@ -514,17 +592,20 @@ historian.Context.prototype.msPerPixel = function() {
   var startTime = this.xScale.invert(0);
   var endTime = this.xScale.invert(this.visSize[historian.constants.WIDTH]);
   var ext = endTime - startTime;
-  return Math.round(Number(ext / this.visSize[historian.constants.WIDTH]));
+  return ext / this.visSize[historian.constants.WIDTH];
 };
 
 
 /**
  * Returns the start and end time of the currently viewable time range.
- * @return {{start: number, end: number}}
+ * @return {!historian.historianV2Logs.Extent}
  */
 historian.Context.prototype.getViewableTimeRange = function() {
+  // The actual domain of the x-axis is the xExtent plus a margin, so ensure
+  // we don't include points that solely lie in the margin outside the graph.
   return {
-    start: this.xScale.invert(0),
-    end: this.xScale.invert(this.visSize[historian.constants.WIDTH])
+    min: Math.max(this.xExtent_.min, this.xScale.invert(0)),
+    max: Math.min(this.xExtent_.max,
+        this.xScale.invert(this.visSize[historian.constants.WIDTH]))
   };
 };

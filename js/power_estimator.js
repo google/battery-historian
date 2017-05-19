@@ -80,45 +80,45 @@ var avgCurrent = function(mah, ms) {
  * consumed by a wakeup reason, the power consumed by each running event
  * corresponding to the wakeup reason are added together.
  * The power for a single running event is calculated by finding overlapping
- * powermonitor events.
+ * power monitor events.
  */
 var Estimator = goog.defineClass(null, {
   /**
    * @param {!Array<!historian.AggregatedEntry>} runningEvents Running events
    *     which are non overlapping and sorted by startTime in ascending order.
-   * @param {!Array<!historian.Entry>} powermonitorEvents Powermonitor events
+   * @param {!Array<!historian.Entry>} powerMonitorEvents Power monitor events
    *     which are non overlapping and sorted by startTime in ascending order.
    * @param {?jQuery} container The panel body container for the power
    *     statistics.
    * @constructor
    * @final
    */
-  constructor: function(runningEvents, powermonitorEvents, container) {
+  constructor: function(runningEvents, powerMonitorEvents, container) {
 
     /**
-     * Running events that lie in the range of the powermonitor events.
+     * Running events that lie in the range of the power monitor events.
      * @private {!Array<!historian.AggregatedEntry>}
      */
-    this.runningEvents_ = powermonitorEvents.length == 0 ?
+    this.runningEvents_ = powerMonitorEvents.length == 0 ?
         [] : utils.inTimeRange(
-            powermonitorEvents[0].startTime,
-            powermonitorEvents[powermonitorEvents.length - 1].endTime,
+            powerMonitorEvents[0].startTime,
+            powerMonitorEvents[powerMonitorEvents.length - 1].endTime,
             runningEvents);
 
     /** @private {!Array<!historian.Entry>} */
-    this.powermonitorEvents_ = powermonitorEvents;
+    this.powerMonitorEvents_ = powerMonitorEvents;
 
     /**
      * Map from wakeup reason to an array of power estimator events, sorted
      * by start time.
      * Each power estimator event contains the original running event and
-     * powermonitor events associated with the running event.
-     * Populated in matchPowermonitorEvents.
+     * power monitor events associated with the running event.
+     * Populated in matchPowerMonitorEvents.
      * @private {!Object<!Array<!Event>>}
      */
     this.wakeupReasonToEventsMap_ = {};
 
-    this.matchPowermonitorEvents_();
+    this.matchPowerMonitorEvents_();
     if (container) {
       this.renderStats_(container);
     }
@@ -204,16 +204,16 @@ var Estimator = goog.defineClass(null, {
 
   /**
    * Populates the mapping with power events. Each power stat event contains
-   * a running event. Powermonitor events which overlap in the same time period
+   * a running event. Power monitor events which overlap in the same time period
    * as the running event are added to the corresponding power stat event.
    * @private
    */
-  matchPowermonitorEvents_: function() {
-    if (this.powermonitorEvents_.length == 0) {
+  matchPowerMonitorEvents_: function() {
+    if (this.powerMonitorEvents_.length == 0) {
       return;
     }
 
-    var powermonitorIdx = 0;
+    var powerMonitorIdx = 0;
     this.runningEvents_.forEach(function(running, runningIdx) {
       // Each running event can have multiple wakeup reasons, only consider the
       // non abort wakeups.
@@ -223,95 +223,95 @@ var Estimator = goog.defineClass(null, {
           this.wakeupReasonToEventsMap_[wakeupReason] || [];
       powerEvents.push(entry);
 
-      // Find the next powermonitor event which intersects with the running
+      // Find the next power monitor event which intersects with the running
       // event.
       var intersects = false;
 
       // We want to count the rising edge before the start of a running event.
       // Track the start index of the last seen increasing edge that started
       // below the base threshold.
-      var risingStartIdx = powermonitorIdx;
-      while (powermonitorIdx < this.powermonitorEvents_.length) {
-        if (powermonitorIdx > 0) {
-          // If the value of the current powermonitor reading is less than the
+      var risingStartIdx = powerMonitorIdx;
+      while (powerMonitorIdx < this.powerMonitorEvents_.length) {
+        if (powerMonitorIdx > 0) {
+          // If the value of the current power monitor reading is less than the
           // previous and is smaller than the base threshold, this signifies
           // the edge is decreasing. Overwrite the saved index with the current
           // index, as it is potentially the start index of the next rising
           // edge.
-          var curValue = this.powermonitorEvents_[powermonitorIdx].value;
-          var prevValue = this.powermonitorEvents_[powermonitorIdx - 1].value;
+          var curValue = this.powerMonitorEvents_[powerMonitorIdx].value;
+          var prevValue = this.powerMonitorEvents_[powerMonitorIdx - 1].value;
 
           if ((curValue < MAX_STANDBY_CURRENT) && (curValue < prevValue)) {
-            risingStartIdx = powermonitorIdx;
+            risingStartIdx = powerMonitorIdx;
           }
         }
         intersects = hasIntersection(running,
-            this.powermonitorEvents_[powermonitorIdx]);
+            this.powerMonitorEvents_[powerMonitorIdx]);
         // Since the events are sorted in ascending order, there is no point
-        // in searching further if the current powermonitor event starts after
+        // in searching further if the current power monitor event starts after
         // the current running event.
         if (intersects ||
-            this.powermonitorEvents_[powermonitorIdx]
+            this.powerMonitorEvents_[powerMonitorIdx]
                 .startTime > running.endTime) {
           break;
         }
-        powermonitorIdx++;
+        powerMonitorIdx++;
       }
-      // If no intersecting powermonitor event was found, move on to the next
+      // If no intersecting power monitor event was found, move on to the next
       // running event.
       if (!intersects) {
         return;
       }
 
-      // Add the powermonitor events for the rising edge before the running
+      // Add the power monitor events for the rising edge before the running
       // event.
-      while (risingStartIdx < powermonitorIdx) {
-        entry.addPowermonitorEvent(this.powermonitorEvents_[risingStartIdx]);
+      while (risingStartIdx < powerMonitorIdx) {
+        entry.addPowerMonitorEvent(this.powerMonitorEvents_[risingStartIdx]);
         risingStartIdx++;
       }
 
-      // Add all overlapping powermonitor events. The current event at index
-      // powermonitorIdx is guaranteed to intersect at this point.
+      // Add all overlapping power monitor events. The current event at index
+      // powerMonitorIdx is guaranteed to intersect at this point.
       do {
-        entry.addPowermonitorEvent(this.powermonitorEvents_[powermonitorIdx]);
-        powermonitorIdx++;
-      } while ((powermonitorIdx < this.powermonitorEvents_.length) &&
-          hasIntersection(running, this.powermonitorEvents_[powermonitorIdx]));
+        entry.addPowerMonitorEvent(this.powerMonitorEvents_[powerMonitorIdx]);
+        powerMonitorIdx++;
+      } while ((powerMonitorIdx < this.powerMonitorEvents_.length) &&
+          hasIntersection(running, this.powerMonitorEvents_[powerMonitorIdx]));
 
       var nextRunning = (runningIdx + 1 < this.runningEvents_.length) ?
           this.runningEvents_[runningIdx + 1] : null;
 
       // We want to count the falling edge after the end of a running event.
-      // Add all powermonitor events that are larger than the base threshold.
-      while ((powermonitorIdx < this.powermonitorEvents_.length) &&
-          (this.powermonitorEvents_[powermonitorIdx].value > MAX_STANDBY_CURRENT)) {
+      // Add all power monitor events that are larger than the base threshold.
+      while ((powerMonitorIdx < this.powerMonitorEvents_.length) &&
+          (this.powerMonitorEvents_[powerMonitorIdx].value > MAX_STANDBY_CURRENT)) {
         // Stop if an intersection is found with the next wakeup event.
-        var curPowermonitor = this.powermonitorEvents_[powermonitorIdx];
-        if (nextRunning && hasIntersection(nextRunning, curPowermonitor)) {
+        var curPowerMonitor = this.powerMonitorEvents_[powerMonitorIdx];
+        if (nextRunning && hasIntersection(nextRunning, curPowerMonitor)) {
           break;
         }
-        entry.addPowermonitorEvent(curPowermonitor);
-        powermonitorIdx++;
+        entry.addPowerMonitorEvent(curPowerMonitor);
+        powerMonitorIdx++;
       }
 
-      // Add all powermonitor events until the end of the falling edge.
-      // At least one event intersected, so powermonitorIdx is guaranteed
+      // Add all power monitor events until the end of the falling edge.
+      // At least one event intersected, so powerMonitorIdx is guaranteed
       // to be at least one.
-      while ((powermonitorIdx < this.powermonitorEvents_.length) &&
-          (this.powermonitorEvents_[powermonitorIdx].value <
-           this.powermonitorEvents_[powermonitorIdx - 1].value)) {
+      while ((powerMonitorIdx < this.powerMonitorEvents_.length) &&
+          (this.powerMonitorEvents_[powerMonitorIdx].value <
+           this.powerMonitorEvents_[powerMonitorIdx - 1].value)) {
         // Stop if an intersection is found with the next wakeup event.
-        var curPowermonitor = this.powermonitorEvents_[powermonitorIdx];
-        if (nextRunning && hasIntersection(nextRunning, curPowermonitor)) {
+        var curPowerMonitor = this.powerMonitorEvents_[powerMonitorIdx];
+        if (nextRunning && hasIntersection(nextRunning, curPowerMonitor)) {
           break;
         }
-        entry.addPowermonitorEvent(curPowermonitor);
-        powermonitorIdx++;
+        entry.addPowerMonitorEvent(curPowerMonitor);
+        powerMonitorIdx++;
       }
 
-      // Multiple running events can overlap with the same powermonitor event,
+      // Multiple running events can overlap with the same power monitor event,
       // so backtrack one index here.
-      powermonitorIdx--;
+      powerMonitorIdx--;
     }, this);
   },
 
@@ -431,10 +431,10 @@ var Estimator = goog.defineClass(null, {
       }, 0);
     }
 
-    var totalEnergy = utils.calculateTotalCharge(this.powermonitorEvents_);
-    var totalTime = (this.powermonitorEvents_.length == 0) ? 0 :
-        this.powermonitorEvents_[this.powermonitorEvents_.length - 1].endTime -
-        this.powermonitorEvents_[0].startTime;
+    var totalEnergy = utils.calculateTotalCharge(this.powerMonitorEvents_);
+    var totalTime = (this.powerMonitorEvents_.length == 0) ? 0 :
+        this.powerMonitorEvents_[this.powerMonitorEvents_.length - 1].endTime -
+        this.powerMonitorEvents_[0].startTime;
 
     var suspendTime = totalTime - wakeupTime;
     var suspendEnergy = totalEnergy - wakeupEnergy;
@@ -451,7 +451,7 @@ var Estimator = goog.defineClass(null, {
   },
 
   /**
-   * Renders wakeup statistics generated from running and powermonitor events.
+   * Renders wakeup statistics generated from running and power monitor events.
    * @param {!jQuery} container Container to render stats in.
    */
   renderStats_: function(container) {
@@ -530,7 +530,7 @@ Estimator.WakeupStatsTable;
 /**
  * Overall wakeup and suspend statistics.
  *
- * suspendTime:       total duration in suspend with powermonitor events.
+ * suspendTime:       total duration in suspend with power monitor events.
  * wakeupTime:        total duration for wakeup power events.
  * suspendEnergy:     total energy (mAh) consumed while in suspend.
  * wakeupEnergy:      total energy (mAh) consumed by all wakeup power events.

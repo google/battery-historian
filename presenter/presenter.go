@@ -67,18 +67,19 @@ type AppStat struct {
 
 // HTMLData is the main structure passed to the frontend HTML template containing all analysis items.
 type HTMLData struct {
-	SDKVersion      int
-	DeviceID        string
-	DeviceModel     string
-	Historian       template.HTML
-	Count           int
-	UnplugSummaries []UnplugSummary
-	CheckinSummary  aggregated.Checkin
-	Error           string
-	Warning         string
-	Filename        string
-	AppStats        []AppStat
-	Overflow        bool
+	SDKVersion             int
+	DeviceID               string
+	DeviceModel            string
+	Historian              template.HTML
+	Count                  int
+	UnplugSummaries        []UnplugSummary
+	CheckinSummary         aggregated.Checkin
+	Error                  string
+	Warning                string
+	Filename               string
+	AppStats               []AppStat
+	Overflow               bool
+	HasBatteryStatsHistory bool
 }
 
 // CombinedCheckinSummary is the combined structure for the 2 files being compared
@@ -822,7 +823,9 @@ func decodeWakeupReasons(c *aggregated.Checkin) ([]string, []error) {
 }
 
 // Data returns a single structure (HTMLData) containing aggregated battery stats in html format.
-func Data(meta *bugreportutils.MetaInfo, fname string, summaries []parseutils.ActivitySummary, checkinOutput *bspb.BatteryStats, historianOutput string, warnings []string, errs []error, overflow bool) HTMLData {
+func Data(meta *bugreportutils.MetaInfo, fname string, summaries []parseutils.ActivitySummary,
+	checkinOutput *bspb.BatteryStats, historianOutput string,
+	warnings []string, errs []error, overflow, hasBatteryStatsHistory bool) HTMLData {
 	var output []UnplugSummary
 	ch := aggregated.ParseCheckinData(checkinOutput)
 	w, e := decodeWakeupReasons(&ch)
@@ -896,17 +899,18 @@ func Data(meta *bugreportutils.MetaInfo, fname string, summaries []parseutils.Ac
 	}
 
 	return HTMLData{
-		DeviceID:        meta.DeviceID,
-		SDKVersion:      meta.SdkVersion,
-		DeviceModel:     meta.ModelName,
-		Historian:       template.HTML(historianOutput),
-		Filename:        fname,
-		Count:           len(output),
-		UnplugSummaries: output,
-		CheckinSummary:  ch,
-		Error:           historianutils.ErrorsToString(errs),
-		Warning:         strings.Join(warnings, "\n"),
-		AppStats:        parseAppStats(checkinOutput, meta.Sensors),
-		Overflow:        overflow,
+		DeviceID:               meta.DeviceID,
+		SDKVersion:             meta.SdkVersion,
+		DeviceModel:            meta.ModelName,
+		Historian:              template.HTML(historianOutput),
+		Filename:               fname,
+		Count:                  len(output),
+		UnplugSummaries:        output,
+		CheckinSummary:         ch,
+		Error:                  historianutils.ErrorsToString(errs),
+		Warning:                strings.Join(warnings, "\n"),
+		AppStats:               parseAppStats(checkinOutput, meta.Sensors),
+		Overflow:               overflow,
+		HasBatteryStatsHistory: hasBatteryStatsHistory,
 	}
 }

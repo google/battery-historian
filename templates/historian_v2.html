@@ -18,17 +18,33 @@ specific language governing permissions and limitations under the License.
       <select class='configure-metrics'></select>
     </span>
     <span class="settings-section">
-      <label>Show bars</label><input class="show-bars" type="checkbox" checked>
+      <label>Show bars<input class="show-bars" type="checkbox" checked></label>
+    </span>
+    <span class="settings-section settings-right">
+      <select class="line-overlay-metrics"></select>
+    </span>
+    <span class="settings-section settings-right">
+      <label>Show rate of change<input class="show-rate-of-change" type="checkbox"></label>
+    </span>
+    <span class="settings-section center">
+     <label>Restrict domain<select class="set-domain"></select></label>
     </span>
     <span class="settings-section">
-      <label>Show level summaries</label><input class="show-level-summary" type="checkbox" checked>
+      <label>Regexp search<input name="regexp-search" type="text"></label>
     </span>
-    <span class="settings-section">
-      <label>Show line overlay</label><input class="show-line-overlay" type="checkbox" checked>
-    </span>
-    <span class="settings-section">
-      <label>Show rate of change</label><input class="show-rate-of-change" type="checkbox">
-    </span>
+    <button type="button" class="btn btn-default btn-sm settings-button">
+      <span class="glyphicon glyphicon-cog" aria-hidden="true"></span>
+      <div class="settings-overflow">
+         <a href="#" class="show-level-summary">
+           <span class="glyphicon glyphicon-ok glyphicon-inline-left settings-checkbox"></span>
+           <span>Show level summaries</span>
+         </a>
+         <a href="#" class="filter-unimportant" title="Filter out events considered insignificant, such as locks with short duration.">
+           <span class="glyphicon glyphicon-ok glyphicon-inline-left settings-checkbox"></span>
+           <span>Filter unimportant</span>
+         </a>
+      </div>
+    </button>
   </div>
   <div class="graph"></div>
   <!-- The graph div is cleared and redrawn on several occasions, so put the default

@@ -276,6 +276,15 @@ historian.appstats.displayAppNetworkInfo = function(network, wifi,
             historian.utils.describeBytes(mobileRx),
             historian.utils.describeBytes(mobileTx))
       ]);
+      var mobileRxBg = network.mobile_bytes_bg_rx || 0;
+      var mobileTxBg = network.mobile_bytes_bg_tx || 0;
+      bodyRows.push([
+        'Mobile data transferred in the background',
+        goog.string.subs('%s total (%s received, %s transmitted)',
+            historian.utils.describeBytes(mobileRxBg + mobileTxBg),
+            historian.utils.describeBytes(mobileRxBg),
+            historian.utils.describeBytes(mobileTxBg))
+      ]);
       var wifiRx = network.wifi_bytes_rx || 0;
       var wifiTx = network.wifi_bytes_tx || 0;
       bodyRows.push([
@@ -285,6 +294,15 @@ historian.appstats.displayAppNetworkInfo = function(network, wifi,
             historian.utils.describeBytes(wifiRx),
             historian.utils.describeBytes(wifiTx))
       ]);
+      var wifiRxBg = network.wifi_bytes_bg_rx || 0;
+      var wifiTxBg = network.wifi_bytes_bg_tx || 0;
+      bodyRows.push([
+        'Wifi data transferred in the background',
+        goog.string.subs('%s total (%s received, %s transmitted)',
+            historian.utils.describeBytes(wifiRxBg + wifiTxBg),
+            historian.utils.describeBytes(wifiRxBg),
+            historian.utils.describeBytes(wifiTxBg))
+      ]);
       bodyRows.push([
         'Mobile packets transferred',
         goog.string.subs('%s total (%s received, %s transmitted)',
@@ -292,10 +310,22 @@ historian.appstats.displayAppNetworkInfo = function(network, wifi,
             network.mobile_packets_rx, network.mobile_packets_tx)
       ]);
       bodyRows.push([
+        'Mobile packets transferred in the background',
+        goog.string.subs('%s total (%s received, %s transmitted)',
+            network.mobile_packets_bg_rx + network.mobile_packets_bg_tx,
+            network.mobile_packets_bg_rx, network.mobile_packets_bg_tx)
+      ]);
+      bodyRows.push([
         'Wifi packets transferred',
         goog.string.subs('%s total (%s received, %s transmitted)',
             network.wifi_packets_rx + network.wifi_packets_tx,
             network.wifi_packets_rx, network.wifi_packets_tx)
+      ]);
+      bodyRows.push([
+        'Wifi packets transferred in the background',
+        goog.string.subs('%s total (%s received, %s transmitted)',
+            network.wifi_packets_bg_rx + network.wifi_packets_bg_tx,
+            network.wifi_packets_bg_rx, network.wifi_packets_bg_tx)
       ]);
       var row = [
         'Mobile active time',
@@ -341,11 +371,26 @@ historian.appstats.displayAppNetworkInfo = function(network, wifi,
         // we can be smarter about showing this value.
         bodyRows.push(['Wifi scan count', wifi.scan_count]);
       }
-      bodyRows.push([
-        'Wifi scan time',
-        wifi.scan_time_msec ?
-            historian.time.formatDuration(wifi.scan_time_msec) : ''
-      ]);
+      if (historian.reportVersion >= 21) {
+        bodyRows.push(['Wifi background scan count', wifi.scan_count_bg]);
+
+        // Show the user the total time instead of the split time.
+        bodyRows.push([
+          'Wifi scan time',
+          wifi.scan_actual_time_msec ?
+              historian.time.formatDuration(wifi.scan_actual_time_msec) : ''
+        ]);
+      } else {
+        bodyRows.push([
+          {
+            value: 'Wifi scan time',
+            title: 'Scan time split among apps performing wifi scans at the ' +
+                'same time.',
+          },
+          wifi.scan_time_msec ?
+              historian.time.formatDuration(wifi.scan_time_msec) : ''
+        ]);
+      }
       if (historian.reportVersion >= 14 && historian.reportVersion < 17) {
         // These fields were deprecated in report version 17.
         bodyRows.push([
@@ -405,7 +450,7 @@ historian.appstats.displayAppNetworkInfo = function(network, wifi,
  *
  * @param {!Array<batterystats.BatteryStats.App.Process>} processes
  *     the list of processes in the app proto
- * @param {!Array<batterystats.BatteryStats.App.StateTime>} states
+ * @param {!batterystats.BatteryStats.App.StateTime} states
  *     info on the process states for the app
  */
 historian.appstats.displayAppProcess = function(processes, states) {
@@ -419,49 +464,54 @@ historian.appstats.displayAppProcess = function(processes, states) {
 
     if (states && historian.reportVersion >= 17) {
       var bodyRows = [];
-      bodyRows.push([
-        {
-          value: 'Time spent running actively in the foreground',
-          title: 'This does not include time running as top, top sleeping,' +
-              ' or with a service in the foreground'
-        },
-        historian.time.formatDuration(states.foreground_time_msec)
-      ]);
-      bodyRows.push([
-        {
-          value: 'Time spent with a service running in the foreground'
-        },
-        historian.time.formatDuration(states.foreground_service_time_msec)
-      ]);
-      bodyRows.push([
-        {
-          value: 'Time spent on top',
-          title: 'The app would be visible to the user'
-        },
-        historian.time.formatDuration(states.top_time_msec)
-      ]);
-      bodyRows.push([
-        {
-          value: 'Time spent on top while the device was sleeping',
-          title: 'Sleeping is mostly screen off, but also includes the the' +
-              ' time when the screen is on but the device has not yet been' +
-              ' unlocked.'
-        },
-        historian.time.formatDuration(states.top_sleeping_time_msec)
-      ]);
-      bodyRows.push([
-        {
-          value: 'Time spent running actively in the background'
-        },
-        historian.time.formatDuration(states.background_time_msec)
-      ]);
-      bodyRows.push([
-        {
-          value: 'Time spent cached',
-          title: 'There was some process running'
-        },
-        historian.time.formatDuration(states.cached_time_msec)
-      ]);
+      if (states.top_time_msec) {
+        bodyRows.push([
+          {
+            value: 'Time spent on top',
+            title: 'The app would be visible to the user'
+          },
+          historian.time.formatDuration(states.top_time_msec)
+        ]);
+      }
+      if (states.foreground_service_time_msec) {
+        bodyRows.push([
+          'Time spent with a service running in the foreground',
+          historian.time.formatDuration(states.foreground_service_time_msec)
+        ]);
+      }
+      if (states.top_sleeping_time_msec) {
+        bodyRows.push([
+          {
+            value: 'Time spent on top while the device was sleeping',
+            title: 'Sleeping is mostly screen off, but also includes the the' +
+                ' time when the screen is on but the device has not yet been' +
+                ' unlocked.'
+          },
+          historian.time.formatDuration(states.top_sleeping_time_msec)
+        ]);
+      }
+      if (states.foreground_time_msec) {
+        bodyRows.push([
+          {
+            value: 'Time spent running actively in the foreground',
+            title: 'This does not include time running as top, top sleeping,' +
+                ' or with a service in the foreground'
+          },
+          historian.time.formatDuration(states.foreground_time_msec)
+        ]);
+      }
+      if (states.background_time_msec) {
+        bodyRows.push([
+          'Time spent running actively in the background',
+          historian.time.formatDuration(states.background_time_msec)
+        ]);
+      }
+      if (states.cached_time_msec) {
+        bodyRows.push([
+          {value: 'Time spent cached', title: 'There was some process running'},
+          historian.time.formatDuration(states.cached_time_msec)
+        ]);
+      }
 
       var table = historian.tables.createTable(null, bodyRows)
           .addClass('no-paging no-ordering no-info no-searching no-header');
@@ -719,12 +769,22 @@ historian.appstats.displayAppWakelock = function(wakelocks) {
     // full count, partial count, and window count.
     wakelocks.sort(function(a, b) {
       return b.full_time_msec - a.full_time_msec ||
+             b.partial_total_duration_msec - a.partial_total_duration_msec ||
              b.partial_time_msec - a.partial_time_msec ||
              b.window_time_msec - a.window_time_msec ||
              b.full_count - a.full_count ||
              b.partial_count - a.partial_count ||
              b.window_count - a.window_count;
     });
+
+    var partialTimeHeader = 'Minimum total partial Time';
+    var partialTimeTitle = 'Lower bound of the total time held holding a ' +
+        'partial wake lock';
+    if (historian.reportVersion >= 21) {
+      // Partial total time is available.
+      partialTimeHeader = 'Total Partial Time';
+      partialTimeTitle = 'Total time held holding the partial wake lock';
+    }
 
     var headRow = [
       'Wakelock Name',
@@ -738,8 +798,8 @@ historian.appstats.displayAppWakelock = function(wakelocks) {
         title: 'Number of full wake locks held'
       },
       {
-        value: 'Partial Time',
-        title: 'Time held holding a partial wake lock',
+        value: partialTimeHeader,
+        title: partialTimeTitle,
         classes: 'duration'
       },
       {
@@ -756,21 +816,44 @@ historian.appstats.displayAppWakelock = function(wakelocks) {
         title: 'Number of window wake locks held'
       }
     ];
+
     var bodyRows = [];
     for (var i = 0; i < wakelocks.length; i++) {
       var w = wakelocks[i];
-      bodyRows.push([
+      var pt = w.partial_time_msec ?
+          historian.time.formatDuration(w.partial_time_msec) : '';
+      if (historian.reportVersion >= 20) {
+        var cur = w.partial_current_duration_msec ?
+            goog.string.subs(
+                '\nDuration of wakelock held when the report was taken: %s',
+                historian.time.formatDuration(
+                    w.partial_current_duration_msec)) : '';
+        var maxFormat = w.partial_max_duration_msec ?
+            historian.time.formatDuration(w.partial_max_duration_msec) : '';
+        var ptVal = w.partial_max_duration_msec > w.partial_time_msec ?
+            maxFormat : pt;
+        if (historian.reportVersion >= 21) {
+          // Partial total time is available.
+          ptVal = historian.time.formatDuration(w.partial_total_duration_msec || 0);
+        }
+        pt = {
+          value: ptVal,
+          title: goog.string.subs(
+              'Longest individual wakelock duration: %s%s', maxFormat, cur)
+        };
+      }
+      var row = [
         w.name,
         w.full_time_msec ?
             historian.time.formatDuration(w.full_time_msec) : '',
         w.full_count,
-        w.partial_time_msec ?
-            historian.time.formatDuration(w.partial_time_msec) : '',
+        pt,
         w.partial_count,
         w.window_time_msec ?
             historian.time.formatDuration(w.window_time_msec) : '',
         w.window_count
-      ]);
+      ];
+      bodyRows.push(row);
     }
     var table = historian.tables.createTable(headRow, bodyRows);
     $('#appWakelock').empty().append(table);
@@ -834,6 +917,9 @@ historian.appstats.displayApp = function(appUid) {
 
   var bodyRows = [];
   bodyRows.push(['Application', app.RawStats.name]);
+  if (app.RawStats.version_name) {
+    bodyRows.push(['Version Name', app.RawStats.version_name]);
+  }
   bodyRows.push(['Version Code', app.RawStats.version_code]);
   bodyRows.push(['UID', app.RawStats.uid]);
 

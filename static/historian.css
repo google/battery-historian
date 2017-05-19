@@ -21,7 +21,7 @@
 }
 
 .axis text {
-  font-size: .9em;
+  font-size: 1.2em;
 }
 
 .axis path {
@@ -52,8 +52,23 @@
   stroke: black;
 }
 
-.level-highlighted {
+.level-event-marker-line {
+  pointer-events: none;
+  stroke: black;
+  stroke-dasharray: 5, 5;
+  stroke-width: 1;
+}
+
+.level-event-marker-line.overflow {
   stroke: red;
+}
+
+.level-event-marker-label {
+  font-size: .60em;
+  text-anchor: end;
+}
+
+.level-highlighted {
   stroke-width: 4;
 }
 
@@ -61,13 +76,15 @@
   text-anchor: end;
 }
 
-.level-legend rect {
-  fill: black;
-}
-
 .level-line {
   stroke: black;
   stroke-width: 3;
+  fill: none;
+}
+
+.level-line-connector {
+  stroke: black;
+  stroke-width: 1;
   fill: none;
 }
 
@@ -125,6 +142,17 @@ rect.level-summary {
   text-anchor: end;
 }
 
+.series-label:not(.heading) {
+  cursor: pointer;
+}
+
+.series-label.heading {
+  fill: blue;
+  font-size: 1.1em;
+  font-weight: bold;
+  text-anchor: start;
+}
+
 .series-label.unreliable {
   fill: grey;
 }
@@ -157,10 +185,6 @@ table.values-table td {
   height: auto;
   max-height: 500px;
   overflow-x: hidden;
-}
-
-.selectable-level-metric {
-  cursor: pointer;
 }
 
 rect.bar, circle.bar {
@@ -223,21 +247,22 @@ rect.bar:hover, circle.bar:hover {
   color: darkred;
 }
 
-.historian-v2.settings .settings-section, #historian-v2 .settings-section label {
+.historian-v2.settings .settings-section, .historian-v2.settings .settings-section label {
   margin-right: 5px;
+}
+
+.historian-v2.settings .settings-section label input,
+.historian-v2.settings .settings-section .select2-container.set-domain {
+  margin-left: 4px;
+}
+
+.historian-v2.settings .settings-section label:hover {
+  background-color: #BDECB6;
+  cursor: pointer;
 }
 
 .historian-v2.settings {
   font-size: 0.9em;
-}
-
-.historian-v2.settings input[type="number"] {
-  display: inline;
-  font-size: 1em;
-  height: auto;
-  padding: 0px;
-  text-align: center;
-  width: 40px;
 }
 
 .legend-item {
@@ -245,4 +270,74 @@ rect.bar:hover, circle.bar:hover {
   height: 10px;
   margin-right: 8px;
   width: 10px;
+}
+
+.legend-item.circle {
+  border-radius: 50%;
+}
+
+.highlighted-cell {
+  background-color: #FFB6C1;
+}
+
+#copy span {
+  float: left;
+  font-weight: bold;
+  width: 50px;
+}
+
+#copy textarea {
+  margin-top: 5px;
+  max-height: 500px;
+  max-width: 1000px;
+  white-space: pre;
+}
+
+.offscreen {
+  right: 10000px;
+  position: absolute;
+  visibility: hidden;
+  white-space: pre;
+}
+
+.settings-section.center {
+  margin-left: 70px;
+}
+
+.settings-section.settings-right {
+  float: right;
+  margin-left: 5px;
+  margin-right: 0;
+}
+
+.settings-button {
+  position: relative;
+}
+
+.settings-overflow {
+  background-color: #f9f9f9;
+  box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.2);
+  display: none;
+  position: absolute;
+  z-index: 1;
+}
+
+.settings-overflow.show {
+  display: block;
+}
+
+.settings-overflow a {
+  color: black;
+  display: block;
+  padding: 10px 14px;
+  text-align: left;
+  text-decoration: none;
+}
+
+.settings-overflow a:hover {
+  background-color: #f1f1f1;
+}
+
+.graph.faded .bar {
+  opacity: 0.4;
 }

@@ -39,6 +39,7 @@ goog.provide('historian.data');
 goog.provide('historian.data.ClusterEntry');
 goog.provide('historian.data.ClusterEntryValue');
 
+goog.require('goog.array');
 goog.require('goog.asserts');
 goog.require('historian.LevelConfigs');
 goog.require('historian.LevelSummaryData');
@@ -47,7 +48,9 @@ goog.require('historian.historianV2Logs');
 goog.require('historian.metrics');
 goog.require('historian.metrics.Csv');
 goog.require('historian.metrics.DataHasher');
+goog.require('historian.sysui');
 goog.require('historian.time');
+goog.require('historian.utils');
 
 
 /**
@@ -66,7 +69,10 @@ goog.require('historian.time');
  *   endTime: number,
  *   value: !historian.Value,
  *   id: (number|undefined),
- *   uid: (number|undefined)
+ *   uid: (number|undefined),
+ *   opt: (string|undefined),
+ *   unknownEndTime: (boolean|undefined),
+ *   duringScreenOff: (boolean|undefined)
  * }}
  */
 historian.Entry;
@@ -84,10 +90,7 @@ historian.Entry;
  * @typedef {{
  *   startTime: number,
  *   endTime: number,
- *   pid: number,
- *   process: string,
- *   uid: number,
- *   component: string
+ *   logLine: string,
  * }}
  */
 historian.AMProcValue;
@@ -120,7 +123,7 @@ historian.CPUUsage;
 /**
  * A cluster entry can hold several values. These are all the possible types
  * those values can be.
- * @typedef {string|number|!historian.KernelUptimeValue|!historian.AMProcValue|!historian.LPSValue|!historian.CPUUsage}
+ * @typedef {string|number|!historian.KernelUptimeValue|!historian.AMProcValue|!historian.LPSValue|!historian.CPUUsage|!historian.sysui.AppTransition}
  */
 historian.Value;
 
@@ -164,7 +167,8 @@ historian.KernelUptimeValue;
  * @typedef {{
  *   name: string,
  *   index: ?number,
- *   series: !Array<!historian.SeriesData>
+ *   series: !Array<!historian.SeriesData>,
+ *   source: !historian.historianV2Logs.Sources
  * }}
  */
 historian.SeriesGroup;
@@ -175,8 +179,8 @@ historian.SeriesGroup;
  *
  * name: The name of the series.
  * source: Log source the data in the series originated from.
- * type: The type of data for the series (int, bool, string, service, or
- *     summary).
+ * type: The type of data for the series (int, float, bool, string, service,
+ *     group or summary).
  * values: The data points for the series.
  * originalValues: The data points before aggregation. Only populated for
  *     aggregated series.
@@ -225,14 +229,16 @@ historian.TimeToDelta;
  * This data object is used by the historian v2 plot.
  *
  * @typedef {{
- *   nameToBarGroup: !Object<!historian.SeriesGroup>,
+ *   barGroups: !historian.metrics.DataHasher,
  *   nameToLevelGroup: !Object<!historian.SeriesGroup>,
+ *   nameToLineGroup: !Object<!historian.LineGroup>,
  *   nameToSummary: !Object<!Array<!historian.Entry>>,
- *   extent: !Array<number>,
+ *   logToExtent: !Object<historian.historianV2Logs.Extent>,
  *   configs: !historian.LevelConfigs,
  *   defaultLevelMetric: string,
  *   timeToDelta: !historian.TimeToDelta,
- *   location: string
+ *   location: string,
+ *   overflowMs: ?number
  * }}
  */
 historian.HistorianV2Data;
@@ -276,74 +282,113 @@ historian.EntryInfo_;
  * @param {!historian.TimeToDelta} timeToDelta The map from timestamp to human
  *     readable format.
  * @param {string} location The location of the bug report.
- * @param {boolean} displayPowermonitor Whether to display powermonitor data.
+ * @param {boolean} displayPowerMonitor Whether to display power monitor data.
+ * @param {!Object<string>} systemUiDecoder
+ * @param {number=} opt_overflowMs Unix milliseconds of when the overflow
+ *     occurred.
  * @return {historian.HistorianV2Data}
  */
 historian.data.processHistorianV2Data = function(logs, deviceCapacity,
-    timeToDelta, location, displayPowermonitor) {
+    timeToDelta, location, displayPowerMonitor, systemUiDecoder, opt_overflowMs) {
   // The metric to overlay as the level line.
-  var levelMetric = displayPowermonitor ? historian.metrics.Csv.POWERMONITOR :
+  var levelMetric = displayPowerMonitor ? historian.metrics.Csv.POWER_MONITOR :
       historian.metrics.Csv.BATTERY_LEVEL;
 
-  historian.metrics.initMetrics();
+  historian.metrics.initMetrics(systemUiDecoder);
 
   var data = {};
   data.defaultLevelMetric = levelMetric;
   data.timeToDelta = timeToDelta;
   data.location = location;
+  data.overflowMs = opt_overflowMs || null;
+  data.logToExtent =
+      /** @type {!Object<historian.historianV2Logs.Extent>} */({});
 
   var entries = [];
 
   logs.forEach(function(log) {
-    entries = entries.concat(d3.csv.parse(log.csv, function(d) {
-      // Boolean entries will only have true as the value, which is not useful.
-      // Use the opt field for bools in case there's extra data attached.
-      var v = d.type == 'bool' ? d.opt : d.value;
-      var seriesName = d.type == historian.metrics.ERROR_TYPE ?
-          historian.metrics.typedMetricName(d.type, d.metric) : d.metric;
+    var newEntries = d3.csvParse(log.csv, function(d) {
+      var seriesName = d['type'] == historian.metrics.ERROR_TYPE ?
+          historian.metrics.typedMetricName(d['type'], d['metric']) :
+          d['metric'];
+
+      var v = d['value'];
+      switch (d['type']) {
+        case 'bool':
+          // Boolean entries will only have true as the value, which is not
+          // useful. Use the opt field for bools in case there's extra data.
+          v = d['opt'];
+          break;
+        case 'int':
+          v = parseInt(v, 10);
+          if (seriesName == historian.metrics.Csv.TEMPERATURE) {
+            // Temperature values are in deciCelcius (1/10 of a Celcius), so
+            // convert to Celcius.
+            v /= 10;
+          }
+          break;
+        case 'float':
+          v = parseFloat(v);
+          break;
+      }
       return {
         seriesName: seriesName,
-        type: d.type,
-        startTime: parseInt(d.start_time, 10),
-        endTime: parseInt(d.end_time, 10),
-        value: d.type == 'int' ? parseInt(v, 10) : v,
+        type: d['type'],
+        startTime: parseInt(d['start_time'], 10),
+        endTime: parseInt(d['end_time'], 10),
+        value: v,
         source: log.source,
-        uid: d.type == 'service' && d.opt != '' ? parseInt(d.opt, 10) : null
+        opt: d['opt'],
+        uid: (d['type'] == 'service' ||
+            seriesName in historian.metrics.appSpecificMetrics) &&
+            d['opt'] != '' ? parseInt(d['opt'], 10) : null
       };
-    }));
-
-    // BATTERY_HISTORY domain takes precedence over the domain of other logs.
-    // If BATTERY_HISTORY is not present, it will be set to the domain of the
-    // first log.
-    if (!data.extent ||
-        log.source == historian.historianV2Logs.Sources.BATTERY_HISTORY) {
-      data.extent = /** @type {!Array<number>} */ (
-          d3.extent(entries, function(d) {
-            return d.startTime;
-          }));
+    });
+    if (newEntries.length == 0) {
+      return;
     }
+    entries = entries.concat(newEntries);
+    var startExtent = d3.extent(newEntries, function(d) {
+      if (d.startTime > 0) {
+        return d.startTime;
+      }  // Else return undefined so d3.extent ignores it.
+    });
+    var endExtent = d3.extent(newEntries, function(d) {
+      if (d.endTime > 0) {
+        return d.endTime;
+      }
+    });
+    data.logToExtent[log.source] = {
+      // If a log start time was passed in, it will be more accurate than the
+      // calculated start extent, as it will account for events not in the CSV.
+      min: log.startMs || startExtent[0] || 0,
+      max: endExtent[1] || 0  // TODO: consider passing log endMs.
+    };
   });
-  if (!data.extent) {
-    // No data.
-    data.extent = [0, 0];
-  }
-
 
   // Separate data into series - each data value is added as an entry into
   // the value array for that series.
   var allSeries = new historian.metrics.DataHasher();
 
+  var groupedLines =
+      /** @type {!Object<!historian.LineGroup>}} */ ({});
   entries.forEach(function(d) {
+    if (d.type == 'group') {
+      groupedLines[d.seriesName + ' [group]'] =
+          {names: d.value.split('|'), desc: d.opt};
+      return;
+    }
     switch (d.seriesName) {
       case historian.metrics.Csv.AM_PROC:
-        var amValue =
-            historian.data.splitAMProcValue_(d.value, d.startTime, d.endTime);
-        d.value = amValue;
-
+        d.value = {
+          startTime: d.startTime,  // Time of AM_PROC_START.
+          endTime: d.endTime,  // Time of corresponding AM_PROC_DIED.
+          logLine: d.value
+        };
         // An AM_PROC_START and AM_PROC_DIED event is created for each AM_PROC
         // event. An unknown start or end time means no start or died event
         // respectively.
-        if (amValue.startTime != historian.constants.UNKNOWN_TIME) {
+        if (d.startTime != historian.constants.UNKNOWN_TIME) {
           // AM_PROC_START and AM_PROC_END are instant events. Each pair of
           // START and END events share the same value, so we clone amValue
           // here. The only difference is the series name, and the event time -
@@ -351,16 +396,14 @@ historian.data.processHistorianV2Data = function(logs, deviceCapacity,
           var startEntry =
               /** @type {!historian.EntryInfo_} */ (jQuery.extend({}, d));
           startEntry.seriesName = historian.metrics.Csv.AM_PROC_START;
-          startEntry.startTime = amValue.startTime;
-          startEntry.endTime = amValue.startTime;
-          historian.data.addEntry(allSeries, startEntry);
+          startEntry.endTime = startEntry.startTime;
+          historian.data.addEntry(allSeries, startEntry, data.logToExtent);
         }
-        if (amValue.endTime != historian.constants.UNKNOWN_TIME) {
+        if (d.endTime != historian.constants.UNKNOWN_TIME) {
           // No need to clone, as we've already cloned for the start event case.
           d.seriesName = historian.metrics.Csv.AM_PROC_DIED;
-          d.startTime = amValue.endTime;
-          d.endTime = amValue.endTime;
-          historian.data.addEntry(allSeries, d);
+          d.startTime = d.endTime;
+          historian.data.addEntry(allSeries, d, data.logToExtent);
         }
         return;  // Already added entries, so can return early.
       case historian.metrics.Csv.LOW_POWER_STATE:
@@ -370,11 +413,11 @@ historian.data.processHistorianV2Data = function(logs, deviceCapacity,
         d.value = historian.data.splitCPUUsage_(d.value);
         break;
     }
-    historian.data.addEntry(allSeries, d);
+    historian.data.addEntry(allSeries, d, data.logToExtent);
   });
 
-  var running = allSeries.getBatteryHistorySeries(
-      historian.metrics.Csv.CPU_RUNNING);
+  var running = /** @type {!historian.SeriesData} */ (
+      allSeries.getBatteryHistoryData(historian.metrics.Csv.CPU_RUNNING));
   if (running) {
     // Each running entry can have multiple wakeup reasons as its value.
     // For each entry, convert the multiple value string into an array.
@@ -394,10 +437,38 @@ historian.data.processHistorianV2Data = function(logs, deviceCapacity,
     allSeries.add(kernelUptimeSeries);
   }
 
-  /** @type {!Object<!historian.SeriesGroup>} */
-  var barGroups = {};
-  /** @type {!Object<!historian.SeriesGroup>} */
-  var levelGroups = {};
+  var sysuiAction = allSeries.get(historian.historianV2Logs.Sources.EVENT_LOG,
+      historian.metrics.Csv.SYSUI_ACTION);
+  if (sysuiAction) {
+    sysuiAction.values.sort(compareEntries);
+    var transitions = historian.data.extractAppTransitions(sysuiAction.values);
+    if (transitions.length > 0) {
+      allSeries.add({
+        name: historian.metrics.Csv.APP_TRANSITIONS,
+        source: historian.historianV2Logs.Sources.EVENT_LOG,
+        type: 'service',
+        values: transitions,
+        cluster: true
+      });
+    }
+  }
+
+  var powerMonitor = allSeries.get(
+      historian.historianV2Logs.Sources.POWER_MONITOR,
+      historian.metrics.Csv.POWER_MONITOR);
+  if (powerMonitor) {
+    var powerEntries = historian.utils.calculateCumulativeChargeEntries(
+        powerMonitor.values, 3);
+    allSeries.add({
+      name: historian.metrics.Csv.POWER_MONITOR_MAH,
+      source: historian.historianV2Logs.Sources.GENERATED,
+      type: 'float',
+      values: powerEntries,
+      cluster: true
+    });
+  }
+
+  var barGroups = new historian.metrics.DataHasher();
   /** @type {!Object<!Array<!historian.Entry>>} */
   var summaries = {};
 
@@ -418,13 +489,28 @@ historian.data.processHistorianV2Data = function(logs, deviceCapacity,
     // aggregated metric that happens to not have any overlapping
     // entries in that specific bugreport.
     if (!(seriesName in historian.metrics.metricsToAggregate)) {
-      var hasOverlapping = series.values.some(function(cur, i, arr) {
+      var hasOverlapping = false;
+      series.values.forEach(function(cur, i, arr) {
         if (i == arr.length - 1) {
-          return false;
+          return;
         }
         var next = arr[i + 1];
-        return Math.max(cur.startTime, next.startTime) <
-            Math.min(cur.endTime, next.endTime);
+        var overlaps = next.startTime < cur.endTime;
+        if (!overlaps) {
+          return;
+        }
+        if (series.type == 'int' || series.type == 'float' ||
+            series.type == 'string' || series.type == 'bool') {
+          // These metrics represent state and should never overlap.
+          // Sometimes the data gets mangled and they do, in which
+          // case we need to fix it to ensure it displays at all.
+          cur.endTime = next.startTime;
+          // TODO: add some UI indication that the event
+          // is malformed.
+          console.log('Modified ' + series.name + ' entry ' + i + ' end time');
+        } else {
+          hasOverlapping = true;
+        }
       });
       if (hasOverlapping) {
         historian.metrics.metricsToAggregate[series.name] = true;
@@ -435,66 +521,257 @@ historian.data.processHistorianV2Data = function(logs, deviceCapacity,
       // Deep copy the array as aggregateData_ may change the data.
       series.originalValues = /** @type {!Array<!historian.Entry>} */ (
           jQuery.extend(true, [], series.values));
-      series.values = historian.data.aggregateData_(series.values);
+      switch (series.name) {
+        case historian.metrics.Csv.ACTIVE_BROADCAST_BACKGROUND:
+        case historian.metrics.Csv.ACTIVE_BROADCAST_FOREGROUND:
+          // The number of active broadcasts is unbounded (unlike historical
+          // broadcasts which are bounded at 300). Since active broadcasts
+          // span until the end of the bugreport, we should just draw
+          // a single rectangle for the earliest such broadcast and include
+          // all active broadcasts rather than the usual slicing up algorithm.
+          // Since they are already sorted, this will be the first entry.
+          goog.asserts.assert(series.values.length > 0);
+          series.values.forEach(function(entry, i) {
+            entry.id = i;
+          });
+          series.values = [{
+            startTime: series.values[0].startTime,
+            endTime: series.values[0].endTime,
+            services: series.values
+          }];
+          break;
+        default:
+          series.values = historian.data.aggregateData_(series.values);
+      }
     }
     var groupName = seriesName;
     if (series.type == historian.metrics.ERROR_TYPE) {
       groupName = historian.metrics.baseMetric(series.type, seriesName);
     }
-    switch (seriesName) {
-      case historian.metrics.Csv.AM_PROC_START:
-      case historian.metrics.Csv.AM_PROC_DIED:
-        groupName = historian.metrics.Csv.AM_PROC;
-        break;
-      case historian.metrics.Csv.AM_LOW_MEMORY:
-      case historian.metrics.Csv.AM_ANR:
-        groupName = historian.metrics.Csv.AM_LOW_MEMORY_ANR;
-        break;
-      case historian.metrics.Csv.CRASHES:
-      case historian.metrics.Csv.NATIVE_CRASHES:
-        groupName = historian.metrics.Csv.CRASHES;
-        break;
+    var customGroupName = historian.data.getCustomGroupName_(series);
+    var source = series.source;
+    if (customGroupName) {
+      groupName = customGroupName;
+      // Specially defined group with possibly more than one series.
+      source = historian.historianV2Logs.Sources.CUSTOM;
     }
-    if (!(groupName in barGroups)) {
-      var seriesGroup = {
-        name: groupName,
-        series: [],
-        index: null
-      };
-      barGroups[groupName] = seriesGroup;
-      levelGroups[groupName] = seriesGroup;
-    }
-    barGroups[groupName].series.push(series);
+    // Doesn't do anything if the group already exists.
+    barGroups.add({
+      name: groupName,
+      series: [],
+      index: null,
+      source: source
+    });
+    barGroups.get(source, groupName).series.push(series);
   });
-  historian.data.addUnavailableSeries_(data.extent[0], barGroups, logs);
 
-  if (historian.metrics.Csv.BATTERY_LEVEL in barGroups) {
+  if (barGroups.contains(historian.historianV2Logs.Sources.POWER_MONITOR,
+      historian.metrics.Csv.POWER_MONITOR)) {
+    // If there is power monitor data, battery level and coulomb data are invalid.
+    barGroups.delete(historian.historianV2Logs.Sources.BATTERY_HISTORY,
+        historian.metrics.Csv.BATTERY_LEVEL);
+    barGroups.delete(historian.historianV2Logs.Sources.BATTERY_HISTORY,
+        historian.metrics.Csv.COULOMB_CHARGE);
+
+    if (barGroups.contains(historian.historianV2Logs.Sources.POWER_MONITOR,
+        historian.metrics.Csv.POWER_MONITOR_MW)) {
+      groupedLines[historian.metrics.Csv.POWER_MONITOR_MA_MW_GROUP] = {
+        names: [
+          historian.metrics.Csv.POWER_MONITOR,
+          historian.metrics.Csv.POWER_MONITOR_MW
+        ]
+      };
+    }
+
+    if (barGroups.contains(historian.historianV2Logs.Sources.GENERATED,
+        historian.metrics.Csv.POWER_MONITOR_MAH)) {
+      groupedLines[historian.metrics.Csv.POWER_MONITOR_MA_MAH_GROUP] = {
+        names: [
+          historian.metrics.Csv.POWER_MONITOR,
+          historian.metrics.Csv.POWER_MONITOR_MAH
+        ]
+      };
+    }
+  }
+
+  /** @type {!Object<!historian.SeriesGroup>} */
+  var levelGroups = {};
+  // Copy the groups that can be displayed as a level overlay from barGroups.
+  barGroups.getAll().forEach(function(barGroup) {
+    var groupName = barGroup.name;
+    if (!historian.metrics.isSelectableAsLevel(barGroup) &&
+        groupName != historian.metrics.Csv.LOGCAT_MISC) {
+      return;
+    }
+    // The barGroups holds a reference to the same object, so we should
+    // deep clone it so we don't apply barGroup specific processing to it,
+    // such as adding unavailable series.
+    levelGroups[groupName] = /** @type {!historian.SeriesGroup} */ (
+        jQuery.extend(true, {}, barGroup));
+
+    // String metrics can be displayed as a line if we have predefined
+    // the expected values.
+    if (groupName in historian.metrics.expectedStrings) {
+      var expectedValues = historian.metrics.expectedStrings[groupName];
+      var mapping = {};
+      expectedValues.forEach(function(val, idx) {
+        mapping[val] = idx;  // Each string value maps to its array index.
+      });
+      var nextIdx = expectedValues.length;  // For unexpected values we find.
+      levelGroups[groupName].series.forEach(function(series) {
+        if (series.type != 'string') {
+          return;  // The group may have an UNAVAILABLE type series.
+        }
+        series.values.forEach(function(entry) {
+          if (!(entry.value in mapping)) {  // Non-predefined value.
+            console.log(series.name + ' got unknown value: ' + entry.value);
+            // Add it to the original array so we can map back from the number
+            // to readable string value later on.
+            historian.metrics.expectedStrings[groupName].push(
+                /** @type {string} */ (entry.value));
+            mapping[entry.value] = nextIdx;
+            nextIdx++;
+          }
+          entry.value = mapping[entry.value];
+        });
+      });
+      return;
+    }
+    // Bucket the data if necessary. This is only required for non 'int'
+    // metrics, such as AM_PROC.
+    if (!historian.metrics.isBuckettedLevelGroup(groupName)) {
+      return;
+    }
+    var bucketDur = historian.metrics.levelGroupBucketDuration[groupName];
+    levelGroups[groupName].series.forEach(function(series) {
+      var entryTimes = series.values.map(function(entry) {
+        return entry.startTime;
+      });
+      var bucketted = historian.data.bucket(
+          data.logToExtent[series.source].min, entryTimes, bucketDur);
+      var newEntries = [];
+      bucketted.forEach(function(res, idx) {
+        if (idx != 0) {
+          // If there is a time period not covered by a bucket,
+          // create an entry with count zero.
+          var prevEnd = bucketted[idx - 1].bucketMs + bucketDur;
+          if (prevEnd != res.bucketMs) {
+            newEntries.push({
+              startTime: prevEnd,
+              endTime: res.bucketMs,
+              value: 0
+            });
+          }
+        }
+        newEntries.push({
+          startTime: res.bucketMs,
+          endTime: res.bucketMs + bucketDur,
+          value: res.count
+        });
+      });
+      series.values = newEntries;
+    });
+  });
+  var batteryLevelGroup = /** @type {?historian.SeriesGroup} */
+      (barGroups.getBatteryHistoryData(historian.metrics.Csv.BATTERY_LEVEL));
+  if (batteryLevelGroup) {
+    // Create data for the Screen Off Discharge mode.
+    var screenOffDischarge = historian.data.copyGroup_(
+        batteryLevelGroup, historian.metrics.Csv.SCREEN_OFF_DISCHARGE);
+    screenOffDischarge.series[0].values = historian.utils.generateDerivative(
+        screenOffDischarge.series[0].values);
+
+    var screenOnGroup = barGroups.getBatteryHistoryData(
+        historian.metrics.Csv.SCREEN_ON);
+    var screenOnValues = screenOnGroup ? screenOnGroup.series[0].values : [];
+    screenOffDischarge.series[0].values.forEach(function(entry) {
+      entry.duringScreenOff = historian.utils.isMostlyScreenOffEvent(
+          /** @type {!historian.Entry} */ (entry), screenOnValues);
+    });
+    levelGroups[historian.metrics.Csv.SCREEN_OFF_DISCHARGE] =
+        screenOffDischarge;
+
+    var avgGroup = historian.data.copyGroup_(
+        screenOffDischarge, historian.metrics.Csv.SCREEN_OFF_DISCHARGE_AVG);
+    levelGroups[historian.metrics.Csv.SCREEN_OFF_DISCHARGE_AVG] = avgGroup;
+
+    historian.utils.avgByCategory(avgGroup.series[0].values,
+        function(entry) { return entry.duringScreenOff; });
+
+    // Add option to display both metrics at the same time.
+    groupedLines[historian.metrics.Csv.SCREEN_OFF_DISCHARGE_GROUP] = {
+      names: [
+        historian.metrics.Csv.SCREEN_OFF_DISCHARGE,
+        historian.metrics.Csv.SCREEN_OFF_DISCHARGE_AVG
+      ]
+    };
+
     // The data to display bar and level is the same, except for battery level
     // data. This needs to be converted to instant non clustered events.
-    var series = barGroups[historian.metrics.Csv.BATTERY_LEVEL].series[0];
+    var series = batteryLevelGroup.series[0];
     var ticks = historian.data.createTicks_(
         historian.metrics.Csv.BATTERY_LEVEL, series, false);
-
-    barGroups[historian.metrics.Csv.BATTERY_LEVEL] = {
-      name: series.name,
-      index: null,
-      series: [ticks]
-    };
+    batteryLevelGroup.series = [ticks];
   }
-  var powermonitorData = levelGroups[historian.metrics.Csv.POWERMONITOR] ?
-      levelGroups[historian.metrics.Csv.POWERMONITOR].series[0].values : [];
-  if (powermonitorData.length > 0) {
-    // If there is powermonitor data, battery level and coulomb data are
-    // invalid.
-    delete barGroups[historian.metrics.Csv.BATTERY_LEVEL];
-    delete barGroups[historian.metrics.Csv.COULOMB_CHARGE];
-  }
+  historian.data.addUnavailableSeries_(data.logToExtent, barGroups);
 
   data.nameToSummary = summaries;
-  data.configs = new historian.LevelConfigs(deviceCapacity, powermonitorData);
-  data.nameToBarGroup = barGroups;
+  data.configs = new historian.LevelConfigs(
+      deviceCapacity, levelGroups, groupedLines);
+  data.barGroups = barGroups;
   data.nameToLevelGroup = levelGroups;
+  data.nameToLineGroup = groupedLines;
   return data;
+};
+
+
+/**
+ * Returns a copy of the given group, with all name references replaced
+ * with the given name.
+ * @param {!historian.SeriesGroup} groupToCopy
+ * @param {string} newName
+ * @return {!historian.SeriesGroup}
+ * @private
+ */
+historian.data.copyGroup_ = function(groupToCopy, newName) {
+  var copy = /** @type {!historian.SeriesGroup} */ (
+      jQuery.extend(true, {}, groupToCopy));
+  copy.name = newName;
+  copy.series.forEach(function(series) {
+    series.name = newName;
+  });
+  return copy;
+};
+
+
+/**
+ * Returns the custom group name if it exists, null otherwise.
+ * @param {!historian.SeriesData} series
+ * @return {?string}
+ * @private
+ */
+historian.data.getCustomGroupName_ = function(series) {
+  if (series.source == historian.historianV2Logs.Sources.EVENT_LOG) {
+    switch (series.name) {
+      case historian.metrics.Csv.AM_PROC_START:
+      case historian.metrics.Csv.AM_PROC_DIED:
+        return historian.metrics.Csv.AM_PROC;
+      case historian.metrics.Csv.AM_LOW_MEMORY:
+      case historian.metrics.Csv.AM_ANR:
+        return historian.metrics.Csv.AM_LOW_MEMORY_ANR;
+    }
+  } else if (series.source == historian.historianV2Logs.Sources.SYSTEM_LOG) {
+    switch (series.name) {
+      case historian.metrics.Csv.CRASHES:
+      case historian.metrics.Csv.NATIVE_CRASHES:
+        return historian.metrics.Csv.CRASHES;
+      case historian.metrics.Csv.GC_PAUSE_BACKGROUND_PARTIAL:
+      case historian.metrics.Csv.GC_PAUSE_BACKGROUND_STICKY:
+      case historian.metrics.Csv.GC_PAUSE_FOREGROUND:
+        return historian.metrics.Csv.GC_PAUSE;
+    }
+  }
+  return null;
 };
 
 
@@ -502,57 +779,59 @@ historian.data.processHistorianV2Data = function(logs, deviceCapacity,
  * Adds an extra series of UNAVAILABLE_TYPE to log groups where the log start
  * time is after the bug report start time. This signifies that data was not
  * available for that time period.
- * @param {number} reportStart Start time of the bug report.
- * @param {!Object<!historian.SeriesGroup>} barGroups Map from group name to
+ * @param {!Object<!historian.historianV2Logs.Extent>} logToExtent
+ * @param {!historian.metrics.DataHasher} barGroups Map from group name to
  *     series group data.
- * @param {!Array<!historian.historianV2Logs.Log>} logs The Historian v2 logs.
  * @private
  */
-historian.data.addUnavailableSeries_ = function(reportStart, barGroups, logs) {
-  var logToStartMs = {};
-  logs.forEach(function(log) {
-    // Some logs might not have populated the log start time field and will
-    // be 0.
-    if (log.startMs) {
-      logToStartMs[log.source] = log.startMs;
-    }
-  });
+historian.data.addUnavailableSeries_ = function(logToExtent, barGroups) {
+  var reportExtent = historian.historianV2Logs.getExtent(
+      logToExtent, Object.keys(logToExtent));
+  if (!reportExtent) {
+    return;
+  }
+  var reportStart = reportExtent.min;
 
-  for (var groupName in barGroups) {
-    var group = barGroups[groupName];
+  barGroups.getAll().forEach(function(group) {
+    var groupName = group.name;
 
+    // Find the log(s) with the earliest start time for the series in the
+    // current group.
     var logStart = null;
-    var logSource = '';
+    var logSources = {};
+
     // TODO: render time between logs as unavailable too -
     // need to add end time of logs. Currently only uses the earliest
     // log start time.
     group.series.forEach(function(series) {
-      if (series.source in logToStartMs) {
-        var start = logToStartMs[series.source];
+      if (series.source in logToExtent) {
+        var start = logToExtent[series.source].min;
         if (!logStart || start < logStart) {
           logStart = start;
-          logSource = series.source;
+          logSources = { [series.source]: true };
+        } else if (start == logStart) {
+          logSources[series.source] = true;
         }
       }
     });
-    if (reportStart > logStart) {
-      continue;
+    if (!logStart || reportStart >= logStart) {
+      return;
     }
     // We want this series to be rendered before any other series in the
     // group, in case it overlaps with any entries rendered as circles.
-    barGroups[groupName].series.unshift({
+    group.series.unshift({
       name: historian.metrics.typedMetricName(
           historian.metrics.UNAVAILABLE_TYPE, groupName),
       type: historian.metrics.UNAVAILABLE_TYPE,
       values: [{
         startTime: reportStart,
         endTime: logStart,
-        value: logSource
+        value: Object.keys(logSources).join(', ')
       }],
       cluster: false,
       source: historian.historianV2Logs.Sources.GENERATED
     });
-  }
+  });
 };
 
 
@@ -560,8 +839,10 @@ historian.data.addUnavailableSeries_ = function(reportStart, barGroups, logs) {
  * Creates the series if it does not exist and adds an entry to that series.
  * @param {!historian.metrics.DataHasher} allSeries The existing series.
  * @param {!historian.EntryInfo_} entryInfo Details of the entry to add.
+ * @param {!Object<!historian.historianV2Logs.Extent>} logToExtent Map from log
+ *     source name to log domain.
  */
-historian.data.addEntry = function(allSeries, entryInfo) {
+historian.data.addEntry = function(allSeries, entryInfo, logToExtent) {
   var series = allSeries.get(entryInfo.source, entryInfo.seriesName);
   if (!series) {
     series = /** @type {!historian.SeriesData} */ ({
@@ -581,6 +862,18 @@ historian.data.addEntry = function(allSeries, entryInfo) {
   };
   if (entryInfo.uid != null) {  // Don't use falsy check as may be zero.
     entry.uid = entryInfo.uid;
+  }
+  switch (entryInfo.seriesName) {
+    case historian.metrics.Csv.ACTIVE_BROADCAST_FOREGROUND:
+    case historian.metrics.Csv.ACTIVE_BROADCAST_BACKGROUND:
+      // If it's unknown when a broadcast was dispatched, replace it with the
+      // last known time in the broadcasts log, as we can't render an end time
+      // of -1.
+      if (entry.endTime == historian.constants.UNKNOWN_TIME) {
+        entry.endTime = logToExtent[entryInfo.source].max;
+        entry.unknownEndTime = true;
+      }
+      break;
   }
   series.values.push(entry);
 };
@@ -607,32 +900,10 @@ historian.data.createTicks_ = function(name, series, cluster) {
   });
   return {
     name: name,
-    source: historian.historianV2Logs.Sources.GENERATED,
+    source: series.source,
     type: 'int',
     values: values,
     cluster: cluster
-  };
-};
-
-
-/**
- * Creates an Activity Manager Proc value from the tilde delimited string.
- * @param {string} value The value to split.
- * @param {number} startTime The start time of the proc event.
- * @param {number} endTime The end time of the proc event.
- * @return {!historian.AMProcValue}
- * @private
- */
-historian.data.splitAMProcValue_ = function(value, startTime, endTime) {
-  var parts = value.split(',');
-  goog.asserts.assert(parts.length >= 4);
-  return {
-    startTime: startTime,
-    endTime: endTime,
-    pid: parseInt(parts[0], 10),
-    uid: parts[1] == '' ? 0 : parseInt(parts[1], 10),
-    process: parts[2],
-    component: parts[3]
   };
 };
 
@@ -689,16 +960,20 @@ historian.data.splitRunningValues_ = function(running) {
     var values = r.value.split('|');
     var processed = [];
 
-    var previousEndTime = r.startTime;
     values.forEach(function(v) {
-      // Each value is of the format endTime~wakeupreason.
+      // Each value is of the format startTime~endTime~wakeupreason OR
+      // instantTime~wakeupreason.
       var parts = v.split('~');
-      goog.asserts.assert(parts.length == 2);
-      var endTime = parts[0];
-      var reason = parts[1];
-
-      var startTime = previousEndTime;
-      previousEndTime = endTime;
+      goog.asserts.assert(parts.length == 3 || parts.length == 2);
+      var startTime = parts[0];
+      if (parts.length == 2) {
+        // Instant event.
+        var endTime = startTime;
+        var reason = parts[1];
+      } else {
+        var endTime = parts[1];
+        var reason = parts[2];
+      }
 
       processed.push({
         startTime: parseInt(startTime, 10),
@@ -873,27 +1148,27 @@ historian.data.mergeSplitEntries = function(entries) {
  *     CPU running entry begins.
  * @param {number} start The ms timestamp the entry begins.
  * @param {number} end The ms timestamp the entry ends.
- * @param {string} value The value of the entry.
+ * @param {!Array<string>} wakeupReasons
  * @param {number} wakelockClassification
  *     Whether the running entry occured during a wakelock.
- * @return {!historian.Entry} The created entry.
+ * @return {!historian.AggregatedEntry} The created entry.
  * @private
  */
 function createKernelUptimeEntry_(
-    runningStart, start, end, value, wakelockClassification) {
-  var wakeReason = value;
-  // Only show the wakeup reason if the start time corresponds
-  // to the running entry start time.
-  if (runningStart != start) {
-    wakeReason = 'No wakeup reason';
-  }
+    runningStart, start, end, wakeupReasons, wakelockClassification) {
   return {
     startTime: start,
     endTime: end,
-    value: {
-      wakeReason: wakeReason,
-      wakelockCategory: wakelockClassification
-    }
+    services: wakeupReasons.map(function(wr) {
+      return {
+        startTime: start,  // Wakeup times are irrelevant.
+        endTime: end,
+        value: {
+          wakeReason: wr,
+          wakelockCategory: wakelockClassification
+        }
+      };
+    })
   };
 }
 
@@ -919,12 +1194,36 @@ historian.data.categorizeRunning = function(running, wakelocks) {
     // We process each running entry in segments. curStartTime keeps track
     // of where in the running entry we're up to.
     var curStartTime = r.startTime;
-    // Each running entry can have multiple wake reasons. We take the first.
-    var allWakeReasons = r.services;
-    var wakeReason = 'No wakeup reason';
-    if (allWakeReasons.length > 0) {
-      wakeReason = /** @type {string} */ (allWakeReasons[0].value);
-    }
+    // Each running entry can have multiple wake reasons. Make a copy of the
+    // array so we can modify it.
+    var allWakeReasons = r.services.slice();
+
+    var mostRelevantWakeReasons = function(startTime, endTime) {
+      if (allWakeReasons.length == 0) {
+        return ['No wakeup reason'];
+      }
+      // Get the next wakeup reason and any that intersect.
+      var num = 1;
+      for (; num < allWakeReasons.length; num++) {
+        var wr = allWakeReasons[num];
+        // Check if the time the wakeup reason was reported (start time)
+        // intersects with the kernel uptime entry.
+        var intersection = historian.utils.inTimeRange(startTime, endTime,
+            [
+              {startTime: wr.startTime, endTime: wr.startTime, value: wr.value}
+            ]);
+        if (!intersection.length > 0) {
+          break;
+        }
+      }
+      // Copy the relevant wakeup reasons.
+      var res = allWakeReasons.slice(0, num).map(function(wr) {
+        return wr.value;
+      });
+      // Delete used wakeup reason so we don't double count.
+      allWakeReasons.splice(0, num);
+      return res;
+    };
 
     var intersectingUserspaceWakelock = false;
 
@@ -933,7 +1232,7 @@ historian.data.categorizeRunning = function(running, wakelocks) {
       var w = wakelocks[wakelockIndex];
 
       // Find out if the userspace wakelock and CPU running entry overlaps.
-      var intersection = getIntersection(
+      var intersection = historian.utils.getIntersection(
           curStartTime, r.endTime, w.startTime, w.endTime);
 
       // If there is any intersection, we need to split up the running entry.
@@ -945,7 +1244,8 @@ historian.data.categorizeRunning = function(running, wakelocks) {
           // Wakelock starts after the current segment of the running entry.
           // Unaccounted for running time with no userspace wakelock.
           var e = createKernelUptimeEntry_(r.startTime, curStartTime,
-              intersectStart, wakeReason,
+              intersectStart,
+              mostRelevantWakeReasons(curStartTime, intersectStart),
               historian.metrics.KERNEL_UPTIME_WITH_USERSPACE);
           categorized.push(e);
           curStartTime = intersectStart;
@@ -970,31 +1270,12 @@ historian.data.categorizeRunning = function(running, wakelocks) {
         category = historian.metrics.KERNEL_UPTIME_NO_USERSPACE;
       }
       var e = createKernelUptimeEntry_(r.startTime, curStartTime, r.endTime,
-          wakeReason, category);
+          mostRelevantWakeReasons(curStartTime, r.endTime), category);
       categorized.push(e);
     }
   });
   return categorized;
 };
-
-
-/**
- * Returns the intersection of the two time ranges s1, e1 and s2, e2.
- * @param {number} s1 Start time of the first range.
- * @param {number} e1 End time of the first range.
- * @param {number} s2 Start time of the second range.
- * @param {number} e2 End time of the second range.
- * @return {!Array<number>} The intersection, with at least duration 1 ms.
- *     Returns an empty array if no intersection is found.
- */
-function getIntersection(s1, e1, s2, e2) {
-  var start = Math.max(s1, s2);
-  var end = Math.min(e1, e2);
-  if (start <= end && start != end) {
-    return [start, end];
-  }
-  return [];
-}
 
 
 /**
@@ -1031,7 +1312,8 @@ historian.data.cluster = function(seriesData, minDuration) {
     var clusteredGroup = {
       name: seriesGroup.name,
       index: seriesGroup.index,
-      series: []
+      series: [],
+      source: seriesGroup.source
     };
     clusteredSeriesData.push(clusteredGroup);
     seriesGroup.series.forEach(function(series) {
@@ -1261,11 +1543,12 @@ historian.data.ClusterEntry.key_ = function(entry) {
 
 
 /**
- * Returns the value to duration map as an array, sorted by duration
+ * Returns the value to duration map as an array, sorted by default by duration
  * in descending order.
+ * @param {boolean=} opt_byCount Sort by count instead.
  * @return {!Array<!historian.data.ClusterEntryValue>}
  */
-historian.data.ClusterEntry.prototype.getSortedValues = function() {
+historian.data.ClusterEntry.prototype.getSortedValues = function(opt_byCount) {
   var sorted = [];
 
   for (var key in this.clusteredValues) {
@@ -1273,7 +1556,7 @@ historian.data.ClusterEntry.prototype.getSortedValues = function() {
   }
 
   sorted.sort(function(a, b) {
-    return b.duration - a.duration;
+    return opt_byCount ? b.count - a.count : b.duration - a.duration;
   });
   return sorted;
 };
@@ -1297,6 +1580,24 @@ historian.data.ClusterEntry.prototype.getMaxValue = function() {
     }
   }
   return this.clusteredValues[maxValue].value;
+};
+
+
+/**
+ * Returns all the ids of entries present in the cluster, sorted numerically.
+ * These ids can map to the originalValues stored per series.
+ * @return {!Array<number>}
+ */
+historian.data.ClusterEntry.prototype.getIds = function() {
+  var ids = {};
+  for (var key in this.clusteredValues) {
+    for (var id in this.clusteredValues[key].ids) {
+      ids[id] = true;
+    }
+  }
+  return Object.keys(ids)
+      .map(function(id) { return parseInt(id, 10); })
+      .sort(function(a, b) { return a - b; });
 };
 
 
@@ -1338,12 +1639,12 @@ historian.data.isNonBlankEntry_ = function(serie, d) {
  */
 historian.data.getWakelockData_ = function(allSeries) {
   var values = [];
-  var wakelockIn = allSeries.getBatteryHistorySeries(
+  var wakelockIn = allSeries.getBatteryHistoryData(
       historian.metrics.Csv.WAKELOCK_IN);
   if (wakelockIn) {
     values = wakelockIn.values;
   }
-  var wakelockHeld = allSeries.getBatteryHistorySeries(
+  var wakelockHeld = allSeries.getBatteryHistoryData(
       historian.metrics.Csv.WAKE_LOCK_HELD);
   if (wakelockHeld) {
     values = values.concat(wakelockHeld.values);
@@ -1406,4 +1707,168 @@ historian.data.sampleData = function(data) {
  */
 historian.data.duration = function(d) {
   return (d.endTime - d.startTime);
+};
+
+
+/**
+ * Returns a map of wakeup reason to array of counts for each time interval,
+ * determined by the given bucket size.
+ * This will be used to plot a histogram of wakeup count over time for a
+ * selected wakeup.
+ *
+ * @param {number} reportStart Start time of the report since epoch in
+ *     milliseconds.
+ * @param {!historian.SeriesGroup} runningGroup Group containing the battery
+ *     history running series. The series should have non-overlapping entries,
+ *     sorted by start time. Each entry should contain an array of
+ *     non-overlapping wakeup reasons, sorted by start time.
+ * @param {number} bucketSize Size of each bucket in milliseconds, greater than
+ *     zero.
+ * @return {!Object<!Array<{bucketMs: number, count: number}>>} Map from wakeup
+ *     reason to bucket start times and corresponding count for the time period
+ *     [bucketMs, bucketMs + bucketSize).
+ */
+historian.data.bucketWakeups =
+    function(reportStart, runningGroup, bucketSize) {
+  goog.asserts.assert(bucketSize > 0);
+  var idx = goog.array.findIndex(runningGroup.series, function(series) {
+    return series.name == historian.metrics.Csv.CPU_RUNNING &&
+        series.source == historian.historianV2Logs.Sources.BATTERY_HISTORY;
+  });
+  if (idx == -1) {
+    return [];
+  }
+  var running = runningGroup.series[idx].values;
+  // Each running entry can have multiple wakeup reasons. Construct a map from
+  // wakeup reason to all entries.
+  var wakeupToData = {};
+  running.forEach(function(entry) {
+    entry.services.forEach(function(wakeupEntry) {
+      var wakeupName = wakeupEntry.value.trim();
+      if (!(wakeupName in wakeupToData)) {
+        // Use the wakeup name as the key.
+        wakeupToData[wakeupName] = [];
+      }
+      wakeupToData[wakeupName].push(wakeupEntry);
+    });
+  });
+
+  var wakeupToCounts = {};
+  for (var wakeup in wakeupToData) {
+    // The stored end time is the time the wakeup reason was reported.
+    var times = wakeupToData[wakeup].map(function(entry) {
+      return entry.endTime;
+    });
+    wakeupToCounts[wakeup] =
+        historian.data.bucket(reportStart, times, bucketSize);
+  }
+  return wakeupToCounts;
+};
+
+
+/**
+ * Returns an array of counts for each time interval, determined by the
+ * given bucket size.
+ *
+ * @param {number} reportStart Start time of the report since epoch in
+ *     milliseconds.
+ * @param {!Array<number>} times Array of event times.
+ * @param {number} bucketSize Size of each bucket in milliseconds, greater than
+ *     zero.
+ * @return {!Array<{bucketMs: number, count: number}>} Bucket start times and
+ *     corresponding count for the time period
+ *     [bucketMs, bucketMs + bucketSize).
+ */
+historian.data.bucket = function(reportStart, times, bucketSize) {
+  goog.asserts.assert(bucketSize > 0);
+  if (times.length == 0) {
+    return [];
+  }
+  var bucketStart = null;
+  var result = [];
+  var count = 0;
+  times.forEach(function(time) {
+    var timeDiff = time - reportStart;
+    var bucket = reportStart +
+        ((Math.floor(timeDiff / bucketSize)) * bucketSize);
+    if (bucketStart && bucket != bucketStart) {
+      // Add the previous bucket if we've moved on to a different bucket.
+      result.push({bucketMs: bucketStart, count});
+      count = 0;
+    }
+    bucketStart = bucket;
+    count++;
+  });
+  result.push({bucketMs: bucketStart, count: count});
+  return result;
+};
+
+
+/**
+ * Extracts app transition events from the sysui_action series, and removes
+ * transition related events from the input array.
+ * @param {!Array<!historian.Entry>} sysuiActions Sorted sysui action events.
+ * @return {!Array<!historian.Entry>} Any app transition events.
+ */
+historian.data.extractAppTransitions = function(sysuiActions) {
+  var transitions = [];
+
+  // Returns the transition not containing an event of the given transition id,
+  // with the closest time to the given event. If no such transition is found,
+  // null is returned and means a new transition should be created.
+  var getClosestTransition = function(event) {
+    var parts = event.value.split(',');  // e.g. 321,1111
+    var transitionId = parts[0];
+    var time = event.startTime;
+    switch (parseInt(transitionId, 10)) {
+      case historian.sysui.Transition.DELAY_MS:
+      case historian.sysui.Transition.STARTING_WINDOW_DELAY_MS:
+      case historian.sysui.Transition.WINDOWS_DRAWN_DELAY_MS:
+        // These events are logged with delay, which is stored as the value.
+        var delayMs = parts[1];
+        if (isNaN(delayMs)) {
+          console.log('encountered NaN delay ms: ' + parts[1]);
+        } else {
+          time -= delayMs;
+        }
+    }
+    return transitions.reduce(function(curClosest, transition) {
+      if (transitionId in transition.value) {
+        return curClosest;
+      } else if (!curClosest) {
+        return transition;
+      } else {
+        var curClosestDiff = Math.abs(time - curClosest.startTime);
+        var tranDiff = Math.abs(time - transition.startTime);
+        return curClosestDiff < tranDiff ? curClosest : transition;
+      }
+    }, null);
+  };
+  for (var i = 0; i < sysuiActions.length; i++) {
+    var curEvent = sysuiActions[i];
+    var transitionId = curEvent.value.split(',')[0];  // e.g. 321,1111
+    if (!historian.sysui.isTransition(parseInt(transitionId, 10))) {
+      continue;
+    }
+    // The order of app transition events doesn't seem to be fixed, so find
+    // the closest event that doesn't already contain that transition type.
+    var closestTransition = getClosestTransition(curEvent);
+    if (!closestTransition) {
+      transitions.push({
+        startTime: curEvent.startTime,
+        endTime: curEvent.endTime,
+        value: {
+          [transitionId]: curEvent
+        }
+      });
+    } else {
+      closestTransition.value[transitionId] = curEvent;
+      // Sysui action events are instant events so they have the same
+      // start and end times, and are sorted.
+      closestTransition.endTime = curEvent.endTime;
+    }
+    sysuiActions.splice(i, 1);
+    i--;
+  }
+  return transitions;
 };

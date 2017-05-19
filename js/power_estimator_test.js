@@ -44,13 +44,13 @@ var createRunningEvent = function(startTime, endTime, value) {
 
 
 /**
- * Creates a powermonitor power event.
+ * Creates a power monitor power event.
  * @param {number} startTime
  * @param {number} endTime
  * @param {number} value Power reading in mAh.
  * @return {!historian.Entry}
  */
-var createPowermonitorEvent = function(startTime, endTime, value) {
+var createPowerMonitorEvent = function(startTime, endTime, value) {
   return {
     startTime: startTime,
     endTime: endTime,
@@ -62,31 +62,31 @@ testSuite({
   /**
    * Tests the creating of wake up reasons to power events mappings.
    */
-  testMatchPowermonitorEvents: function() {
+  testMatchPowerMonitorEvents: function() {
     var tests = [
       {
-        desc: 'Filtering of running events for those in powermonitor events' +
+        desc: 'Filtering of running events for those in power monitor events' +
             'range',
         runningEvents: [
-          // Out of powermonitor events range.
+          // Out of power monitor events range.
           createRunningEvent(0, 350, 'r1'),
           createRunningEvent(500, 700, 'r1'),
           createRunningEvent(1000, 1200, 'r1'),
           createRunningEvent(1499, 1500, 'r1'),
-          // Out of powermonitor events range.
+          // Out of power monitor events range.
           createRunningEvent(1500, 1600, 'r1')
         ],
-        powermonitorEvents: [
-          createPowermonitorEvent(600, 700, 10),
-          createPowermonitorEvent(700, 800, 10),
-          createPowermonitorEvent(800, 900, 20),
-          createPowermonitorEvent(900, 1000, 20),
-          createPowermonitorEvent(1000, 1100, 10),
-          createPowermonitorEvent(1100, 1200, 10),
-          createPowermonitorEvent(1100, 1200, 10),
-          createPowermonitorEvent(1200, 1300, 10),
-          createPowermonitorEvent(1300, 1400, 20),
-          createPowermonitorEvent(1400, 1500, 10),
+        powerMonitorEvents: [
+          createPowerMonitorEvent(600, 700, 10),
+          createPowerMonitorEvent(700, 800, 10),
+          createPowerMonitorEvent(800, 900, 20),
+          createPowerMonitorEvent(900, 1000, 20),
+          createPowerMonitorEvent(1000, 1100, 10),
+          createPowerMonitorEvent(1100, 1200, 10),
+          createPowerMonitorEvent(1100, 1200, 10),
+          createPowerMonitorEvent(1200, 1300, 10),
+          createPowerMonitorEvent(1300, 1400, 20),
+          createPowerMonitorEvent(1400, 1500, 10),
         ],
         expectedTimeRanges: {
           'r1': [
@@ -97,11 +97,11 @@ testSuite({
         },
       },
       {
-        desc: 'Running event borders on powermonitor event',
+        desc: 'Running event borders on power monitor event',
         runningEvents: [
           createRunningEvent(50, 250, 'r1')
         ],
-        powermonitorEvents: [
+        powerMonitorEvents: [
           {
             startTime: 0,
             endTime: 50,
@@ -112,15 +112,15 @@ testSuite({
         expectedPower: []
       },
       {
-        desc: 'First running event does not overlap with any powermonitor' +
+        desc: 'First running event does not overlap with any power monitor' +
             ' event',
         runningEvents: [
           createRunningEvent(50, 250, 'r1'),
           createRunningEvent(500, 700, 'r2')
         ],
-        powermonitorEvents: [
-          createPowermonitorEvent(0, 30, 1000),
-          createPowermonitorEvent(400, 900, 7200)
+        powerMonitorEvents: [
+          createPowerMonitorEvent(0, 30, 1000),
+          createPowerMonitorEvent(400, 900, 7200)
         ],
         expectedTimeRanges: {
           'r1': [null],
@@ -134,13 +134,13 @@ testSuite({
         ]
       },
       {
-        desc: 'Running events overlap same powermonitor event',
+        desc: 'Running events overlap same power monitor event',
         runningEvents: [
           createRunningEvent(0, 1500, 'r1'),
           createRunningEvent(1750, 2500, 'r2')
         ],
-        powermonitorEvents: [
-          createPowermonitorEvent(1000, 2000, 7200)
+        powerMonitorEvents: [
+          createPowerMonitorEvent(1000, 2000, 7200)
         ],
         expectedTimeRanges: {
           'r1': [
@@ -156,16 +156,16 @@ testSuite({
         ]
       },
       {
-        desc: 'Multiple running events of same type, shares same powermonitor' +
+        desc: 'Multiple running events of same type, shares same power monitor' +
             ' event',
         runningEvents: [
           createRunningEvent(1750, 2500, 'r1'),
           createRunningEvent(2500, 4000, 'r1')
         ],
-        powermonitorEvents: [
-          createPowermonitorEvent(1000, 2000, 7200),
-          createPowermonitorEvent(2000, 3000, 7200),
-          createPowermonitorEvent(3000, 4000, 7200)
+        powerMonitorEvents: [
+          createPowerMonitorEvent(1000, 2000, 7200),
+          createPowerMonitorEvent(2000, 3000, 7200),
+          createPowerMonitorEvent(3000, 4000, 7200)
         ],
         expectedTimeRanges: {
           'r1': [
@@ -178,13 +178,13 @@ testSuite({
         ]
       },
       {
-        desc: 'One running event corresponding to two powermonitor events',
+        desc: 'One running event corresponding to two power monitor events',
         runningEvents: [
           createRunningEvent(500, 2500, 'r1')
         ],
-        powermonitorEvents: [
-          createPowermonitorEvent(0, 1000, 3600),
-          createPowermonitorEvent(1000, 1500, 7200)
+        powerMonitorEvents: [
+          createPowerMonitorEvent(0, 1000, 3600),
+          createPowerMonitorEvent(1000, 1500, 7200)
         ],
         expectedTimeRanges: {
           'r1': [
@@ -215,8 +215,8 @@ testSuite({
             ]
           }
         ],
-        powermonitorEvents: [
-          createPowermonitorEvent(1000, 2000, 7200)
+        powerMonitorEvents: [
+          createPowerMonitorEvent(1000, 2000, 7200)
         ],
         expectedTimeRanges: {
           'r1': [
@@ -247,8 +247,8 @@ testSuite({
             ]
           }
         ],
-        powermonitorEvents: [
-          createPowermonitorEvent(1000, 2000, 7200)
+        powerMonitorEvents: [
+          createPowerMonitorEvent(1000, 2000, 7200)
         ],
         expectedTimeRanges: {
           'No non abort events found': [
@@ -260,7 +260,7 @@ testSuite({
         ]
       },
       {
-        desc: 'No intersecting powermonitor events, no non abort wakeup' +
+        desc: 'No intersecting power monitor events, no non abort wakeup' +
             ' reasons',
         runningEvents: [
           {
@@ -280,10 +280,10 @@ testSuite({
             ]
           }
         ],
-        powermonitorEvents: [
-          createPowermonitorEvent(0, 400, 7200),
-          createPowermonitorEvent(2000, 3000, 1200),
-          createPowermonitorEvent(3000, 4000, 3600)
+        powerMonitorEvents: [
+          createPowerMonitorEvent(0, 400, 7200),
+          createPowerMonitorEvent(2000, 3000, 1200),
+          createPowerMonitorEvent(3000, 4000, 3600)
         ],
         expectedTimeRanges: {
           'No non abort events found': [null]
@@ -307,18 +307,18 @@ testSuite({
             ]
           }
         ],
-        powermonitorEvents: [
-          createPowermonitorEvent(0, 100, 10),
-          createPowermonitorEvent(100, 200, 60),
-          createPowermonitorEvent(200, 300, 80),
+        powerMonitorEvents: [
+          createPowerMonitorEvent(0, 100, 10),
+          createPowerMonitorEvent(100, 200, 60),
+          createPowerMonitorEvent(200, 300, 80),
           // Start of increasing edge.
-          createPowermonitorEvent(300, 400, 20),
-          createPowermonitorEvent(400, 500, 70),
+          createPowerMonitorEvent(300, 400, 20),
+          createPowerMonitorEvent(400, 500, 70),
           // Decreased, but still above base threshold.
-          createPowermonitorEvent(500, 600, 60),
-          createPowermonitorEvent(600, 700, 200),
-          createPowermonitorEvent(700, 800, 500),
-          createPowermonitorEvent(900, 1000, 700)
+          createPowerMonitorEvent(500, 600, 60),
+          createPowerMonitorEvent(600, 700, 200),
+          createPowerMonitorEvent(700, 800, 500),
+          createPowerMonitorEvent(900, 1000, 700)
         ],
         expectedTimeRanges: {
           'wr': [{start: 300, end: 1000}]
@@ -339,13 +339,13 @@ testSuite({
             ]
           }
         ],
-        powermonitorEvents: [
-          createPowermonitorEvent(500, 600, 0),
-          createPowermonitorEvent(600, 700, 30),
-          createPowermonitorEvent(700, 800, 40),
+        powerMonitorEvents: [
+          createPowerMonitorEvent(500, 600, 0),
+          createPowerMonitorEvent(600, 700, 30),
+          createPowerMonitorEvent(700, 800, 40),
           // Start of increasing edge.
-          createPowermonitorEvent(800, 900, 0),
-          createPowermonitorEvent(900, 1000, 70)
+          createPowerMonitorEvent(800, 900, 0),
+          createPowerMonitorEvent(900, 1000, 70)
         ],
         expectedTimeRanges: {
           'wr': [{start: 800, end: 1000}]
@@ -366,19 +366,19 @@ testSuite({
             ]
           }
         ],
-        powermonitorEvents: [
-          createPowermonitorEvent(900, 1000, 300),
-          createPowermonitorEvent(1000, 1100, 200),
-          createPowermonitorEvent(1100, 1200, 100),
+        powerMonitorEvents: [
+          createPowerMonitorEvent(900, 1000, 300),
+          createPowerMonitorEvent(1000, 1100, 200),
+          createPowerMonitorEvent(1100, 1200, 100),
           // Increasing but above base threshold.
-          createPowermonitorEvent(1200, 1300, 200),
-          createPowermonitorEvent(1300, 1400, 100),
+          createPowerMonitorEvent(1200, 1300, 200),
+          createPowerMonitorEvent(1300, 1400, 100),
           // Reached base threshold.
-          createPowermonitorEvent(1400, 1500, 50),
-          createPowermonitorEvent(1500, 1600, 30),
-          createPowermonitorEvent(1600, 1700, 10),
+          createPowerMonitorEvent(1400, 1500, 50),
+          createPowerMonitorEvent(1500, 1600, 30),
+          createPowerMonitorEvent(1600, 1700, 10),
           // Larger than previous entry, not included.
-          createPowermonitorEvent(1700, 1800, 20)
+          createPowerMonitorEvent(1700, 1800, 20)
         ],
         expectedTimeRanges: {
           'wr': [{start: 900, end: 1700}]
@@ -410,15 +410,15 @@ testSuite({
             ]
           }
         ],
-        powermonitorEvents: [
-          createPowermonitorEvent(1800, 1900, 7200),
+        powerMonitorEvents: [
+          createPowerMonitorEvent(1800, 1900, 7200),
           // End of first wakeup reason intersection.
-          createPowermonitorEvent(1900, 2000, 1200),
-          createPowermonitorEvent(2000, 2100, 300),
-          createPowermonitorEvent(2100, 2200, 40),
+          createPowerMonitorEvent(1900, 2000, 1200),
+          createPowerMonitorEvent(2000, 2100, 300),
+          createPowerMonitorEvent(2100, 2200, 40),
           // Intersects with next wakeup.
-          createPowermonitorEvent(2200, 2300, 20),
-          createPowermonitorEvent(2300, 2400, 100)
+          createPowerMonitorEvent(2200, 2300, 20),
+          createPowerMonitorEvent(2300, 2400, 100)
         ],
         expectedTimeRanges: {
           'wr1': [{start: 1800, end: 2200}],
@@ -451,15 +451,15 @@ testSuite({
             ]
           }
         ],
-        powermonitorEvents: [
-          createPowermonitorEvent(1800, 1900, 7200),
+        powerMonitorEvents: [
+          createPowerMonitorEvent(1800, 1900, 7200),
           // End of first wakeup reason intersection.
-          createPowermonitorEvent(1900, 2000, 1200),
-          createPowermonitorEvent(2000, 2100, 300),
-          createPowermonitorEvent(2100, 2200, 700),
+          createPowerMonitorEvent(1900, 2000, 1200),
+          createPowerMonitorEvent(2000, 2100, 300),
+          createPowerMonitorEvent(2100, 2200, 700),
           // Intersects with next wakeup.
-          createPowermonitorEvent(2200, 2300, 800),
-          createPowermonitorEvent(2300, 2400, 1000)
+          createPowerMonitorEvent(2200, 2300, 800),
+          createPowerMonitorEvent(2300, 2400, 1000)
         ],
         expectedTimeRanges: {
           'wr1': [{start: 1800, end: 2200}],
@@ -470,7 +470,7 @@ testSuite({
 
     tests.forEach(function(test) {
       var powerEstimator =
-          new Estimator(test.runningEvents, test.powermonitorEvents, null);
+          new Estimator(test.runningEvents, test.powerMonitorEvents, null);
 
       if (test.expectedPower) {
         assertArrayEquals(
@@ -493,13 +493,13 @@ testSuite({
   testGeneratePerWakeupTables: function() {
     var tests = [
       {
-        desc: 'No overlapping powermonitor events',
+        desc: 'No overlapping power monitor events',
         runningEvents: [
           createRunningEvent(50, 250, 'r1')
         ],
-        powermonitorEvents: [
-          createPowermonitorEvent(0, 50, 100),
-          createPowermonitorEvent(250, 300, 100)
+        powerMonitorEvents: [
+          createPowerMonitorEvent(0, 50, 100),
+          createPowerMonitorEvent(250, 300, 100)
         ],
         expectedPerWakeupTables: {
           'Duration': [
@@ -523,25 +523,25 @@ testSuite({
           createRunningEvent(1400, 1500, 'r3'),
           createRunningEvent(1700, 31500, 'r1')
         ],
-        powermonitorEvents: [
-          createPowermonitorEvent(0, 100, 170), // r2
-          createPowermonitorEvent(100, 200, 30), // r2
-          createPowermonitorEvent(200, 300, 40), // none
-          createPowermonitorEvent(300, 400, 10), // r3
-          createPowermonitorEvent(400, 500, 7160), // r3
-          createPowermonitorEvent(500, 600, 30), // r3
-          createPowermonitorEvent(600, 700, 20), // r2
-          createPowermonitorEvent(700, 800, 100), // r2
-          createPowermonitorEvent(800, 900, 30), // r2
-          createPowermonitorEvent(900, 1000, 100), // none
-          createPowermonitorEvent(1000, 1100, 30), // r2
-          createPowermonitorEvent(1100, 1200, 40), // none
-          createPowermonitorEvent(1200, 1300, 30), // r3
-          createPowermonitorEvent(1300, 1400, 7270), // r3
-          createPowermonitorEvent(1400, 1500, 7070), // r3
-          createPowermonitorEvent(1500, 1600, 30), // r3
-          createPowermonitorEvent(1600, 1700, 40), // none
-          createPowermonitorEvent(1700, 1800, 10) // r1
+        powerMonitorEvents: [
+          createPowerMonitorEvent(0, 100, 170), // r2
+          createPowerMonitorEvent(100, 200, 30), // r2
+          createPowerMonitorEvent(200, 300, 40), // none
+          createPowerMonitorEvent(300, 400, 10), // r3
+          createPowerMonitorEvent(400, 500, 7160), // r3
+          createPowerMonitorEvent(500, 600, 30), // r3
+          createPowerMonitorEvent(600, 700, 20), // r2
+          createPowerMonitorEvent(700, 800, 100), // r2
+          createPowerMonitorEvent(800, 900, 30), // r2
+          createPowerMonitorEvent(900, 1000, 100), // none
+          createPowerMonitorEvent(1000, 1100, 30), // r2
+          createPowerMonitorEvent(1100, 1200, 40), // none
+          createPowerMonitorEvent(1200, 1300, 30), // r3
+          createPowerMonitorEvent(1300, 1400, 7270), // r3
+          createPowerMonitorEvent(1400, 1500, 7070), // r3
+          createPowerMonitorEvent(1500, 1600, 30), // r3
+          createPowerMonitorEvent(1600, 1700, 40), // none
+          createPowerMonitorEvent(1700, 1800, 10) // r1
         ],
         expectedPerWakeupTables: {
           'Duration': [
@@ -564,7 +564,7 @@ testSuite({
     ];
     tests.forEach(function(test) {
       var powerEstimator =
-          new Estimator(test.runningEvents, test.powermonitorEvents, null);
+          new Estimator(test.runningEvents, test.powerMonitorEvents, null);
       var gotTables = powerEstimator.generateWakeupTables();
       assertObjectEquals(test.desc, test.expectedPerWakeupTables, gotTables);
     });
@@ -577,12 +577,12 @@ testSuite({
       {
         desc: 'No wakeups',
         runningEvents: [],
-        powermonitorEvents: [
-          createPowermonitorEvent(0, 100, 100),
-          createPowermonitorEvent(100, 200, 200),
-          createPowermonitorEvent(200, 300, 200),
-          createPowermonitorEvent(300, 400, 100),
-          createPowermonitorEvent(400, 500, 200)
+        powerMonitorEvents: [
+          createPowerMonitorEvent(0, 100, 100),
+          createPowerMonitorEvent(100, 200, 200),
+          createPowerMonitorEvent(200, 300, 200),
+          createPowerMonitorEvent(300, 400, 100),
+          createPowerMonitorEvent(400, 500, 200)
         ],
         expectedSummary: {
           suspendTime: '500ms',
@@ -600,17 +600,17 @@ testSuite({
           createRunningEvent(300, 500, 'r2'),
           createRunningEvent(910, 1200, 'r1'),
         ],
-        powermonitorEvents: [
-          createPowermonitorEvent(0, 100, 100), // r1
-          createPowermonitorEvent(100, 200, 7060), // r1
-          createPowermonitorEvent(200, 300, 40), // r1
-          createPowermonitorEvent(300, 400, 30), //r2
-          createPowermonitorEvent(400, 500, 3530), // r2
-          createPowermonitorEvent(500, 600, 40), // r2
-          createPowermonitorEvent(600, 700, 3550), // none
-          createPowermonitorEvent(700, 800, 50), // none
-          createPowermonitorEvent(800, 900, 40), // r1
-          createPowermonitorEvent(900, 1000, 7160) // r1
+        powerMonitorEvents: [
+          createPowerMonitorEvent(0, 100, 100), // r1
+          createPowerMonitorEvent(100, 200, 7060), // r1
+          createPowerMonitorEvent(200, 300, 40), // r1
+          createPowerMonitorEvent(300, 400, 30), //r2
+          createPowerMonitorEvent(400, 500, 3530), // r2
+          createPowerMonitorEvent(500, 600, 40), // r2
+          createPowerMonitorEvent(600, 700, 3550), // none
+          createPowerMonitorEvent(700, 800, 50), // none
+          createPowerMonitorEvent(800, 900, 40), // r1
+          createPowerMonitorEvent(900, 1000, 7160) // r1
         ],
         expectedSummary: {
           suspendTime: '200ms',
@@ -624,7 +624,7 @@ testSuite({
     ];
     tests.forEach(function(test) {
       var powerEstimator =
-          new Estimator(test.runningEvents, test.powermonitorEvents, null);
+          new Estimator(test.runningEvents, test.powerMonitorEvents, null);
       var gotSummary = powerEstimator.generateSummaryStats();
       assertObjectEquals(test.desc, test.expectedSummary, gotSummary);
     });
@@ -639,19 +639,19 @@ testSuite({
       createRunningEvent(600, 750, 'r2'),
       createRunningEvent(1000, 1100, 'r2')
     ];
-    var powermonitorEvents = [
-      createPowermonitorEvent(0, 100, 170), // r2
-      createPowermonitorEvent(100, 200, 30), // r2
-      createPowermonitorEvent(200, 300, 40), // none
-      createPowermonitorEvent(300, 400, 10), // r3
-      createPowermonitorEvent(400, 500, 7160), // r3
-      createPowermonitorEvent(500, 600, 30), // r3
-      createPowermonitorEvent(600, 700, 20), // r2
-      createPowermonitorEvent(700, 800, 100), // r2
-      createPowermonitorEvent(800, 900, 30), // r2
-      createPowermonitorEvent(900, 1000, 100), // none
-      createPowermonitorEvent(1000, 1100, 30), // r2
-      createPowermonitorEvent(1100, 1200, 40), // none
+    var powerMonitorEvents = [
+      createPowerMonitorEvent(0, 100, 170), // r2
+      createPowerMonitorEvent(100, 200, 30), // r2
+      createPowerMonitorEvent(200, 300, 40), // none
+      createPowerMonitorEvent(300, 400, 10), // r3
+      createPowerMonitorEvent(400, 500, 7160), // r3
+      createPowerMonitorEvent(500, 600, 30), // r3
+      createPowerMonitorEvent(600, 700, 20), // r2
+      createPowerMonitorEvent(700, 800, 100), // r2
+      createPowerMonitorEvent(800, 900, 30), // r2
+      createPowerMonitorEvent(900, 1000, 100), // none
+      createPowerMonitorEvent(1000, 1100, 30), // r2
+      createPowerMonitorEvent(1100, 1200, 40), // none
     ];
     var expectedPowerEventTimes = [
       {start: 0, end: 200},
@@ -660,7 +660,7 @@ testSuite({
       {start: 1000, end: 1100}
     ];
 
-    var powerEstimator = new Estimator(runningEvents, powermonitorEvents);
+    var powerEstimator = new Estimator(runningEvents, powerMonitorEvents);
     runningEvents.forEach(function(event, i) {
       var got = powerEstimator.getRunningPowerEvent(event);
       assertObjectEquals('existing running events',

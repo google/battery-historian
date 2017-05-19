@@ -93,7 +93,9 @@ var setUp = function() {
  * Tests getting the default battery level config from the level data.
  */
 var testGetDefault = function() {
-  assertArrayEquals(batteryLevelData, levelData.getData());
+  var gotArray = levelData.getData();
+  assertEquals(gotArray.length, 1);
+  assertArrayEquals(batteryLevelData, gotArray[0]);
   assertObjectEquals(historian.LevelConfigs.batteryLevelConfig_(deviceCapacity),
       levelData.getConfig());
 };
@@ -156,7 +158,9 @@ var testNoData = function() {
  */
 var testConfigGenerated = function() {
   levelData.setLevel(historian.metrics.Csv.VOLTAGE);
-  assertArrayEquals(voltageData, levelData.getData());
+  var gotArray = levelData.getData();
+  assertEquals(gotArray.length, 1);
+  assertArrayEquals(voltageData, gotArray[0]);
 
   var gotConfig = levelData.getConfig();
   assertObjectEquals({min: 100, max: 500}, gotConfig.yDomain);

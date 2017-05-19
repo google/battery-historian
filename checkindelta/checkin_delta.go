@@ -21,8 +21,10 @@ import (
 	"log"
 	"reflect"
 	"strconv"
+	"strings"
 
 	"github.com/golang/protobuf/proto"
+	"github.com/google/battery-historian/checkinparse"
 	"github.com/google/battery-historian/packageutils"
 
 	bspb "github.com/google/battery-historian/pb/batterystats_proto"
@@ -32,78 +34,6 @@ import (
 const (
 	// connector string used to combine 2 build information strings.
 	connector = " - "
-)
-
-var (
-	// idMap contains a list of all the fields in BatteryStats_* messages that should not be diffed
-	idMap = map[reflect.Type]map[int]bool{
-		// App fields
-		reflect.TypeOf(&bspb.BatteryStats_App_Apk_Service{}): {
-			0: true, // name
-		},
-		reflect.TypeOf(&bspb.BatteryStats_App_Process{}): {
-			0: true, // name
-		},
-		reflect.TypeOf(&bspb.BatteryStats_App_ScheduledJob{}): {
-			0: true, // name
-		},
-		reflect.TypeOf(&bspb.BatteryStats_App_Sensor{}): {
-			0: true, // number
-		},
-		reflect.TypeOf(&bspb.BatteryStats_App_Sync{}): {
-			0: true, // name
-		},
-		reflect.TypeOf(&bspb.BatteryStats_App_UserActivity{}): {
-			0: true, // name
-		},
-		reflect.TypeOf(&bspb.BatteryStats_App_Wakelock{}): {
-			0: true, // name
-		},
-		reflect.TypeOf(&bspb.BatteryStats_App_WakeupAlarm{}): {
-			0: true, // name
-		},
-		reflect.TypeOf(&bspb.BatteryStats_ControllerActivity_TxLevel{}): {
-			0: true, // level
-		},
-		// System fields
-		reflect.TypeOf(&bspb.BatteryStats_System_Battery{}): {
-			5: true, // start_clock_time_msec
-		},
-		reflect.TypeOf(&bspb.BatteryStats_System_BluetoothState{}): {
-			0: true, // name
-		},
-		// It doesn't make sense to diff ChargeStep fields.
-		reflect.TypeOf(&bspb.BatteryStats_System_DataConnection{}): {
-			0: true, // name
-		},
-		reflect.TypeOf(&bspb.BatteryStats_System_KernelWakelock{}): {
-			0: true, // name
-		},
-		reflect.TypeOf(&bspb.BatteryStats_System_PowerUseItem{}): {
-			0: true, // name
-		},
-		reflect.TypeOf(&bspb.BatteryStats_System_PowerUseSummary{}): {
-			0: true, // battery_capacity_mah
-		},
-		reflect.TypeOf(&bspb.BatteryStats_System_ScreenBrightness{}): {
-			0: true, // name
-		},
-		reflect.TypeOf(&bspb.BatteryStats_System_SignalStrength{}): {
-			0: true, // name
-		},
-		reflect.TypeOf(&bspb.BatteryStats_System_WakeupReason{}): {
-			0: true, // name
-		},
-		reflect.TypeOf(&bspb.BatteryStats_System_WifiSignalStrength{}): {
-			0: true, // name
-		},
-		reflect.TypeOf(&bspb.BatteryStats_System_WifiSupplicantState{}): {
-			0: true, // name
-		},
-		reflect.TypeOf(&bspb.BatteryStats_System_WifiState{}): {
-			0: true, // name
-		},
-	}
 )
 
 // combineProtoStrings compares and combines 2 strings from a proto.
@@ -397,7 +327,7 @@ func subtractApp(a1, a2 *bspb.BatteryStats_App) *bspb.BatteryStats_App {
 		c2map[c.GetName()] = c
 	}
 
-	changed := false
+	changed := a1.GetVersionCode() != a2.GetVersionCode() || a1.GetVersionName() != a2.GetVersionName()
 	if diff := subtractMessage(a1.GetCpu(), a2.GetCpu()); diff != nil {
 		a.Cpu = diff.(*bspb.BatteryStats_App_Cpu)
 		changed = true
@@ -542,17 +472,11 @@ func subtractAppChild(p1, p2 *bspb.BatteryStats_App_Child) *bspb.BatteryStats_Ap
 	}
 
 	d := &bspb.BatteryStats_App_Child{
-		Name: p1.Name,
+		Name:        p1.Name,
+		VersionName: combineProtoStrings(p1.GetVersionName(), p2.GetVersionName(), connector),
+		VersionCode: p1.VersionCode,
 	}
-	changed := false
-	if diff := p1.GetVersionCode() - p2.GetVersionCode(); diff != 0 {
-		d.VersionCode = proto.Int32(diff)
-		changed = true
-	}
-	if p1.GetVersionName() != p2.GetVersionName() {
-		d.VersionName = proto.String(fmt.Sprintf("%s -> %s", p1.GetVersionName(), p2.GetVersionName()))
-		changed = true
-	}
+	changed := p1.GetVersionCode() != p2.GetVersionCode() || p1.GetVersionName() != p2.GetVersionName()
 	if diff := subtractAppApk(p1.GetApk(), p2.GetApk()); diff != nil {
 		d.Apk = diff
 		changed = true
@@ -780,7 +704,10 @@ func subtractStruct(out, in1, in2 reflect.Value, ids map[int]bool) bool {
 	}
 
 	changed := false
-	for i := 0; i < in1.NumField()-1; i++ {
+	for i := 0; i < in1.NumField(); i++ {
+		if f := in1.Type().Field(i); strings.HasPrefix(f.Name, "XXX_") || f.PkgPath != "" {
+			continue // skip XXX_ and unexported fields
+		}
 		// pointer to field i
 		fieldPtrV1, fieldPtrV2 := in1.Field(i), in2.Field(i)
 		if fieldPtrV1.IsNil() && fieldPtrV2.IsNil() {
@@ -838,7 +765,8 @@ func subtractMessage(p1, p2 proto.Message) proto.Message {
 		in2 = reflect.New(in1.Type().Elem())
 	}
 	out := reflect.New(in1.Type().Elem())
-	changed := subtractStruct(out.Elem(), in1.Elem(), in2.Elem(), idMap[r])
+	// ID fields should not be diffed.
+	changed := subtractStruct(out.Elem(), in1.Elem(), in2.Elem(), checkinparse.BatteryStatsIDMap[r])
 	if !changed {
 		return nil
 	}

@@ -19,6 +19,7 @@
  */
 goog.provide('historian.TableRow');
 goog.provide('historian.tables');
+goog.provide('historian.tables.Panes');
 
 goog.require('historian.note');
 goog.require('historian.time');
@@ -98,17 +99,20 @@ historian.tables.Panes = {
 historian.tables.addRow = function(tElement, data) {
   var tr = $('<tr></tr>').appendTo(tElement);
   if (data.title) tr.attr('title', data.title);
-  for (var i = 0; i < data.length; i++) {
+  data.forEach(function(d) {
     var td = $('<td></td>').appendTo(tr);
-    var d = data[i];
     if (typeof(d) == 'object') {
       td.text(d.value);
-      if (d.title) td.attr('title', d.title);
-      if (d.classes) td.attr('class', d.classes);
+      if (d.title) {
+        td.attr('title', d.title);
+      }
+      if (d.classes) {
+        td.attr('class', d.classes);
+      }
     } else {
       td.text(d);
     }
-  }
+  });
 };
 
 
@@ -168,7 +172,8 @@ historian.tables.activateDataTable = function(tables) {
       ordering: !noOrdering,
       orderClasses: false,
       searching: !noSearching,
-      info: !noInfo
+      info: !noInfo,
+      pageLength: 5  // Zero is not a valid page length.
     });
   });
 };
@@ -198,7 +203,7 @@ historian.tables.toString = function(table, opt_tableName) {
       .map(function(curValue, index) {
         var lengths = [];
         $(curValue).find('th, td').each(function() {
-          lengths.push($(this).text().length);
+          lengths.push($(this).text().trim().length);
         });
         return lengths;
       })
@@ -219,8 +224,8 @@ historian.tables.toString = function(table, opt_tableName) {
         var x = $(curValue).find('th, td');
         var numEmpty = 0;
         for (var i = 0; i < x.length; i++) {
-          var text = /** @type {string} */ ($(x[i]).text());
-          if (text.trim().length == 0) {
+          var text = /** @type {string} */ ($(x[i]).text().trim());
+          if (text.length == 0) {
             numEmpty++;
           }
           padded.push(historian.utils.padString(
@@ -356,10 +361,19 @@ historian.tables.initTables = function() {
       $('#wakeup-no-breakdown').show();
     }
   });
+};
+
+
+/**
+ * Hides low metrics from appropriate checkin tables.
+ */
+historian.tables.initTablesHideLowMetrics = function() {
+  var hidableTables = $('table#checkin.hidable-metrics');
+  if (hidableTables.length == 0) return;
   // Show aggregated checkin stats with 0 levels only if checkbox checked.
-  // 0-Values are determined by looking at Checkin's column 1 (second column).
-  historian.tables.determineZeroValueRows($('table#checkin'), 1);
-  var lowAggCheckinRows = $('table#checkin .label-zero-value-row');
+  // 0-Values are determined by looking at Checkin's second column.
+  historian.tables.determineZeroValueRows(hidableTables, 1);
+  var lowAggCheckinRows = hidableTables.find('.label-zero-value-row');
   lowAggCheckinRows.hide();
   $('#show-low-metrics').change(function() {
     if ($(this).prop('checked')) {
@@ -590,6 +604,7 @@ historian.tables.initTableJumps = function() {
  */
 historian.tables.initialize = function() {
   historian.tables.initTables();
+  historian.tables.initTablesHideLowMetrics();
   historian.tables.initTableTogglers();
   historian.tables.initTableSidebar();
   historian.tables.initTableJumps();

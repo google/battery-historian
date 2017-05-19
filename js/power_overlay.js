@@ -35,7 +35,7 @@ var DROPDOWN_CONTAINER_ID = '#power-selector-container';
 
 
 /**
- * Renders the powermonitor overlay, showing the powermonitor events
+ * Renders the power monitor overlay, showing the power monitor events
  * corresponding to the selected wakeup reason.
  */
 exports = goog.defineClass(null, {
@@ -62,14 +62,14 @@ exports = goog.defineClass(null, {
      * Line generator.
      * @private {function(this:Node, !Array<!historian.Entry>): string}
      */
-    this.levelLine_ = d3.svg.line()
+    this.levelLine_ = d3.line()
         .x(function(d) {
           return context.xScale(d.startTime);
         })
         .y(function(d) {
           return context.yScale(d.value);
         })
-        .interpolate('linear');
+        .curve(d3.curveLinear);
 
     /** @private {!jQuery} */
     this.container_ = container;
@@ -99,29 +99,29 @@ exports = goog.defineClass(null, {
 
 
   /**
-   * Renders the powermonitor events corresponding to the selected wakeup
-   * reason. If powermonitor is not the currently overlaid level metric, the
+   * Renders the power monitor events corresponding to the selected wakeup
+   * reason. If power monitor is not the currently overlaid level metric, the
    * wakeup reason dropdown is hidden.
    */
   render: function() {
     this.clear_();
-    var powermonitorDisplayed =
-        this.levelData_.getConfig().name == Csv.POWERMONITOR;
-    // Hide the dropdown if the currently overlaid metric is not powermonitor.
-    this.showSelector_(powermonitorDisplayed);
+    var powerMonitorDisplayed =
+        this.levelData_.getConfig().name == Csv.POWER_MONITOR;
+    // Hide the dropdown if the currently overlaid metric is not power monitor.
+    this.showSelector_(powerMonitorDisplayed);
 
     var selected = this.getSelected_();
-    if (!selected || !powermonitorDisplayed) {
+    if (!selected || !powerMonitorDisplayed) {
       return;
     }
     var msPerPixel = this.context_.msPerPixel();
     this.powerEstimator_.getEvents(selected).forEach(function(event) {
-      var powermonitorEvents = event.getPowermonitorEvents();
+      var powerMonitorEvents = event.getPowerMonitorEvents();
       if (msPerPixel > time.MSECS_IN_SEC) {
-        // Apply sampling to match the underlying powermonitor events.
-        powermonitorEvents = data.sampleData(powermonitorEvents);
+        // Apply sampling to match the underlying power monitor events.
+        powerMonitorEvents = data.sampleData(powerMonitorEvents);
       }
-      this.draw_(powermonitorEvents);
+      this.draw_(powerMonitorEvents);
     }, this);
   },
 

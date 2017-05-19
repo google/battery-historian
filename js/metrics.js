@@ -20,9 +20,28 @@
 goog.provide('historian.metrics');
 goog.provide('historian.metrics.Csv');
 goog.provide('historian.metrics.DataHasher');
+goog.provide('historian.metrics.GroupProperties');
 
 goog.require('historian.constants');
 goog.require('historian.historianV2Logs');
+goog.require('historian.time');
+
+
+/**
+ * Properties that uniquely identifies a group.
+ * source: Log source for the series in the group. Excluding UNAVAILABLE or
+ *     ERROR type series, a group will by default have one series, in which case
+ *     the group source will be the same as the series.
+ *     If the group is specially defined (e.g. AM_PROC), the source will be
+ *     historian.historianV2Logs.Sources.CUSTOM.
+ * name: The group name.
+ *
+ * @typedef {{
+ *   source: !historian.historianV2Logs.Sources,
+ *   name: string
+ * }}
+ */
+historian.metrics.GroupProperties;
 
 
 /** CPU Running entry that intersects with a wakelock entry. */
@@ -55,90 +74,182 @@ historian.metrics.UNAVAILABLE_TYPE = 'unavailable';
 
 
 /**
+ * The suffix appended to rate of change metrics.
+ * @const {string}
+ */
+historian.metrics.ROC_SUFFIX = ' (Rate of change)';
+
+
+/**
  * The string representing the metric in the historian V2 CSV input.
  *
  * @enum {string}
  */
 historian.metrics.Csv = {
   // Int metrics
-  TEMPERATURE: 'Temperature',
-  VOLTAGE: 'Voltage',
-  BATTERY_LEVEL: 'Level',
+  BATTERY_LEVEL: 'Battery Level',
   BRIGHTNESS: 'Brightness',
   COULOMB_CHARGE: 'Coulomb charge',
-  SIGNAL_STRENGTH: 'Mobile signal strength',
+  POWER_MONITOR: 'Power Monitor (mA)',
+  POWER_MONITOR_MW: 'Power Monitor (mW)',
+  POWER_MONITOR_MAH: 'Power Monitor (cumulative mAh)',
+  // Group name for power monitor metrics.
+  POWER_MONITOR_MA_MW_GROUP: 'Power Monitor mA / mW [group]',
+  POWER_MONITOR_MA_MAH_GROUP: 'Power Monitor mA / cumulative mAh [group]',
+  TEMPERATURE: 'Temperature',
+  VOLTAGE: 'Voltage',
 
   // String metrics
-  PHONE_STATE: 'Phone state',
-  DATA_CONNECTION: 'Mobile network type',
-  PLUG_TYPE: 'Plug',
   CHARGING_STATUS: 'Charging status',
+  DATA_CONNECTION: 'Mobile network type',
   HEALTH: 'Health',
-  WIFI_SUPPLICANT: 'Wifi supplicant',
-  WIFI_SIGNAL_STRENGTH: 'Wifi signal strength',
   IDLE_MODE_ON: 'Doze',
+  PHONE_STATE: 'Phone state',
+  PLUG_TYPE: 'Plug',
+  SIGNAL_STRENGTH: 'Mobile signal strength',
+  WIFI_SIGNAL_STRENGTH: 'Wifi signal strength',
+  WIFI_SUPPLICANT: 'Wifi supplicant',
 
   // Bool metrics
+  AUDIO: 'Audio',
+  BLE_SCANNING: 'BLE scanning',
+  CAMERA: 'Camera',
+  CHARGING_ON: 'Charging on',
   CPU_RUNNING: 'CPU running',
-  SENSOR_ON: 'Sensor',
+  DEVICE_ACTIVE: 'Device active',
+  FLASHLIGHT: 'Flashlight on',
   GPS_ON: 'GPS',
-  WIFI_FULL_LOCK: 'Wifi full lock',
-  WIFI_SCAN: 'Wifi scan',
-  WIFI_MULTICAST_ON: 'Wifi multicast',
+  LOW_POWER_MODE: 'Battery Saver',
   MOBILE_RADIO_ON: 'Mobile radio active',
+  PHONE_IN_CALL: 'Phone call',
+  PHONE_SCANNING: 'Phone scanning',
+  PLUGGED: 'Plugged',
+  REBOOT: 'Reboot',
+  SCREEN_ON: 'Screen',
+  SENSOR_ON: 'Sensor',
+  SIGNIFICANT_MOTION: 'Significant motion',
+  VIDEO: 'Video',
+  WIFI_FULL_LOCK: 'Wifi full lock',
+  WIFI_MULTICAST_ON: 'Wifi multicast',
   WIFI_ON: 'Wifi on',
   WIFI_RADIO: 'Wifi radio',
   WIFI_RUNNING: 'Wifi running',
-  PHONE_SCANNING: 'Phone scanning',
-  BLE_SCANNING: 'BLE scanning',
-  SCREEN_ON: 'Screen',
-  PLUGGED: 'Plugged',
-  PHONE_IN_CALL: 'Phone call',
-  LOW_POWER_MODE: 'Battery Saver',
-  AUDIO: 'Audio',
-  CAMERA: 'Camera',
-  VIDEO: 'Video',
-  REBOOT: 'Reboot',
-  FLASHLIGHT: 'Flashlight on',
-  CHARGING_ON: 'Charging on',
-  DEVICE_ACTIVE: 'Device active',
-  SIGNIFICANT_MOTION: 'Significant motion',
+  WIFI_SCAN: 'Wifi scan',
 
   // Service metrics
-  APPLICATION_PROCESSOR_WAKEUP: 'App Processor wakeup',
-  WAKELOCK_IN: 'Wakelock_in',
-  WAKE_LOCK_HELD: 'Partial wakelock',
-  SYNC_APP: 'SyncManager',
   ACTIVE_PROCESS: 'Active process',
-  LONG_WAKELOCK: 'Long Wakelocks',
-  FOREGROUND_PROCESS: 'Foreground process',
-  TOP_APPLICATION: 'Top app',
+  APPLICATION_PROCESSOR_WAKEUP: 'App Processor wakeup',
   CONNECTIVITY: 'Network connectivity',
-  SCHEDULED_JOB: 'JobScheduler',
-  PACKAGE_INSTALL: 'Package install',
-  PACKAGE_UNINSTALL: 'Package uninstall',
+  FOREGROUND_PROCESS: 'Foreground process',
+  LONG_WAKELOCK: 'Long Wakelocks',
   PACKAGE_ACTIVE: 'Package active',
   PACKAGE_INACTIVE: 'Package inactive',
+  PACKAGE_INSTALL: 'Package install',
+  PACKAGE_UNINSTALL: 'Package uninstall',
+  SCHEDULED_JOB: 'JobScheduler',
+  SYNC_APP: 'SyncManager',
   TMP_WHITE_LIST: 'Temp White List',
+  TOP_APPLICATION: 'Top app',
+  WAKE_LOCK_HELD: 'Partial wakelock',
+  WAKELOCK_IN: 'Wakelock_in',
 
+  // Kernel trace metrics.
   KERNEL_WAKESOURCE: 'Kernel Wakesource',
-  POWERMONITOR: 'Powermonitor',
 
   // Logcat metrics
-  CRASHES: 'Crashes',
-  NATIVE_CRASHES: 'Native crash',
+  BACKGROUND_COMPILATION: 'dex2oat',
+  BATTERY_TEST_UTIL: 'BatteryTestUtil',
   BLUETOOTH_SCAN: 'Bluetooth Scan',
+  CHOREOGRAPHER_SKIPPED: 'Choreographer (skipped frames)',
+  CRASHES: 'Crashes',
+  GC_PAUSE_BACKGROUND_PARTIAL: 'GC Pause - Background (partial)',
+  GC_PAUSE_BACKGROUND_STICKY: 'GC Pause - Background (sticky)',
+  GC_PAUSE_FOREGROUND: 'GC Pause - Foreground',
+  // Group name for GC_PAUSE metrics.
+  GC_PAUSE: 'GC Pause',
   LOGCAT_MISC: 'Logcat misc',
+  NATIVE_CRASHES: 'Native crash',
+  STRICT_MODE_VIOLATION: 'StrictMode policy violation',
 
   // Event log metrics.
-  AM_PROC_START: 'AM Proc Start',
-  AM_PROC_DIED: 'AM Proc Died',
   // Group name for AM_PROC_START and AM_PROC_DIED.
   AM_PROC: 'Activity Manager Proc',
-  AM_LOW_MEMORY: 'AM Low Memory',
-  AM_ANR: 'ANR',
   // Group name for AM_LOW_MEMORY and AM_ANR.
   AM_LOW_MEMORY_ANR: 'AM Low Memory / ANR',
+  DVM_LOCK_SAMPLE: 'Long dvm_lock_sample',
+
+  // Event log metrics parsed directly from:
+  // frameworks/base/services/core/java/com/android/server/am/EventLogTags.logtags
+  AM_PROC_START: 'AM Proc Start',
+  AM_PROC_DIED: 'AM Proc Died',
+  AM_LOW_MEMORY: 'AM Low Memory',
+  AM_ANR: 'ANR',
+  CONFIGURATION_CHANGED: 'configuration_changed',
+  CPU: 'cpu',
+  BOOT_PROGRESS_AMS_READY: 'boot_progress_ams_ready',
+  BOOT_PROGRESS_ENABLE_SCREEN: 'boot_progress_enable_screen',
+  AM_FINISH_ACTIVITY: 'am_finish_activity',
+  AM_TASK_TO_FRONT: 'am_task_to_front',
+  AM_NEW_INTENT: 'am_new_intent',
+  AM_CREATE_TASK: 'am_create_task',
+  AM_CREATE_ACTIVITY: 'am_create_activity',
+  AM_RESTART_ACTIVITY: 'am_restart_activity',
+  AM_RESUME_ACTIVITY: 'am_resume_activity',
+  AM_ACTIVITY_LAUNCH_TIME: 'am_activity_launch_time',
+  AM_PROC_BOUND: 'am_proc_bound',
+  AM_FAILED_TO_PAUSE: 'am_failed_to_pause',
+  AM_PAUSE_ACTIVITY: 'am_pause_activity',
+  AM_PROC_BAD: 'am_proc_bad',
+  AM_PROC_GOOD: 'am_proc_good',
+  AM_DESTROY_ACTIVITY: 'am_destroy_activity',
+  AM_RELAUNCH_RESUME_ACTIVITY: 'am_relaunch_resume_activity',
+  AM_RELAUNCH_ACTIVITY: 'am_relaunch_activity',
+  AM_ON_PAUSED_CALLED: 'am_on_paused_called',
+  AM_ON_RESUME_CALLED: 'am_on_resume_called',
+  AM_KILL: 'am_kill',
+  AM_BROADCAST_DISCARD_FILTER: 'am_broadcast_discard_filter',
+  AM_BROADCAST_DISCARD_APP: 'am_broadcast_discard_app',
+  AM_CREATE_SERVICE: 'am_create_service',
+  AM_DESTROY_SERVICE: 'am_destroy_service',
+  AM_PROCESS_CRASHED_TOO_MUCH: 'am_process_crashed_too_much',
+  AM_DROP_PROCESS: 'am_drop_process',
+  AM_SERVICE_CRASHED_TOO_MUCH: 'am_service_crashed_too_much',
+  AM_SCHEDULE_SERVICE_RESTART: 'am_schedule_service_restart',
+  AM_PROVIDER_LOST_PROCESS: 'am_provider_lost_process',
+  AM_PROCESS_START_TIMEOUT: 'am_process_start_timeout',
+  AM_CRASH: 'am_crash',
+  AM_WTF: 'am_wtf',
+  AM_SWITCH_USER: 'am_switch_user',
+  AM_ACTIVITY_FULLY_DRAWN_TIME: 'am_activity_fully_drawn_time',
+  AM_SET_RESUMED_ACTIVITY: 'am_set_resumed_activity',
+  AM_FOCUSED_STACK: 'am_focused_stack',
+  AM_PRE_BOOT: 'am_pre_boot',
+  AM_MEMINFO: 'am_meminfo',
+  AM_PSS: 'am_pss',
+  AM_STOP_ACTIVITY: 'am_stop_activity',
+  AM_ON_STOP_CALLED: 'am_on_stop_called',
+  AM_MEM_FACTOR: 'am_mem_factor',
+
+  // Event log metrics from:
+  // frameworks/base/core/java/com/android/internal/logging/EventLogTags.logtags
+  SYSUI_VIEW_VISIBILITY: 'sysui_view_visibility',
+  SYSUI_ACTION: 'sysui_action',
+  SYSUI_COUNT: 'sysui_count',
+  SYSUI_HISTOGRAM: 'sysui_histogram',
+
+  APP_TRANSITIONS: 'App Transitions (sysui_action)',
+
+  // Broadcasts log metrics.
+  ACTIVE_BROADCAST_FOREGROUND: 'Active Broadcast (foreground)',
+  ACTIVE_BROADCAST_BACKGROUND: 'Active Broadcast (background)',
+  BROADCAST_ENQUEUE_FOREGROUND: 'Broadcast Enqueue (foreground)',
+  BROADCAST_DISPATCH_FOREGROUND: 'Broadcast Dispatch (foreground)',
+  BROADCAST_ENQUEUE_BACKGROUND: 'Broadcast Enqueue (background)',
+  BROADCAST_DISPATCH_BACKGROUND: 'Broadcast Dispatch (background)',
+
+  // Dmesg metrics.
+  LOW_MEMORY_KILLER: 'Low memory killer',
+  SELINUX_DENIAL: 'SELinux denial',
 
   // Summary metrics
   APP_CPU_USAGE: 'Highest App CPU Usage',
@@ -146,103 +257,497 @@ historian.metrics.Csv = {
 
   // Wearable metrics
   WEARABLE_RPC: 'Wearable RPC',
-  WEARABLE_TRANSPORT: 'Wearable Transport'
+  WEARABLE_TRANSPORT: 'Wearable Transport',
+
+  SCREEN_OFF_DISCHARGE_GROUP: 'Screen Off Discharge Rate [group]',
+  SCREEN_OFF_DISCHARGE: 'Screen Off Discharge Rate',
+  SCREEN_OFF_DISCHARGE_AVG: 'Screen Off Discharge Rate Averaged'
+};
+
+
+/**
+ * Headings in historian V2.
+ * @enum {string}
+ */
+historian.metrics.Headings = {
+  ACTIVE_BROADCASTS: 'Active Broadcasts',
+  HISTORICAL_BROADCASTS: 'Historical Broadcasts',
+  MEMORY: 'Memory',
+  PERFORMANCE: 'Performance'
+};
+
+
+/**
+ * Map from event log metric to properties defined in:
+ * frameworks/base/services/core/java/com/android/server/am/EventLogTags.logtags.
+ * Used to render tooltip tables. Only some entries have a data unit property.
+ * @const {!Object<!Array<{colName: string, unit: (number|string|undefined)}>>}
+ */
+historian.metrics.EventLogProperties = {
+  [historian.metrics.Csv.CONFIGURATION_CHANGED]: [
+    {colName: 'Config mask', unit: 5}
+  ],
+  [historian.metrics.Csv.CPU]: [
+    {colName: 'Total', unit: 6},
+    {colName: 'User', unit: 6},
+    {colName: 'System', unit: 6},
+    {colName: 'Iowait', unit: 6},
+    {colName: 'Irq', unit: 6},
+    {colName: 'Softirq', unit: 6}
+  ],
+  [historian.metrics.Csv.BOOT_PROGRESS_AMS_READY]: [
+    {colName: 'Time', unit: 3}
+  ],
+  [historian.metrics.Csv.BOOT_PROGRESS_ENABLE_SCREEN]: [
+    {colName: 'Time', unit: 3}
+  ],
+  [historian.metrics.Csv.AM_FINISH_ACTIVITY]: [
+    {colName: 'User', unit: 5},
+    {colName: 'Token', unit: 5},
+    {colName: 'Task ID', unit: 5},
+    {colName: 'Component Name'},
+    {colName: 'Reason'}
+  ],
+  [historian.metrics.Csv.AM_TASK_TO_FRONT]: [
+    {colName: 'User', unit: 5},
+    {colName: 'Task', unit: 5}
+  ],
+  [historian.metrics.Csv.AM_NEW_INTENT]: [
+    {colName: 'User', unit: 5},
+    {colName: 'Token', unit: 5},
+    {colName: 'Task ID', unit: 5},
+    {colName: 'Component Name'},
+    {colName: 'Action'},
+    {colName: 'MIME Type'},
+    {colName: 'URI'},
+    {colName: 'Flags', unit: 5}
+  ],
+  [historian.metrics.Csv.AM_CREATE_TASK]: [
+    {colName: 'User', unit: 5},
+    {colName: 'Task ID', unit: 5}
+  ],
+  [historian.metrics.Csv.AM_CREATE_ACTIVITY]: [
+    {colName: 'User', unit: 5},
+    {colName: 'Token', unit: 5},
+    {colName: 'Task ID', unit: 5},
+    {colName: 'Component Name'},
+    {colName: 'Action'},
+    {colName: 'MIME Type'},
+    {colName: 'URI'},
+    {colName: 'Flags', unit: 5}
+  ],
+  [historian.metrics.Csv.AM_RESTART_ACTIVITY]: [
+    {colName: 'User', unit: 5},
+    {colName: 'Token', unit: 5},
+    {colName: 'Task ID', unit: 5},
+    {colName: 'Component Name'}
+  ],
+  [historian.metrics.Csv.AM_RESUME_ACTIVITY]: [
+    {colName: 'User', unit: 5},
+    {colName: 'Token', unit: 5},
+    {colName: 'Task ID', unit: 5},
+    {colName: 'Component Name'}
+  ],
+  [historian.metrics.Csv.AM_ANR]: [
+    {colName: 'User', unit: 5},
+    {colName: 'Pid', unit: 5},
+    {colName: 'Package Name'},
+    {colName: 'Flags', unit: 5},
+    {colName: 'Reason'}
+  ],
+  [historian.metrics.Csv.AM_ACTIVITY_LAUNCH_TIME]: [
+    {colName: 'User', unit: 5},
+    {colName: 'Token', unit: 5},
+    {colName: 'Component Name'},
+    {colName: 'Time', unit: 3},
+    {colName: 'Total Time', unit: 3}
+  ],
+  [historian.metrics.Csv.AM_PROC_BOUND]: [
+    {colName: 'User', unit: 5},
+    {colName: 'PID', unit: 5},
+    {colName: 'Process Name'}
+  ],
+  [historian.metrics.Csv.AM_PROC_DIED]: [
+    {colName: 'User', unit: 5},
+    {colName: 'PID', unit: 5},
+    {colName: 'Process Name'}
+  ],
+  [historian.metrics.Csv.AM_FAILED_TO_PAUSE]: [
+    {colName: 'User', unit: 5},
+    {colName: 'Token', unit: 5},
+    {colName: 'Wanting to pause'},
+    {colName: 'Currently pausing'}
+  ],
+  [historian.metrics.Csv.AM_PAUSE_ACTIVITY]: [
+    {colName: 'User', unit: 5},
+    {colName: 'Token', unit: 5},
+    {colName: 'Component Name'}
+  ],
+  [historian.metrics.Csv.AM_PROC_START]: [
+    {colName: 'User', unit: 5},
+    {colName: 'PID', unit: 5},
+    {colName: 'UID', unit: 5},
+    {colName: 'Process Name'},
+    {colName: 'Type'},
+    {colName: 'Component'}
+  ],
+  [historian.metrics.Csv.AM_PROC_BAD]: [
+    {colName: 'User', unit: 5},
+    {colName: 'UID', unit: 5},
+    {colName: 'Process Name'}
+  ],
+  [historian.metrics.Csv.AM_PROC_GOOD]: [
+    {colName: 'User', unit: 5},
+    {colName: 'UID', unit: 5},
+    {colName: 'Process Name'}
+  ],
+  [historian.metrics.Csv.AM_LOW_MEMORY]: [
+    {colName: 'Num Processes', unit: 1}
+  ],
+  [historian.metrics.Csv.AM_DESTROY_ACTIVITY]: [
+    {colName: 'User', unit: 5},
+    {colName: 'Token', unit: 5},
+    {colName: 'Task ID', unit: 5},
+    {colName: 'Component Name'},
+    {colName: 'Reason'}
+  ],
+  [historian.metrics.Csv.AM_RELAUNCH_RESUME_ACTIVITY]: [
+    {colName: 'User', unit: 5},
+    {colName: 'Token', unit: 5},
+    {colName: 'Task ID', unit: 5},
+    {colName: 'Component Name'}
+  ],
+  [historian.metrics.Csv.AM_RELAUNCH_ACTIVITY]: [
+    {colName: 'User', unit: 5},
+    {colName: 'Token', unit: 5},
+    {colName: 'Task ID', unit: 5},
+    {colName: 'Component Name'}
+  ],
+  [historian.metrics.Csv.AM_ON_PAUSED_CALLED]: [
+    {colName: 'User', unit: 5},
+    {colName: 'Component Name'},
+    {colName: 'Reason'}
+  ],
+  [historian.metrics.Csv.AM_ON_RESUME_CALLED]: [
+    {colName: 'User', unit: 5},
+    {colName: 'Component Name'},
+    {colName: 'Reason'}
+  ],
+  [historian.metrics.Csv.AM_KILL]: [
+    {colName: 'User', unit: 5},
+    {colName: 'PID', unit: 5},
+    {colName: 'Process Name'},
+    {colName: 'OomAdj', unit: 5},
+    {colName: 'Reason'}
+  ],
+  [historian.metrics.Csv.AM_BROADCAST_DISCARD_FILTER]: [
+    {colName: 'User', unit: 5},
+    {colName: 'Broadcast', unit: 5},
+    {colName: 'Action'},
+    {colName: 'Receiver Number', unit: 1},
+    {colName: 'BroadcastFilter', unit: 5}
+  ],
+  [historian.metrics.Csv.AM_BROADCAST_DISCARD_APP]: [
+    {colName: 'User', unit: 5},
+    {colName: 'Broadcast', unit: 5},
+    {colName: 'Action'},
+    {colName: 'Receiver Number', unit: 1},
+    {colName: 'App'}
+  ],
+  [historian.metrics.Csv.AM_CREATE_SERVICE]: [
+    {colName: 'User', unit: 5},
+    {colName: 'Service Record', unit: 5},
+    {colName: 'Name'},
+    {colName: 'UID', unit: 5},
+    {colName: 'PID', unit: 5}
+  ],
+  [historian.metrics.Csv.AM_DESTROY_SERVICE]: [
+    {colName: 'User', unit: 5},
+    {colName: 'Service Record', unit: 5},
+    {colName: 'PID', unit: 5}
+  ],
+  [historian.metrics.Csv.AM_PROCESS_CRASHED_TOO_MUCH]: [
+    {colName: 'User', unit: 5},
+    {colName: 'Name'},
+    {colName: 'PID', unit: 5}
+  ],
+  [historian.metrics.Csv.AM_DROP_PROCESS]: [
+    {colName: 'PID', unit: 5}
+  ],
+  [historian.metrics.Csv.AM_SERVICE_CRASHED_TOO_MUCH]: [
+    {colName: 'User', unit: 5},
+    {colName: 'Crash Count', unit: 1},
+    {colName: 'Component Name'},
+    {colName: 'PID', unit: 5}
+  ],
+  [historian.metrics.Csv.AM_SCHEDULE_SERVICE_RESTART]: [
+    {colName: 'User', unit: 5},
+    {colName: 'Component Name'},
+    {colName: 'Time', unit: 3}
+  ],
+  [historian.metrics.Csv.AM_PROVIDER_LOST_PROCESS]: [
+    {colName: 'User', unit: 5},
+    {colName: 'Package Name'},
+    {colName: 'UID', unit: 5},
+    {colName: 'Name'}
+  ],
+  [historian.metrics.Csv.AM_PROCESS_START_TIMEOUT]: [
+    {colName: 'User', unit: 5},
+    {colName: 'PID', unit: 5},
+    {colName: 'UID', unit: 5},
+    {colName: 'Process Name'}
+  ],
+  [historian.metrics.Csv.AM_CRASH]: [
+    {colName: 'User', unit: 5},
+    {colName: 'PID', unit: 5},
+    {colName: 'Process Name'},
+    {colName: 'Flags', unit: 5},
+    {colName: 'Exception'},
+    {colName: 'Message'},
+    {colName: 'File'},
+    {colName: 'Line', unit: 5}
+  ],
+  [historian.metrics.Csv.AM_WTF]: [
+    {colName: 'User', unit: 5},
+    {colName: 'PID', unit: 5},
+    {colName: 'Process Name'},
+    {colName: 'Flags', unit: 5},
+    {colName: 'Tag'},
+    {colName: 'Message'}
+  ],
+  [historian.metrics.Csv.AM_SWITCH_USER]: [
+    {colName: 'Id', unit: 5}
+  ],
+  [historian.metrics.Csv.AM_ACTIVITY_FULLY_DRAWN_TIME]: [
+    {colName: 'User', unit: 5},
+    {colName: 'Token', unit: 5},
+    {colName: 'Component Name'},
+    {colName: 'Time', unit: 3}
+  ],
+  [historian.metrics.Csv.AM_SET_RESUMED_ACTIVITY]: [
+    {colName: 'User', unit: 5},
+    {colName: 'Component Name'},
+    {colName: 'Reason'}
+  ],
+  [historian.metrics.Csv.AM_FOCUSED_STACK]: [
+    {colName: 'User', unit: 5},
+    {colName: 'Focused Stack Id', unit: 5},
+    {colName: 'Last Focused Stack Id', unit: 5},
+    {colName: 'Reason'}
+  ],
+  [historian.metrics.Csv.AM_PRE_BOOT]: [
+    {colName: 'User', unit: 5},
+    {colName: 'Package'}
+  ],
+  [historian.metrics.Csv.AM_MEMINFO]: [
+    {colName: 'Cached', unit: 2},
+    {colName: 'Free', unit: 2},
+    {colName: 'Zram', unit: 2},
+    {colName: 'Kernel', unit: 2},
+    {colName: 'Native', unit: 2}
+  ],
+  [historian.metrics.Csv.AM_PSS]: [
+    {colName: 'Pid', unit: 5},
+    {colName: 'UID', unit: 5},
+    {colName: 'Process Name'},
+    {colName: 'Pss', unit: 2},
+    {colName: 'Uss', unit: 2},
+    {colName: 'SwapPss', unit: 2}
+  ],
+  [historian.metrics.Csv.AM_STOP_ACTIVITY]: [
+    {colName: 'User', unit: 5},
+    {colName: 'Token', unit: 5},
+    {colName: 'Component Name'}
+  ],
+  [historian.metrics.Csv.AM_ON_STOP_CALLED]: [
+    {colName: 'User', unit: 5},
+    {colName: 'Component Name'},
+    {colName: 'Reason'}
+  ],
+  [historian.metrics.Csv.AM_MEM_FACTOR]: [
+    {colName: 'Current', unit: 5},
+    {colName: 'Previous', unit: 5}
+  ],
+  [historian.metrics.Csv.SYSUI_VIEW_VISIBILITY]: [
+    {colName: 'Category', unit: 5},
+    {colName: 'Visible', unit: 6}
+  ],
+  [historian.metrics.Csv.SYSUI_ACTION]: [
+    {colName: 'Category', unit: 5},
+    // In the logtags file it says 'Pkg', but some don't include package names.
+    // e.g. ACTION_BRIGHTNESS_AUTO includes a brightness value.
+    {colName: 'Value'}
+  ],
+  [historian.metrics.Csv.SYSUI_COUNT]: [
+    {colName: 'Name'},
+    {colName: 'Increment'}
+  ],
+  [historian.metrics.Csv.SYSUI_HISTOGRAM]: [
+    {colName: 'Name'},
+    {colName: 'Bucket', unit: 1}
+  ]
+};
+
+
+/**
+ * Returns an array of group properties constructed from the given group names.
+ * @param {!historian.historianV2Logs.Sources} source
+ * @param {!Array<string>} groups Names of the groups.
+ * @return {!Array<!historian.metrics.GroupProperties>}
+ */
+historian.metrics.makeGroupProperties = function(source, groups) {
+  return groups.map(function(name) { return {source: source, name: name}; });
 };
 
 
 /**
  * Default order of metrics in the Battery History timeline.
- * @const {!Array<string>}
+ * @const {!Array<!historian.metrics.GroupProperties>}
  */
-historian.metrics.BATTERY_HISTORY_ORDER = [
-  historian.metrics.Csv.REBOOT,
-  historian.metrics.Csv.CPU_RUNNING,
-  historian.metrics.Csv.APPLICATION_PROCESSOR_WAKEUP,
-  historian.metrics.KERNEL_UPTIME,
-  historian.metrics.Csv.WAKELOCK_IN,
-  historian.metrics.Csv.WAKE_LOCK_HELD,
-  historian.metrics.Csv.LONG_WAKELOCK,
-  historian.metrics.Csv.KERNEL_WAKESOURCE,
-  historian.metrics.Csv.SCREEN_ON,
-  historian.metrics.Csv.TOP_APPLICATION,
-  historian.metrics.Csv.AM_PROC,
-  historian.metrics.Csv.AM_LOW_MEMORY_ANR,
-  historian.metrics.Csv.CRASHES,
-  historian.metrics.Csv.BRIGHTNESS,
+historian.metrics.BATTERY_HISTORY_ORDER = [].concat(
+    historian.metrics.makeGroupProperties(
+        historian.historianV2Logs.Sources.BATTERY_HISTORY,
+        [
+          historian.metrics.Csv.REBOOT,
+          historian.metrics.Csv.CPU_RUNNING,
+          historian.metrics.Csv.APPLICATION_PROCESSOR_WAKEUP
+        ]
+    ),
+    {
+      source: historian.historianV2Logs.Sources.GENERATED,
+      name: historian.metrics.KERNEL_UPTIME
+    },
+    historian.metrics.makeGroupProperties(
+        historian.historianV2Logs.Sources.BATTERY_HISTORY,
+        [
+          historian.metrics.Csv.WAKELOCK_IN,
+          historian.metrics.Csv.WAKE_LOCK_HELD,
+          historian.metrics.Csv.LONG_WAKELOCK
+        ]
+    ),
+    {
+      source: historian.historianV2Logs.Sources.KERNEL_TRACE,
+      name: historian.metrics.Csv.KERNEL_WAKESOURCE
+    },
+    historian.metrics.makeGroupProperties(
+        historian.historianV2Logs.Sources.BATTERY_HISTORY,
+        [
+          historian.metrics.Csv.SCREEN_ON,
+          historian.metrics.Csv.TOP_APPLICATION
+        ]
+    ),
+    historian.metrics.makeGroupProperties(
+        historian.historianV2Logs.Sources.CUSTOM,
+        [
+          historian.metrics.Csv.AM_PROC,
+          historian.metrics.Csv.AM_LOW_MEMORY_ANR,
+          historian.metrics.Csv.CRASHES
+        ]
+    ),
+    historian.metrics.makeGroupProperties(
+        historian.historianV2Logs.Sources.BATTERY_HISTORY,
+        [
+          historian.metrics.Csv.BRIGHTNESS,
 
-  // Battery saver and Doze
-  historian.metrics.Csv.LOW_POWER_MODE,
-  historian.metrics.Csv.IDLE_MODE_ON,
-  historian.metrics.Csv.DEVICE_ACTIVE,
-  historian.metrics.Csv.SIGNIFICANT_MOTION,
+          // Battery saver and Doze
+          historian.metrics.Csv.LOW_POWER_MODE,
+          historian.metrics.Csv.IDLE_MODE_ON,
+          historian.metrics.Csv.DEVICE_ACTIVE,
+          historian.metrics.Csv.SIGNIFICANT_MOTION,
+          historian.metrics.Csv.SCHEDULED_JOB,
+          historian.metrics.Csv.SYNC_APP,
+          historian.metrics.Csv.TMP_WHITE_LIST,
 
-  historian.metrics.Csv.SCHEDULED_JOB,
-  historian.metrics.Csv.SYNC_APP,
-  historian.metrics.Csv.TMP_WHITE_LIST,
+          historian.metrics.Csv.PHONE_IN_CALL,
+          historian.metrics.Csv.GPS_ON,
+          historian.metrics.Csv.SENSOR_ON
+        ]
+    ),
+    {
+      source: historian.historianV2Logs.Sources.SYSTEM_LOG,
+      name: historian.metrics.Csv.BLUETOOTH_SCAN
+    },
+    historian.metrics.makeGroupProperties(
+        historian.historianV2Logs.Sources.BATTERY_HISTORY,
+        [
+          // Cellular related
+          historian.metrics.Csv.BLE_SCANNING,
+          historian.metrics.Csv.PHONE_SCANNING,
+          historian.metrics.Csv.PHONE_STATE,
+          historian.metrics.Csv.CONNECTIVITY,
+          historian.metrics.Csv.DATA_CONNECTION,
+          historian.metrics.Csv.MOBILE_RADIO_ON,
+          historian.metrics.Csv.SIGNAL_STRENGTH,
 
-  historian.metrics.Csv.PHONE_IN_CALL,
-  historian.metrics.Csv.GPS_ON,
-  historian.metrics.Csv.SENSOR_ON,
-  historian.metrics.Csv.BLUETOOTH_SCAN,
+          // WiFi related
+          historian.metrics.Csv.WIFI_FULL_LOCK,
+          historian.metrics.Csv.WIFI_SCAN,
+          historian.metrics.Csv.WIFI_SUPPLICANT,
+          historian.metrics.Csv.WIFI_RADIO,
+          historian.metrics.Csv.WIFI_SIGNAL_STRENGTH,
+          historian.metrics.Csv.WIFI_MULTICAST_ON,
+          historian.metrics.Csv.WIFI_RUNNING,
+          historian.metrics.Csv.WIFI_ON,
 
-  // Cellular related
-  historian.metrics.Csv.BLE_SCANNING,
-  historian.metrics.Csv.PHONE_SCANNING,
-  historian.metrics.Csv.PHONE_STATE,
-  historian.metrics.Csv.CONNECTIVITY,
-  historian.metrics.Csv.DATA_CONNECTION,
-  historian.metrics.Csv.MOBILE_RADIO_ON,
-  historian.metrics.Csv.SIGNAL_STRENGTH,
+          historian.metrics.Csv.AUDIO,
+          historian.metrics.Csv.FLASHLIGHT,
+          historian.metrics.Csv.CAMERA,
+          historian.metrics.Csv.VIDEO,
 
-  // WiFi related
-  historian.metrics.Csv.WIFI_FULL_LOCK,
-  historian.metrics.Csv.WIFI_SCAN,
-  historian.metrics.Csv.WIFI_SUPPLICANT,
-  historian.metrics.Csv.WIFI_RADIO,
-  historian.metrics.Csv.WIFI_SIGNAL_STRENGTH,
-  historian.metrics.Csv.WIFI_MULTICAST_ON,
-  historian.metrics.Csv.WIFI_RUNNING,
-  historian.metrics.Csv.WIFI_ON,
+          historian.metrics.Csv.FOREGROUND_PROCESS,
 
-  historian.metrics.Csv.AUDIO,
-  historian.metrics.Csv.FLASHLIGHT,
-  historian.metrics.Csv.CAMERA,
-  historian.metrics.Csv.VIDEO,
+          historian.metrics.Csv.PACKAGE_INSTALL,
+          historian.metrics.Csv.PACKAGE_UNINSTALL,
+          historian.metrics.Csv.PACKAGE_ACTIVE,
+          historian.metrics.Csv.PACKAGE_INACTIVE,
 
-  historian.metrics.Csv.FOREGROUND_PROCESS,
-
-  historian.metrics.Csv.PACKAGE_INSTALL,
-  historian.metrics.Csv.PACKAGE_UNINSTALL,
-  historian.metrics.Csv.PACKAGE_ACTIVE,
-  historian.metrics.Csv.PACKAGE_INACTIVE,
-
-  historian.metrics.Csv.BATTERY_LEVEL,
-  historian.metrics.Csv.COULOMB_CHARGE,
-  historian.metrics.Csv.TEMPERATURE,
-  historian.metrics.Csv.PLUGGED,
-  historian.metrics.Csv.CHARGING_ON,
-
-  historian.metrics.Csv.WEARABLE_RPC,
-  historian.metrics.Csv.WEARABLE_TRANSPORT,
-
-  historian.metrics.Csv.LOGCAT_MISC
-];
+          historian.metrics.Csv.BATTERY_LEVEL,
+          historian.metrics.Csv.COULOMB_CHARGE,
+          historian.metrics.Csv.TEMPERATURE,
+          historian.metrics.Csv.PLUGGED,
+          historian.metrics.Csv.CHARGING_ON
+        ]
+    ),
+    {
+      source: historian.historianV2Logs.Sources.SYSTEM_LOG,
+      name: historian.metrics.Csv.BATTERY_TEST_UTIL
+    },
+    historian.metrics.makeGroupProperties(
+        historian.historianV2Logs.Sources.WEARABLE,
+        [
+          historian.metrics.Csv.WEARABLE_RPC,
+          historian.metrics.Csv.WEARABLE_TRANSPORT
+        ]
+    ));
 
 
 /**
  * Default hidden metrics in the Battery History timeline.
- * @const {!Array<string>}
+ * @const {!Array<!historian.metrics.GroupProperties>}
  */
-historian.metrics.BATTERY_HISTORY_HIDDEN = [
-  historian.metrics.Csv.BRIGHTNESS,
-  historian.metrics.Csv.CHARGING_STATUS,
-  historian.metrics.Csv.DEVICE_ACTIVE,
-  historian.metrics.Csv.HEALTH,
-  historian.metrics.Csv.MONSOON,
-  historian.metrics.Csv.PLUG_TYPE,
-  historian.metrics.Csv.TMP_WHITE_LIST,
-  historian.metrics.Csv.VOLTAGE,
-];
+historian.metrics.BATTERY_HISTORY_HIDDEN = [].concat(
+    {
+      source: historian.historianV2Logs.Sources.POWER_MONITOR,
+      name: historian.metrics.Csv.POWER_MONITOR
+    },
+    historian.metrics.makeGroupProperties(
+        historian.historianV2Logs.Sources.BATTERY_HISTORY,
+        [
+          historian.metrics.Csv.BRIGHTNESS,
+          historian.metrics.Csv.CHARGING_STATUS,
+          historian.metrics.Csv.DEVICE_ACTIVE,
+          historian.metrics.Csv.HEALTH,
+          historian.metrics.Csv.PACKAGE_ACTIVE,
+          historian.metrics.Csv.PACKAGE_INACTIVE,
+          historian.metrics.Csv.PLUG_TYPE,
+          historian.metrics.Csv.TMP_WHITE_LIST,
+          historian.metrics.Csv.VOLTAGE
+        ]
+    ),
+    {
+      source: historian.historianV2Logs.Sources.SYSTEM_LOG,
+      name: historian.metrics.Csv.BACKGROUND_COMPILATION
+    });
 
 
 /**
@@ -308,6 +813,72 @@ historian.metrics.getLevelSummaryDimensionKey = function(name) {
 
 
 /**
+ * Map from group name to bucket duration in milliseconds. Groups in this
+ * map will automatically have each series bucketted by count per bucket
+ * duration, and will be selectable as a line overlay to display.
+ * This is useful for groups which usually are not displayable as lines
+ * (not of 'int' type), and for visualizing when there were bursts of
+ * activity, such as network flapping.
+ * @type {!Object<number>}
+ */
+historian.metrics.levelGroupBucketDuration = {
+  [historian.metrics.Csv.AM_PROC] : historian.time.MSECS_IN_MIN
+};
+
+
+/**
+ * Returns whether a group should have its level data bucketted,
+ * and able to be displayed as a level line.
+ * @param {string} groupName Name of the group.
+ * @return {boolean}
+ */
+historian.metrics.isBuckettedLevelGroup = function(groupName) {
+  return groupName in historian.metrics.levelGroupBucketDuration;
+};
+
+
+/**
+ * Expected values for a string metric. The array index will be used for
+ * mapping a string value to a number when plotting as a level line.
+ * @type {!Object<!Array<string>>}
+ */
+historian.metrics.expectedStrings = {
+  // These are the values found in the CSV. Formatting will be applied
+  // before being displayed as y-axis labels.
+  [historian.metrics.Csv.CHARGING_STATUS]: ['?', 'n', 'd', 'c', 'f'],
+  [historian.metrics.Csv.DATA_CONNECTION]: [
+    'none', '1xrtt', 'cdma', 'edge', 'ehrpd', 'evdo_0',
+    'evdo_a', 'evdo_b', 'gprs', 'hsdpa', 'hspa', 'hspap',
+    'hsupa', 'iden', 'lte', 'umts', 'other', 'unknown'
+  ],
+  [historian.metrics.Csv.HEALTH]: ['?', 'g', 'h', 'd', 'v', 'c', 'f'],
+  [historian.metrics.Csv.IDLE_MODE_ON]: ['???', 'off', 'light', 'full'],
+  [historian.metrics.Csv.PHONE_STATE]: ['off', 'em', 'out', 'in'],
+  [historian.metrics.Csv.PLUG_TYPE]: ['n', 'w', 'u', 'a'],
+  [historian.metrics.Csv.SIGNAL_STRENGTH]:  // Mobile signal strength
+      ['none', 'poor', 'moderate', 'good', 'great'],
+  [historian.metrics.Csv.WIFI_SIGNAL_STRENGTH]:
+      ['none', 'poor', 'moderate', 'good', 'great'],
+  [historian.metrics.Csv.WIFI_SUPPLICANT]: [
+    'inv', 'dsc', 'dis', 'inact', 'scan', 'auth', 'ascing',
+    'asced', '4-way', 'group', 'compl', 'dorm', 'uninit'
+  ]
+};
+
+
+/**
+ * Returns whether a group should be displayed as discontinous level data.
+ * @param {string} groupName Name of the group.
+ * @return {boolean}
+ */
+historian.metrics.isDiscontinuousLevelGroup = function(groupName) {
+  return historian.metrics.isBuckettedLevelGroup(groupName) ||
+      (groupName in historian.metrics.expectedStrings) ||
+      groupName == historian.metrics.Csv.BRIGHTNESS;
+};
+
+
+/**
  * Map for testing whether metric will be aggregated.
  * True for metrics to be aggregated.
  * @type {!Object<boolean>}
@@ -321,6 +892,13 @@ historian.metrics.metricsToAggregate = {};
  */
 historian.metrics.METRICS_TO_AGGREGATE_ = [
   historian.metrics.Csv.ACTIVE_PROCESS,
+  historian.metrics.Csv.APP_TRANSITIONS,
+  historian.metrics.Csv.ACTIVE_BROADCAST_FOREGROUND,
+  historian.metrics.Csv.ACTIVE_BROADCAST_BACKGROUND,
+  historian.metrics.Csv.BROADCAST_ENQUEUE_FOREGROUND,
+  historian.metrics.Csv.BROADCAST_DISPATCH_FOREGROUND,
+  historian.metrics.Csv.BROADCAST_ENQUEUE_BACKGROUND,
+  historian.metrics.Csv.BROADCAST_DISPATCH_BACKGROUND,
   historian.metrics.Csv.CONNECTIVITY,
   historian.metrics.Csv.FOREGROUND_PROCESS,
   historian.metrics.Csv.KERNEL_WAKESOURCE,
@@ -357,12 +935,21 @@ historian.metrics.APP_SPECIFIC_METRICS_ = [
   historian.metrics.Csv.PACKAGE_UNINSTALL,
   historian.metrics.Csv.PACKAGE_ACTIVE,
   historian.metrics.Csv.PACKAGE_INACTIVE,
+  historian.metrics.Csv.ACTIVE_BROADCAST_BACKGROUND,
+  historian.metrics.Csv.ACTIVE_BROADCAST_FOREGROUND,
+  historian.metrics.Csv.BROADCAST_ENQUEUE_FOREGROUND,
+  historian.metrics.Csv.BROADCAST_DISPATCH_FOREGROUND,
+  historian.metrics.Csv.BROADCAST_ENQUEUE_BACKGROUND,
+  historian.metrics.Csv.BROADCAST_DISPATCH_BACKGROUND,
   historian.metrics.Csv.AM_PROC_START,
   historian.metrics.Csv.AM_PROC_DIED,
   historian.metrics.Csv.AM_ANR,
   historian.metrics.Csv.BLUETOOTH_SCAN,
+  historian.metrics.Csv.CHOREOGRAPHER_SKIPPED,
   historian.metrics.Csv.CRASHES,
-  historian.metrics.Csv.NATIVE_CRASHES
+  historian.metrics.Csv.DVM_LOCK_SAMPLE,
+  historian.metrics.Csv.NATIVE_CRASHES,
+  historian.metrics.Csv.STRICT_MODE_VIOLATION
 ];
 
 
@@ -389,25 +976,45 @@ historian.metrics.UNRELIABLE_METRICS_ = {
 /**
  * Map for from metric name to bool, for testing whether a metric should be
  * rendered as a circle.
- * @type {!Object<boolean>}
+ * @private {!Object<boolean>}
  */
-historian.metrics.renderAsCircles = {};
+historian.metrics.renderAsCircles_ = {};
 
 
 /**
  * Metrics that will be rendered as circles.
- * By default metrics are rendered as rectangles.
+ * By default event log metrics are rendered as circles, and other metrics are
+ * rendered as rectangles.
  * @private @const {!Array<string>}
  */
 historian.metrics.RENDER_AS_CIRCLES_ = [
-  historian.metrics.Csv.AM_PROC_START,
-  historian.metrics.Csv.AM_PROC_DIED,
-  historian.metrics.Csv.AM_LOW_MEMORY,
-  historian.metrics.Csv.AM_ANR,
+  historian.metrics.Csv.BACKGROUND_COMPILATION,
   historian.metrics.Csv.BLUETOOTH_SCAN,
+  historian.metrics.Csv.CHOREOGRAPHER_SKIPPED,
   historian.metrics.Csv.CRASHES,
-  historian.metrics.Csv.NATIVE_CRASHES
+  historian.metrics.Csv.GC_PAUSE_BACKGROUND_PARTIAL,
+  historian.metrics.Csv.GC_PAUSE_BACKGROUND_STICKY,
+  historian.metrics.Csv.GC_PAUSE_FOREGROUND,
+  historian.metrics.Csv.LOW_MEMORY_KILLER,
+  historian.metrics.Csv.NATIVE_CRASHES,
+  historian.metrics.Csv.SELINUX_DENIAL,
+  historian.metrics.Csv.STRICT_MODE_VIOLATION
 ];
+
+
+/**
+ * Returns true if the series should be rendered as circles.
+ * @param {!historian.SeriesData} series
+ * @return {boolean}
+ */
+historian.metrics.renderAsCircles = function(series) {
+  if (series.name == historian.metrics.Csv.APP_TRANSITIONS) {
+    return false;  // In the event log, but we want to display durations.
+  }
+  return series.name in historian.metrics.renderAsCircles_ ||
+      series.type == historian.metrics.ERROR_TYPE ||
+      series.source == historian.historianV2Logs.Sources.EVENT_LOG;
+};
 
 
 /**
@@ -428,6 +1035,20 @@ historian.metrics.LOGCAT_METRICS_ = [
 
 
 /**
+ * Map from metric name to the threshold for an event that is important enough
+ * to be rendered.
+ * @type {!Object<number>}
+ */
+historian.metrics.thresholdImportant = {
+  [historian.metrics.Csv.AM_PSS]: 200 * 1024 * 1024,  // 200 MB.
+  [historian.metrics.Csv.DVM_LOCK_SAMPLE]: 400,  // 400 ms.
+  [historian.metrics.Csv.GC_PAUSE_BACKGROUND_PARTIAL]: 6,  // 6 ms.
+  [historian.metrics.Csv.GC_PAUSE_BACKGROUND_STICKY]: 6,  // 6 ms.
+  [historian.metrics.Csv.GC_PAUSE_FOREGROUND]: 3  // 3 ms.
+};
+
+
+/**
  * Map from metric name to bool, for testing whether a metric has only instant
  * events (duration 0 ms).
  * @type {!Object<boolean>}
@@ -441,17 +1062,38 @@ historian.metrics.instantMetrics = {};
  */
 historian.metrics.INSTANT_METRICS_ = [
   historian.metrics.Csv.APPLICATION_PROCESSOR_WAKEUP,
+  historian.metrics.Csv.BACKGROUND_COMPILATION,
   historian.metrics.Csv.BATTERY_LEVEL,
+  historian.metrics.Csv.CHOREOGRAPHER_SKIPPED,
   historian.metrics.Csv.CRASHES,
   historian.metrics.Csv.NATIVE_CRASHES,
   historian.metrics.Csv.SIGNIFICANT_MOTION,
   historian.metrics.Csv.DEVICE_ACTIVE,
+  historian.metrics.Csv.DVM_LOCK_SAMPLE,
+  historian.metrics.Csv.GC_PAUSE_BACKGROUND_PARTIAL,
+  historian.metrics.Csv.GC_PAUSE_BACKGROUND_STICKY,
+  historian.metrics.Csv.GC_PAUSE_FOREGROUND,
+  historian.metrics.Csv.LOW_MEMORY_KILLER,
   historian.metrics.Csv.PACKAGE_INSTALL,
   historian.metrics.Csv.PACKAGE_UNINSTALL,
   historian.metrics.Csv.PACKAGE_ACTIVE,
   historian.metrics.Csv.PACKAGE_INACTIVE,
+  historian.metrics.Csv.SELINUX_DENIAL,
+  historian.metrics.Csv.STRICT_MODE_VIOLATION,
   historian.metrics.Csv.WEARABLE_RPC
 ];
+
+
+/**
+ * Returns the translated event name for the given sysui id.
+ * @param {string} id Id to translate.
+ * @return {string} The translated name, or the id if no translation was found.
+ */
+historian.metrics.decodeSystemUiEvent = function(id) {
+  return historian.metrics.systemUiDecoder_ &&
+      id in historian.metrics.systemUiDecoder_ ?
+      historian.metrics.systemUiDecoder_[id] : id;
+};
 
 
 /**
@@ -463,8 +1105,11 @@ historian.metrics.descriptors = {};
 
 /**
  * Sets up the maps for testing properties for the metrics.
+ * @param {!Object<string>} systemUiDecoder
  */
-historian.metrics.initMetrics = function() {
+historian.metrics.initMetrics = function(systemUiDecoder) {
+  historian.metrics.systemUiDecoder_ = systemUiDecoder;
+
   historian.metrics.METRICS_TO_AGGREGATE_.forEach(function(m) {
     historian.metrics.metricsToAggregate[m] = true;
   });
@@ -485,7 +1130,7 @@ historian.metrics.initMetrics = function() {
     });
   }
   historian.metrics.RENDER_AS_CIRCLES_.forEach(function(m) {
-    historian.metrics.renderAsCircles[m] = true;
+    historian.metrics.renderAsCircles_[m] = true;
   });
   historian.metrics.LOGCAT_METRICS_.forEach(function(m) {
     historian.metrics.logcatMetrics[m] = true;
@@ -494,6 +1139,11 @@ historian.metrics.initMetrics = function() {
     historian.metrics.instantMetrics[m] = true;
   });
   // Descriptors populated here will be shown in the corresponding help icon.
+  historian.metrics.descriptors[historian.metrics.Csv.BACKGROUND_COMPILATION] =
+      'dex2oat indicates background compilation is occurring. This can ' +
+      'occur when the Play Store is installing updates, an OTA is ' +
+      'occurring, or an app is loading a dex file that has not yet been ' +
+      'compiled';
   historian.metrics.descriptors[historian.metrics.Csv.WAKE_LOCK_HELD] =
       'Userspace wakelocks prevent the CPU from sleeping. This may point ' +
       'out problems with applications or services holding wakelocks too ' +
@@ -507,9 +1157,9 @@ historian.metrics.initMetrics = function() {
       'You can also enable full wakelock reporting:\n' +
       'adb shell dumpsys batterystats --enable full-wake-history';
   historian.metrics.descriptors[historian.metrics.Csv.LONG_WAKELOCK] =
-      'Wakelocks are currently logged as being held for a long time after ' +
-      'being held for a minute, so the time shown here is the amount of time ' +
-      'the wakelock was held after the initial minute.';
+      'Wakelocks are currently logged as being held for a long time if they ' +
+      'have been held for more than a minute. The time shown here is the ' +
+      'total amount of time the wakelock was held.';
   historian.metrics.descriptors[historian.metrics.KERNEL_UPTIME] =
       'Time when the CPU is running but there is no userspace wakelock held ' +
       'is attributed to kernel only uptime. This metric is generated by ' +
@@ -578,84 +1228,136 @@ historian.metrics.hasDuration = function(seriesName) {
   // Instant metrics only have events with no duration.
   return (seriesName != historian.metrics.Csv.WAKE_LOCK_HELD) &&
       (seriesName != historian.metrics.Csv.SCREEN_ON) &&
+      (seriesName != historian.metrics.KERNEL_UPTIME) &&
       !(seriesName in historian.metrics.instantMetrics);
 };
 
 
 /**
- * Returns the hash of the log source and series name. Currently assumes each
- * log source has unique series names.
- * @param {!historian.historianV2Logs.Sources} logSource
- * @param {string} seriesName
+ * Whether a group should be selectable to render as a level overlay.
+ * @param {!historian.SeriesGroup} group
+ * @return {boolean}
+ */
+historian.metrics.isSelectableAsLevel = function(group) {
+  // Currently only bucketted groups, or groups with a single series
+  // of type 'int' will be selectable to display as the level metric.
+  var t = group.series[0].type;
+  return historian.metrics.isDiscontinuousLevelGroup(group.name) ||
+      (group.series.length == 1 && (t == 'int' || t == 'float'));
+};
+
+
+/**
+ * Returns the hash of the log source and name.
+ * @param {{source: string, name: string}} properties
  * @return {string}
  */
-historian.metrics.hash = function(logSource, seriesName) {
-  return logSource + seriesName;
+historian.metrics.hash = function(properties) {
+  return properties.source + properties.name;
 };
 
 
 
 /**
- * DataHasher stores series data, hashing based on the log source and series
- * name.
+ * DataHasher stores group or series data, hashing based on the log source
+ * and group or series name.
  * @constructor
  * @struct
  */
 historian.metrics.DataHasher = function() {
   /**
-   * Map from the series hash to the corresponding series data.
-   * @private {!Object<!historian.SeriesData>}
+   * Map from the group or series hash to the corresponding group or series
+   * data.
+   * @private {!Object<!historian.SeriesGroup>|!Object<!historian.SeriesData>}
    */
-  this.series_ = {};
+  this.data_ = {};
 };
 
 
 /**
- * Adds the given series data to the map if it doesn't exist, otherwise nothing
- * is done.
- * @param {!historian.SeriesData} seriesData
+ * Adds the given group or series data to the map if it doesn't exist,
+ * otherwise nothing is done.
+ * @param {!historian.SeriesGroup|!historian.SeriesData} data
  */
-historian.metrics.DataHasher.prototype.add = function(seriesData) {
-  var hash = historian.metrics.hash(seriesData.source, seriesData.name);
-  if (!(hash in this.series_)) {
-    this.series_[hash] = seriesData;
+historian.metrics.DataHasher.prototype.add = function(data) {
+  var hash = historian.metrics.hash(data);
+  if (!(hash in this.data_)) {
+    this.data_[hash] = data;
   }
 };
 
 
 /**
- * Returns the series data corresponding to the log source and series name.
+ * Returns the group or series data corresponding to the log source and
+ * group or series name.
  * @param {!historian.historianV2Logs.Sources} logSource
- * @param {string} seriesName
- * @return {?historian.SeriesData}
+ * @param {string} name
+ * @return {?historian.SeriesGroup|?historian.SeriesData}
  */
-historian.metrics.DataHasher.prototype.get = function(logSource, seriesName) {
-  var hash = historian.metrics.hash(logSource, seriesName);
-  return hash in this.series_ ?
-      this.series_[historian.metrics.hash(logSource, seriesName)] : null;
+historian.metrics.DataHasher.prototype.get = function(logSource, name) {
+  var hash = historian.metrics.hash({source: logSource, name: name});
+  return hash in this.data_ ? this.data_[hash] : null;
 };
 
 
 /**
- * Returns all the stored series data.
- * @return {!Array<!historian.SeriesData>}
+ * Returns whether there is data corresponding to the log source and group or
+ * series name.
+ * @param {!historian.historianV2Logs.Sources} logSource
+ * @param {string} name
+ * @return {boolean}
+ */
+historian.metrics.DataHasher.prototype.contains = function(logSource, name) {
+  var hash = historian.metrics.hash({source: logSource, name: name});
+  return hash in this.data_;
+};
+
+
+/**
+ * Returns all the stored group or series data.
+ * @return {!Array<!historian.SeriesGroup>|!Array<!historian.SeriesData>}
  */
 historian.metrics.DataHasher.prototype.getAll = function() {
   var series = [];
-  for (var hash in this.series_) {
-    series.push(this.series_[hash]);
+  for (var hash in this.data_) {
+    series.push(this.data_[hash]);
   }
   return series;
 };
 
 
 /**
- * Returns the series data for series from the BATTERY_HISTORY log.
- * @param {string} seriesName Name of the series to get data for.
- * @return {?historian.SeriesData}
+ * Deletes the group or series data corresponding to the log source and
+ * group or series name.
+ * @param {!historian.historianV2Logs.Sources} logSource
+ * @param {string} name
  */
-historian.metrics.DataHasher.prototype.getBatteryHistorySeries =
-    function(seriesName) {
-  return this.get(
-      historian.historianV2Logs.Sources.BATTERY_HISTORY, seriesName);
+historian.metrics.DataHasher.prototype.delete = function(logSource, name) {
+  delete this.data_[historian.metrics.hash({source: logSource, name: name})];
+};
+
+
+/**
+ * Returns the group or series data from the BATTERY_HISTORY log.
+ * @param {string} name Name of the group or series to get data for.
+ * @return {?historian.SeriesGroup|?historian.SeriesData}
+ */
+historian.metrics.DataHasher.prototype.getBatteryHistoryData = function(name) {
+  return this.get(historian.historianV2Logs.Sources.BATTERY_HISTORY, name);
+};
+
+
+/**
+ * @param {string} name Name of the metric to check.
+ * @return {boolean}
+ */
+historian.metrics.isScreenOffDischargeMetric = function(name) {
+  switch (name.replace(historian.metrics.ROC_SUFFIX, '')) {
+    case historian.metrics.Csv.SCREEN_OFF_DISCHARGE_GROUP:
+    case historian.metrics.Csv.SCREEN_OFF_DISCHARGE:
+    case historian.metrics.Csv.SCREEN_OFF_DISCHARGE_AVG:
+      return true;
+    default:
+      return false;
+  }
 };

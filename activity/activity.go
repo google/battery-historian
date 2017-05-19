@@ -17,6 +17,7 @@ package activity
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"regexp"
 	"sort"
@@ -28,16 +29,17 @@ import (
 	"github.com/google/battery-historian/csv"
 	"github.com/google/battery-historian/historianutils"
 	"github.com/google/battery-historian/packageutils"
+	metricspb "github.com/google/battery-historian/pb/metrics_proto"
 	usagepb "github.com/google/battery-historian/pb/usagestats_proto"
 )
 
 var (
 	// logEntryRE is a regular expression that matches the common prefix to event log and logcat lines in the bug report.
 	// The details are then matched with the various log event types below.
-	// e.g. 11-19 11:29:07.341  2206  2933 I
+	// e.g. "11-19 11:29:07.341  2206  2933 I"
 	logEntryRE = regexp.MustCompile(`^(?P<month>\d+)-(?P<day>\d+)` + `\s+` +
 		`(?P<timeStamp>[^.]+)` + `[.]` + `(?P<remainder>\d+)` + `\s+` +
-		`(?P<pid>\d+)` + `\s+\d+\s+\S+\s+` + `(?P<event>\S+)` + `\s*:` + `(?P<details>.*)`)
+		`(?P<uid>\S+\s+)?` + `(?P<pid>\d+)` + `\s+\d+\s+\S+\s+` + `(?P<event>\S+)` + `\s*:` + `(?P<details>.*)`)
 
 	// crashStartRE is a regular expression that matches the first line of a crash event.
 	crashStartRE = regexp.MustCompile(`^FATAL\sEXCEPTION:\s+` + `(?P<source>.+)`)
@@ -47,9 +49,19 @@ var (
 
 	// nativeCrashProcessRE is the regular expression that matches the process information of a native crash event.
 	nativeCrashProcessRE = regexp.MustCompile(`name:\s+` + `(?P<thread>\S+)` + `\s+>>>\s+` + `(?P<process>\S+)` + `\s+<<<`)
+
+	// choregrapherRE is the regular expression that matches choreographer skipped frames notifications.
+	choreographerRE = regexp.MustCompile(`Skipped (?P<numFrames>\d+) frames!`)
+
+	// gcPauseRE is the regular expression that matches ART garbage collection pauses.
+	// e.g. "Explicit concurrent mark sweep GC freed 706(30KB) AllocSpace objects, 0(0B) LOS objects, 40% free, 16MB/26MB, paused 632us total 52.753ms"
+	gcPauseRE = regexp.MustCompile(`(?P<type>(Background partial|Background sticky|Explicit))` + ` concurrent mark sweep GC.*paused\s+` + `(?P<pausedDur>[^\s]+)`)
 )
 
 const (
+	// strictModePre matches the prefix of the first line of a StrictMode policy violation event.
+	strictModePre = "StrictMode policy violation;"
+
 	// nativeCrashStart is the expected first line of a native crash event.
 	// https://source.android.com/devices/tech/debug/
 	nativeCrashStart = "*** *** *** *** *** *** *** *** *** *** *** *** *** *** *** ***"
@@ -71,6 +83,9 @@ const (
 
 	// amProc is the CSV description for the Activity Manager Process related events.
 	amProc = "Activity Manager Proc"
+
+	// amWTFEvent is the string for matching am_wtf events in the bug report.
+	amWTFEvent = "am_wtf"
 
 	// crashes is the the CSV description of Crash events.
 	crashes = "Crashes"
@@ -101,6 +116,24 @@ type LogsData struct {
 	Errs     []error
 }
 
+// String returns a string representation of the LogsData.
+func (ld LogsData) String() string {
+	var b bytes.Buffer
+	for n, l := range ld.Logs {
+		// l is a pointer to the log. It shouldn't ever be nil, but add a check just in case.
+		if l != nil {
+			fmt.Fprintf(&b, "\n%s startMs: %d\n%s\n", n, l.StartMs, l.CSV)
+		}
+	}
+	for _, w := range ld.Warnings {
+		b.WriteString(w)
+	}
+	for _, e := range ld.Errs {
+		b.WriteString(e.Error())
+	}
+	return b.String()
+}
+
 type parser struct {
 	// referenceYear is the year extracted from the dumpstate line in a bugreport. Event log lines don't contain a year in the date string, so we use this to reconstruct the full timestamp.
 	referenceYear int
@@ -120,7 +153,7 @@ type parser struct {
 	// pidMappings maps from PID to app info.
 	pidMappings map[string][]bugreportutils.AppInfo
 
-	// lastEventType stores the name of the last seen event.
+	// lastEventType stores the name of the last seen event. e.g. StrictMode
 	lastEventType string
 
 	// partialEvent stores the existing state of a partially parsed event.
@@ -164,14 +197,20 @@ func (p *parser) fullTimestamp(month, day, partialTimestamp, remainder string) (
 	}
 	year := p.referenceYear
 	// The reference month and year represents the time the bugreport was taken.
+	// Since events do not have the year and may be out of order, we guess the
+	// year based on the month the event occurred and the reference month.
+	//
+	// If the event's month was greater than the reference month by a lot, the event
+	// is assumed to have taken place in the year preceding the reference year since
+	// it doesn't make sense for events to exist so long after the bugreport was taken.
+	// e.g. Reference date: March 2016, Event month: October, year assumed to be 2015.
+	//
 	// If the bug report event log begins near the end of a year, and rolls over to the next year,
-	// the events will be in either the previous year to the reference year or in the reference year.
-	// Bug reports are assumed to span at most a month, but we leave a slightly larger margin here
-	// in case we get a slightly longer bug report.
-	if p.referenceMonth < time.March && time.Month(parsedMonth) > time.October {
+	// the event would have taken place in the year preceding the reference year.
+	if int(p.referenceMonth)-parsedMonth < -1 {
 		year--
-		// Some events may still occur after the given reference date, so we check for a year rollover.
-	} else if p.referenceMonth > time.October && time.Month(parsedMonth) < time.March {
+		// Some events may still occur after the given reference date, so we check for a year rollover in the other direction.
+	} else if p.referenceMonth == time.December && time.Month(parsedMonth) == time.January {
 		year++
 	}
 	return bugreportutils.TimeStampToMs(fmt.Sprintf("%d-%s-%s %s", year, month, day, partialTimestamp), remainder, p.loc)
@@ -190,7 +229,11 @@ func Parse(pkgs []*usagepb.PackageInfo, f string) LogsData {
 	// Pointer to the log data to modify. Will be stored in the Logs map.
 	var log *Log
 	for _, line := range strings.Split(f, "\n") {
-		if m, result := historianutils.SubexpNames(bugreportutils.BugReportSectionRE, line); m {
+		// We don't want to falsely match log lines that contain text matching the BugReportSectionRE.
+		// Even if we're not interested in these events, matching it as an unknown section heading
+		// leads to log lines being skipped.
+		// e.g. "06-10 15:19:18.447 20746 21720 I efw     : -------------- Local Query Results -----------"
+		if m, result := historianutils.SubexpNames(bugreportutils.BugReportSectionRE, line); m && strings.HasPrefix(line, "-") {
 			s := result["section"]
 			// Just encountered a new section. Output any pending events.
 			if log != nil {
@@ -233,7 +276,13 @@ func Parse(pkgs []*usagepb.PackageInfo, f string) LogsData {
 			continue
 		}
 		// Store the first time seen for the current section.
-		if log.StartMs == 0 {
+		// If there's a big jump between the purported log start time and the current event timestamp,
+		// it's unlikely the user cares about the earlier events, so we overwrite the log start time
+		// to avoid skewing the graph. Usually the relevant event log events don't
+		// span more than a few days.
+		// TODO: consider making this duration configurable. If there are many events
+		// falling in this duration, we might consider showing them all.
+		if msToTime(timestamp).After(msToTime(log.StartMs).AddDate(0, 0, 14)) {
 			log.StartMs = timestamp
 		}
 		if timestamp < log.StartMs {
@@ -241,7 +290,8 @@ func Parse(pkgs []*usagepb.PackageInfo, f string) LogsData {
 			res.Errs = append(res.Errs, fmt.Errorf("expect log timestamps in sorted order, got section start: %v, event timestamp: %v", log.StartMs, timestamp))
 			log.StartMs = timestamp
 		}
-		warning, err := p.parseEvent(pkgs, timestamp, result["event"], result["details"], result["pid"])
+		// TODO: also consider UID field if present.
+		warning, err := p.parseEvent(pkgs, timestamp, result["event"], strings.TrimSpace(result["details"]), result["pid"])
 		if err != nil {
 			res.Errs = append(res.Errs, err)
 		}
@@ -254,6 +304,11 @@ func Parse(pkgs []*usagepb.PackageInfo, f string) LogsData {
 		log.CSV = appendCSVs(log.CSV, p.outputCSV(lastTimestamp))
 	}
 	return res
+}
+
+// msToTime converts milliseconds since Unix Epoch to a time.Time object.
+func msToTime(ms int64) time.Time {
+	return time.Unix(0, ms*int64(time.Millisecond))
 }
 
 func (p *parser) outputCSV(curMs int64) string {
@@ -325,6 +380,39 @@ func (p *parser) parseEvent(pkgs []*usagepb.PackageInfo, timestamp int64, event,
 			p.partialEvent = csv.Entry{} // Clear it here in case we encounter another line that matches the regexp in this crash event.
 		}
 		return "", err
+	case "StrictMode":
+		// Match the start of a policy violation event.
+		if strings.HasPrefix(details, strictModePre) {
+			// Possible we have a stored existing policy violation event. Print it out if it exists.
+			p.printPartial()
+			// Save the event, but don't print it out yet in case we find the process name in
+			// the stack trace.
+			p.partialEvent = csv.Entry{
+				Desc:  "StrictMode policy violation",
+				Start: timestamp,
+				Type:  "service",
+				Value: strings.TrimSpace(strings.TrimPrefix(details, strictModePre)),
+			}
+			return "", nil
+		}
+		if p.partialEvent.Start != 0 && strings.HasPrefix(details, "at") {
+			// Probably part of the stack trace if it starts with "at".
+			// e.g. "at com.android.app.AppSettings.newInstance(AppSettings.java:11418)"
+			pkg, err := packageutils.GuessPackage(details, "", pkgs)
+			// StrictMode violations will be reported by the "android" package,
+			// but this would be useless to display so we wait until we find a
+			// meaningful package name.
+			if pkg == nil || err != nil || pkg.GetPkgName() == "android" {
+				// Don't bother returning the error as we're not sure what line the real package is on.
+				return "", nil
+			}
+			p.partialEvent.Opt = strconv.Itoa(int(pkg.GetUid()))
+			p.printPartial()
+			return "", nil
+		}
+		// Not part of a stack trace. Print out any existing StrictMode event.
+		p.printPartial()
+		return "", nil
 	case "dumpstate":
 		if strings.Contains(details, "begin") {
 			p.csvState.PrintInstantEvent(csv.Entry{
@@ -365,8 +453,63 @@ func (p *parser) parseEvent(pkgs []*usagepb.PackageInfo, timestamp int64, event,
 			p.partialEvent = csv.Entry{}
 			return "", err
 		}
+	case "art":
+		if m, result := historianutils.SubexpNames(gcPauseRE, details); m {
+			t := ""
+			switch result["type"] {
+			case "Background partial":
+				t = "Background (partial)"
+			case "Background sticky":
+				t = "Background (sticky)"
+			case "Explicit":
+				t = "Foreground"
+			default:
+				return "", fmt.Errorf("got unknown GC Pause type: %s", result["type"])
+			}
+			dur, err := time.ParseDuration(result["pausedDur"])
+			if err != nil {
+				return "", err
+			}
+			p.csvState.PrintInstantEvent(csv.Entry{
+				Desc:  fmt.Sprintf("GC Pause - %s", t),
+				Start: timestamp,
+				Type:  "service",
+				Value: strconv.FormatInt(dur.Nanoseconds(), 10),
+			})
+			return "", nil
+		}
+	case "Choreographer":
+		if m, result := historianutils.SubexpNames(choreographerRE, details); m {
+			_, uid := p.pidInfo(pid)
+			p.csvState.PrintInstantEvent(csv.Entry{
+				Desc:  "Choreographer (skipped frames)",
+				Start: timestamp,
+				Type:  "service",
+				Value: result["numFrames"],
+				Opt:   uid,
+			})
+			return "", nil
+		}
 
 	// Format of Activity Manager details is defined at frameworks/base/services/core/java/com/android/server/am/EventLogTags.logtags.
+	case amWTFEvent:
+		if strings.HasPrefix(details, "[") { // Encountered start of am_wtf event.
+			// Possible we have a stored existing am_wtf event. Print it out if it exists.
+			p.printPartial()
+			// Sometimes the event is multi-line, so save the event for printing later.
+			p.partialEvent = csv.Entry{
+				Desc:  event,
+				Start: timestamp,
+				Type:  "service",
+				Value: strings.Trim(details, "[]"),
+			}
+			return "", nil
+		} else if p.partialEvent.Desc != amWTFEvent { // No saved am_wtf event, and it's not the start of an am_wtf event.
+			return "", fmt.Errorf("am_wtf event with non expected format: %s", amWTFEvent)
+		}
+		p.partialEvent.Value += "\n" + strings.Trim(details, "]") // Continuation of existing event.
+		return "", nil
+
 	case lowMemoryEvent:
 		details = strings.Trim(details, "[]")
 		p.csvState.PrintInstantEvent(csv.Entry{
@@ -382,8 +525,31 @@ func (p *parser) parseEvent(pkgs []*usagepb.PackageInfo, timestamp int64, event,
 	case procStartEvent, procDiedEvent:
 		details = strings.Trim(details, "[]")
 		return p.parseProc(timestamp, details, event)
+	case "dvm_lock_sample":
+		details = strings.Trim(details, "[]")
+		parts := strings.Split(details, ",")
+		warning, err := verifyLen("dvm_lock_sample", parts, 9)
+		if err != nil {
+			return warning, err
+		}
+		uid, err := procToUID(parts[0], pkgs)
+		p.csvState.PrintInstantEvent(csv.Entry{
+			Desc:  "Long dvm_lock_sample", // Filtering on duration is done on JS side.
+			Start: timestamp,
+			Type:  "service",
+			Value: details,
+			Opt:   uid,
+		})
+		return warning, err
+	default:
+		details = strings.Trim(details, "[]")
+		p.csvState.PrintInstantEvent(csv.Entry{
+			Desc:  event,
+			Start: timestamp,
+			Type:  "service",
+			Value: details,
+		})
 	}
-	// Non matching lines are ignored but not considered errors.
 	return "", nil
 }
 
@@ -446,10 +612,6 @@ func (p *parser) parseANR(pkgs []*usagepb.PackageInfo, timestamp int64, v string
 	return warning, err
 }
 
-func amProcValue(pid, uid, process, component string) string {
-	return strings.Join([]string{pid, uid, process, component}, ",")
-}
-
 func (p *parser) parseProc(timestamp int64, v string, t string) (string, error) {
 	switch t {
 	case procStartEvent:
@@ -459,20 +621,20 @@ func (p *parser) parseProc(timestamp int64, v string, t string) (string, error) 
 		if err != nil {
 			return warning, err
 		}
-		if _, err := strconv.Atoi(parts[1]); err != nil {
-			return warning, fmt.Errorf("%s: could not parse pid %v: %v", procStartEvent, parts[1], err)
+		pid := parts[1]
+		if _, err := strconv.Atoi(pid); err != nil {
+			return warning, fmt.Errorf("%s: could not parse pid %v: %v", procStartEvent, pid, err)
 		}
 		uid, err := packageutils.AppIDFromString(parts[2])
 		if err != nil {
 			return warning, fmt.Errorf("%s: could not parse uid %v: %v", procStartEvent, parts[2], err)
 		}
-		pid := parts[1]
 		uidStr := fmt.Sprint(uid)
 		p.csvState.StartEvent(csv.Entry{
 			Desc:       amProc,
 			Start:      timestamp,
 			Type:       "service",
-			Value:      amProcValue(pid, uidStr, parts[3] /** process */, parts[5] /** component */),
+			Value:      v,
 			Opt:        uidStr,
 			Identifier: pid,
 		})
@@ -485,17 +647,16 @@ func (p *parser) parseProc(timestamp int64, v string, t string) (string, error) 
 		if err != nil {
 			return warning, err
 		}
-		if _, err := strconv.Atoi(parts[1]); err != nil {
-			return warning, fmt.Errorf("%s: could not parse pid %v: %v", procDiedEvent, parts[1], err)
-		}
 		pid := parts[1]
+		if _, err := strconv.Atoi(pid); err != nil {
+			return warning, fmt.Errorf("%s: could not parse pid %v: %v", procDiedEvent, pid, err)
+		}
 		if !p.csvState.HasEvent(amProc, pid) {
 			p.csvState.StartEvent(csv.Entry{
-				Desc:  amProc,
-				Start: unknownTime,
-				Type:  "service",
-				// UID and component are not present in died events.
-				Value:      amProcValue(pid, "", parts[2] /** process */, ""),
+				Desc:       amProc,
+				Start:      unknownTime,
+				Type:       "service",
+				Value:      v,
 				Identifier: pid,
 			})
 		}
@@ -517,4 +678,23 @@ func appendCSVs(csv1, csv2 string) string {
 		csv1 += "\n"
 	}
 	return csv1 + csv2
+}
+
+// SystemUIDecoder maps from IDs found in sysui events to the corresponding event name.
+// frameworks/base/proto/src/metrics_constants.proto
+type SystemUIDecoder map[int32]string
+
+// Decoder returns the decoder map for sysui events.
+func Decoder() SystemUIDecoder {
+	return metricspb.MetricsEvent_View_name
+}
+
+// MarshalJSON implements the json.Marshaler interface to marshal SystemUIDecoder into valid JSON.
+func (s SystemUIDecoder) MarshalJSON() ([]byte, error) {
+	// JSON can't do int keys, so we must convert the keys to strings.
+	sm := make(map[string]string)
+	for k, v := range s {
+		sm[strconv.Itoa(int(k))] = v
+	}
+	return json.Marshal(sm)
 }

@@ -38,12 +38,14 @@ var testMetricsUnique = function() {
     unreliable = unreliable.concat(historian.metrics.UNRELIABLE_METRICS_[rv]);
   }
   arraysToCheck.push(unreliable);
-  arraysToCheck.forEach(function(a) {
+  arraysToCheck.forEach(function(arr) {
     var seen = {};
-    a.forEach(function(e) {
-      assertFalse(a + ': Duplicated metric in order definition: ' + e,
-          seen.hasOwnProperty(e));
-      seen[e] = true;
+    arr.forEach(function(e) {
+      var hash = typeof e == 'string' ? e :
+          historian.metrics.hash(e);
+      assertFalse(arr + ': Duplicated metric in order definition: ' + e,
+          seen.hasOwnProperty(hash));
+      seen[hash] = true;
     });
   });
 };
@@ -107,7 +109,7 @@ var testDataHasher = function() {
   };
   allSeries.add(kernelBatteryHistory);
   assertObjectEquals(kernelBatteryHistory,
-      allSeries.getBatteryHistorySeries(kernelBatteryHistory.name));
+      allSeries.getBatteryHistoryData(kernelBatteryHistory.name));
 
   // Try adding a series that already exists.
   var kernelBatteryHistoryNew = {
@@ -119,7 +121,7 @@ var testDataHasher = function() {
   };
   allSeries.add(kernelBatteryHistoryNew);
   assertObjectEquals(kernelBatteryHistory,
-      allSeries.getBatteryHistorySeries(kernelBatteryHistory.name));
+      allSeries.getBatteryHistoryData(kernelBatteryHistory.name));
 
   // Add a series from a different log with the same name.
   var kernelTrace = {

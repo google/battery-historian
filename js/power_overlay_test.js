@@ -75,12 +75,12 @@ testSuite({
   },
 
   /**
-   * Tests rendering if powermonitor is the current level line overlay, and no
+   * Tests rendering if power monitor is the current level line overlay, and no
    * wakeup reason has been selected.
    */
-  testPowermonitorOverlaidNoneSelected: function() {
+  testPowerMonitorOverlaidNoneSelected: function() {
     mockClear();
-    mockLevelData.getConfig().$returns({name: Csv.POWERMONITOR});
+    mockLevelData.getConfig().$returns({name: Csv.POWER_MONITOR});
     mockGetSelected().$returns('');
     mockShowSelector(true);
     mockControl.$replayAll();
@@ -90,12 +90,12 @@ testSuite({
   },
 
   /**
-   * Tests rendering if powermonitor is the current level line overlay, and
+   * Tests rendering if power monitor is the current level line overlay, and
    * the selected wakeup reason has no events.
    */
-  testPowermonitorOverlaidSelectedWithNoEvents: function() {
+  testPowerMonitorOverlaidSelectedWithNoEvents: function() {
     mockClear();
-    mockLevelData.getConfig().$returns({name: Csv.POWERMONITOR});
+    mockLevelData.getConfig().$returns({name: Csv.POWER_MONITOR});
     mockGetSelected().$returns('wake_reason');
     mockShowSelector(true);
     mockContext.msPerPixel().$returns(10);
@@ -107,28 +107,28 @@ testSuite({
   },
 
   /**
-   * Tests rendering if powermonitor is the current level line overlay, and
+   * Tests rendering if power monitor is the current level line overlay, and
    * the current view is zoomed in (msPerPixel is small).
    */
-  testPowermonitorOverlaidZoomedIn: function() {
+  testPowerMonitorOverlaidZoomedIn: function() {
     mockClear();
-    mockLevelData.getConfig().$returns({name: Csv.POWERMONITOR});
+    mockLevelData.getConfig().$returns({name: Csv.POWER_MONITOR});
     mockGetSelected().$returns('wake_reason');
     mockShowSelector(true);
     mockContext.msPerPixel().$returns(10);
 
     var mockPowerEvent1 = mockControl.createStrictMock(Event);
-    var powermonitorEvents1 = [{startTime: 1000}, {startTime: 2000}];
-    mockPowerEvent1.getPowermonitorEvents().$returns(powermonitorEvents1);
+    var powerMonitorEvents1 = [{startTime: 1000}, {startTime: 2000}];
+    mockPowerEvent1.getPowerMonitorEvents().$returns(powerMonitorEvents1);
 
     var mockPowerEvent2 = mockControl.createStrictMock(Event);
-    var powermonitorEvents2 = [{startTime: 300}];
-    mockPowerEvent2.getPowermonitorEvents().$returns(powermonitorEvents2);
+    var powerMonitorEvents2 = [{startTime: 300}];
+    mockPowerEvent2.getPowerMonitorEvents().$returns(powerMonitorEvents2);
 
     mockEstimator.getEvents('wake_reason')
         .$returns([mockPowerEvent1, mockPowerEvent2]);
-    mockDraw(powermonitorEvents1);
-    mockDraw(powermonitorEvents2);
+    mockDraw(powerMonitorEvents1);
+    mockDraw(powerMonitorEvents2);
     mockControl.$replayAll();
 
     overlay.render();
@@ -137,24 +137,24 @@ testSuite({
   },
 
   /**
-   * Tests rendering if powermonitor is the current level line overlay, and
+   * Tests rendering if power monitor is the current level line overlay, and
    * the current view is zoomed out (msPerPixel is large).
    */
-  testPowermonitorOverlaidZoomedOut: function() {
+  testPowerMonitorOverlaidZoomedOut: function() {
     mockClear();
-    mockLevelData.getConfig().$returns({name: Csv.POWERMONITOR});
+    mockLevelData.getConfig().$returns({name: Csv.POWER_MONITOR});
     mockGetSelected().$returns('wake_reason');
     mockShowSelector(true);
     mockContext.msPerPixel().$returns(2000);
 
     var mockPowerEvent = mockControl.createStrictMock(Event);
-    var powermonitorEvents = [{startTime: 1000}, {startTime: 1100}];
-    mockPowerEvent.getPowermonitorEvents().$returns(powermonitorEvents);
+    var powerMonitorEvents = [{startTime: 1000}, {startTime: 1100}];
+    mockPowerEvent.getPowerMonitorEvents().$returns(powerMonitorEvents);
 
     mockEstimator.getEvents('wake_reason').$returns([mockPowerEvent]);
     var sampled = [{startTime: 1000}];
     var sampleMock = mockControl.createMethodMock(data, 'sampleData');
-    sampleMock(powermonitorEvents).$returns(sampled);
+    sampleMock(powerMonitorEvents).$returns(sampled);
     mockDraw(sampled);
     mockControl.$replayAll();
 
@@ -163,7 +163,7 @@ testSuite({
   },
 
   /**
-   * Tests rendering if powermonitor is not the current level line overlay.
+   * Tests rendering if power monitor is not the current level line overlay.
    */
   testOtherOverlaid: function() {
     mockClear();

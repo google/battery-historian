@@ -66,26 +66,30 @@ historian.SeriesLevel = function(
 
   this.barData_.registerListener(this.onSeriesChange.bind(this));
 
-  var wasShown = container.find('.show-level-summary').is(':checked');
-  container.find('.show-level-summary').change(function(event) {
-    this.show_ = $(event.target).is(':checked');
+  var wasShown = this.show_;
+  var levelSummaryElem = container.find('.show-level-summary');
+  levelSummaryElem.on('click', function(event) {
     if (event.hasOwnProperty('originalEvent')) {
       // Change here if the user made the change; ignore if it was changed
       // programatically.
+      this.show_ = !this.show_;  // Toggle the setting.
       wasShown = this.show_;
+    } else {
+      event.stopPropagation();  // Don't change the dropdown menu state.
     }
+    levelSummaryElem.find('.settings-checkbox')
+        .css('opacity', this.show_ ? 1 : 0); // Toggle the setting
+    event.preventDefault();
+
     this.onSeriesChange();
   }.bind(this));
 
   // The level summary data is confusing without the bars, so
   // hide it automatically if the bars are hidden.
   container.find('.show-bars').change(function(event) {
-    if (!$(event.target).is(':checked')) {
-      container.find('.show-level-summary').prop('checked', false).change();
-    } else {
-      container.find('.show-level-summary').prop('checked', wasShown).change();
-    }
-  });
+    this.show_ = $(event.target).is(':checked') ? wasShown : false;
+    levelSummaryElem.click();
+  }.bind(this));
 };
 
 
@@ -151,7 +155,15 @@ historian.SeriesLevel.prototype.renderSeriesLevel_ = function() {
     if (dimName == undefined)
       return;
 
-    var rects = g.selectAll('rect').data(values);
+    // The data for each level drop is stored in each valueRow array.
+    // The count data for this particular series is stored in countIndex of the
+    // valueRow array.
+    var countIndex = this.levelSummaryData_.dimensionToIndex[dimName + '.num'];
+    // Get any rows that have a non zero count for the current series.
+    var nonZeroCount = values.filter(function(valueRow) {
+      return valueRow[countIndex] > 0;
+    });
+    var rects = g.selectAll('rect').data(nonZeroCount);
     rects.enter().append('rect')
         .on('mouseover', function(valueRow) {
           this.hovered = {

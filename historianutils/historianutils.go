@@ -18,10 +18,13 @@ package historianutils
 import (
 	"bytes"
 	"compress/gzip"
+	"errors"
 	"fmt"
 	"os/exec"
 	"regexp"
+	"strconv"
 	"strings"
+	"time"
 )
 
 var (
@@ -68,6 +71,14 @@ func SubexpNames(r *regexp.Regexp, s string) (bool, map[string]string) {
 	return false, nil
 }
 
+// AbsFloat32 returns the absolute value of a float32 number.
+func AbsFloat32(x float32) float32 {
+	if x < 0 {
+		return -x
+	}
+	return x
+}
+
 // ErrorsToString converts an array of errors into a newline delimited string.
 func ErrorsToString(errs []error) string {
 	var errorB bytes.Buffer
@@ -84,6 +95,43 @@ func GzipCompress(uncompressed []byte) ([]byte, error) {
 	_, err := w.Write(uncompressed)
 	w.Close() // Must close this first to flush the bytes to the buffer.
 	return b.Bytes(), err
+}
+
+// MaxInt64 returns the higher of a or b.
+func MaxInt64(a int64, b int64) int64 {
+	if a >= b {
+		return a
+	}
+	return b
+}
+
+// ParseDurationWithDays parses a duration string and returns the milliseconds. e.g. 3d1h2m
+// This is the same as Golang's time.ParseDuration, but also handles days. Assumes days are 24 hours, which is not exact but usually good enough for what we care about.
+func ParseDurationWithDays(input string) (int64, error) {
+	if input == "" {
+		return 0, errors.New("cannot parse duration from empty string")
+	}
+	dur := time.Duration(0)
+
+	dayIdx := strings.Index(input, "d")
+	// Golang's time.ParseDuration throws an error on strings containing days,
+	// so we need to parse it and remove it from the string.
+	if dayIdx >= 0 {
+		days, err := strconv.Atoi(input[0:dayIdx])
+		if err != nil {
+			return 0, err
+		}
+		dur += 24 * time.Hour * time.Duration(days)
+		input = input[dayIdx+1:]
+	}
+	if input != "" {
+		parsed, err := time.ParseDuration(input)
+		if err != nil {
+			return 0, err
+		}
+		dur += parsed
+	}
+	return dur.Nanoseconds() / int64(time.Millisecond), nil
 }
 
 // RunCommand executes the given command and returns the output.

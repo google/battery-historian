@@ -147,7 +147,7 @@ func TestTimeZone(t *testing.T) {
 				`[persist.sys.usb.config]: [adb]`,
 				`[ril.baseband.config.version]: [SHAMU_TMO_CUST]`,
 			},
-			wantErr: errors.New("missing time zone line in bug report"),
+			want: "UTC",
 		},
 	}
 	for _, test := range tests {

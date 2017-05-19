@@ -25,6 +25,7 @@ import (
 	"github.com/golang/protobuf/proto"
 	"github.com/google/battery-historian/bugreportutils"
 	"github.com/google/battery-historian/checkinparse"
+	"github.com/google/battery-historian/historianutils"
 	bspb "github.com/google/battery-historian/pb/batterystats_proto"
 )
 
@@ -45,13 +46,6 @@ func PkgAndSub(t string) (string, string) {
 	return pkg, sub
 }
 
-func abs(x float32) float32 {
-	if x < 0 {
-		return -x
-	}
-	return x
-}
-
 // MDuration holds the duration and the classification level for the value.
 type MDuration struct {
 	V time.Duration
@@ -67,13 +61,23 @@ type MFloat32 struct {
 // ActivityData contains count and duration stats about activity on the device.
 // The UID field will be pouplated (non-zero) if the activity is connected to a specific UID.
 type ActivityData struct {
-	Name          string
-	Title         string
-	UID           int32
-	Count         float32
-	CountPerHour  float32
-	CountLevel    string // Low, Medium, High
-	Duration      time.Duration
+	Name         string
+	Title        string
+	UID          int32
+	Count        float32
+	CountPerHour float32
+	CountLevel   string // Low, Medium, High
+	// MaxDuration is the single longest duration of this ActivityData. This could sometimes be
+	// greater than Duration (eg. in the case of a wakelock whose time was split with another
+	// wakelock -- 2 wakelocks held for an hour each -> Duration would be 30 minutes for each,
+	// but MaxDuration would be one hour).
+	MaxDuration time.Duration
+	Duration    time.Duration
+	// TotalDuration is used to track the total duration of metrics. This may be different from
+	// Duration for metrics such as wakelocks, which will have Duration set to the apportioned
+	// duration.
+	TotalDuration time.Duration
+	// SecondsPerHr based on TotalDuration, if available, otherwise, based on Duration.
 	SecondsPerHr  float32
 	DurationLevel string // Low, Medium, High
 	Level         string // The maximum of CountLevel and DurationLevel.
@@ -82,14 +86,20 @@ type ActivityData struct {
 // activityData converts a WakelockInfo into an ActivityData.
 func activityData(wi *checkinparse.WakelockInfo, realtime time.Duration) ActivityData {
 	ad := ActivityData{
-		Name:     wi.Name,
-		UID:      wi.UID,
-		Count:    wi.Count,
-		Duration: wi.Duration,
+		Name:          wi.Name,
+		UID:           wi.UID,
+		Count:         wi.Count,
+		Duration:      wi.Duration,
+		MaxDuration:   wi.MaxDuration,
+		TotalDuration: wi.TotalDuration,
 	}
 	if realtime > 0 {
 		ad.CountPerHour = wi.Count / float32(realtime.Hours())
-		ad.SecondsPerHr = float32(wi.Duration.Seconds()) / float32(realtime.Hours())
+		d := wi.Duration
+		if wi.TotalDuration > 0 {
+			d = wi.TotalDuration
+		}
+		ad.SecondsPerHr = float32(d.Seconds()) / float32(realtime.Hours())
 	}
 	return ad
 }
@@ -126,18 +136,21 @@ type CPUData struct {
 	Level           string // The maximum of UserTimeLevel and SystemTimeLevel.
 }
 
-// ByPower sorts CPUData by the power usage in descending order.
-type ByPower []CPUData
+// CPUSecs returns the total CPU duration in seconds.
+func (a CPUData) CPUSecs() float64 {
+	return a.UserTime.Seconds() + a.SystemTime.Seconds()
+}
 
-func (a ByPower) Len() int      { return len(a) }
-func (a ByPower) Swap(i, j int) { a[i], a[j] = a[j], a[i] }
-func (a ByPower) Less(i, j int) bool {
-	if abs(a[j].PowerPct-a[i].PowerPct) < 0.01 {
+// ByCPUUsage sorts CPUData by the power usage in descending order. In case of similar
+// power usage, sort according to cpu time.
+type ByCPUUsage []CPUData
+
+func (a ByCPUUsage) Len() int      { return len(a) }
+func (a ByCPUUsage) Swap(i, j int) { a[i], a[j] = a[j], a[i] }
+func (a ByCPUUsage) Less(i, j int) bool {
+	if historianutils.AbsFloat32(a[j].PowerPct-a[i].PowerPct) < 0.01 {
 		// Sort by time if power drain is equal.
-		if a[j].UserTime == a[i].UserTime {
-			return a[j].SystemTime < a[i].SystemTime
-		}
-		return a[j].UserTime < a[i].UserTime
+		return a[j].CPUSecs() < a[i].CPUSecs()
 	}
 	return a[j].PowerPct < a[i].PowerPct
 }
@@ -870,12 +883,21 @@ func ParseCheckinData(c *bspb.BatteryStats) Checkin {
 
 		var pwlt []*checkinparse.WakelockInfo
 		for _, pw := range app.Wakelock {
-			pwlt = append(pwlt, &checkinparse.WakelockInfo{
+			w := &checkinparse.WakelockInfo{
 				Name:     fmt.Sprintf("%s : %s", app.GetName(), pw.GetName()),
 				UID:      app.GetUid(),
 				Duration: time.Duration(pw.GetPartialTimeMsec()) * time.Millisecond,
 				Count:    pw.GetPartialCount(),
-			})
+			}
+			if c.GetReportVersion() >= 20 {
+				// The values are only valid in v20+.
+				w.MaxDuration = time.Duration(pw.GetPartialMaxDurationMsec()) * time.Millisecond
+				if c.GetReportVersion() >= 21 {
+					// The values are only valid in v21+.
+					w.TotalDuration = time.Duration(pw.GetPartialTotalDurationMsec()) * time.Millisecond
+				}
+			}
+			pwlt = append(pwlt, w)
 		}
 		pwl = append(pwl, pwlt...)
 		this.PartialWakelocks = sumWakelockInfo(pwlt, realtime)
@@ -1000,7 +1022,7 @@ func ParseCheckinData(c *bspb.BatteryStats) Checkin {
 		out.CPUUsage = append(out.CPUUsage, *cp)
 		out.TotalAppCPUPowerPct += cp.PowerPct
 	}
-	sort.Sort(ByPower(out.CPUUsage))
+	sort.Sort(ByCPUUsage(out.CPUUsage))
 
 	checkinparse.SortByTime(wfScan)
 	for _, w := range wfScan {

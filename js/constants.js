@@ -18,6 +18,13 @@ goog.module('historian.constants');
 goog.module.declareLegacyNamespace();
 
 
+/** @enum {string} */
+exports.Elements = {
+  // Dropdown for selecting a level metric to overlay.
+  LEVEL_SELECT: '.line-overlay-metrics'
+};
+
+
 /**
  * @const {number}
  */

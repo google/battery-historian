@@ -18,13 +18,16 @@ specific language governing permissions and limitations under the License.
     <script src="//ajax.googleapis.com/ajax/libs/jqueryui/1.11.2/jquery-ui.min.js"></script>
 
     <link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/select2/3.5.4/select2.css">
+    <link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/jquery-contextmenu/1.6.6/jquery.contextMenu.css">
     <link rel="stylesheet" href="//cdn.datatables.net/1.10.9/css/jquery.dataTables.css">
     <script src="//cdnjs.cloudflare.com/ajax/libs/select2/3.5.4/select2.js"></script>
+    <script src="//cdnjs.cloudflare.com/ajax/libs/jquery-contextmenu/1.6.6/jquery.contextMenu.js"></script>
     <script src="//cdn.datatables.net/1.10.9/js/jquery.dataTables.js"></script>
-    <script src="//cdnjs.cloudflare.com/ajax/libs/moment.js/2.10.0/moment.js"></script>
-    <script src="//cdnjs.cloudflare.com/ajax/libs/moment-timezone/0.4.0/moment-timezone-with-data.js"></script>
+    <script src="//cdnjs.cloudflare.com/ajax/libs/moment.js/2.13.0/moment.js"></script>
+    <script src="//cdnjs.cloudflare.com/ajax/libs/moment-timezone/0.5.4/moment-timezone-with-data.js"></script>
 
     <script type="text/javascript" src="https://www.google.com/jsapi"></script>
+    <!-- Loading fonts with https://www.gstatic.com/external_hosted/twitter_bootstrap_css/css/bootstrap.min.css is blocked by CORS policy, which means icons won't load. -->
     <link rel="stylesheet" href="//maxcdn.bootstrapcdn.com/bootstrap/3.3.6/css/bootstrap.min.css">
     <script src="//maxcdn.bootstrapcdn.com/bootstrap/3.3.6/js/bootstrap.min.js"></script>
 
@@ -39,7 +42,7 @@ specific language governing permissions and limitations under the License.
 
     <script src="//www.gstatic.com/external_hosted/jquery_form/jquery.form.min.js" charset="utf-8"></script>
 
-    <script type="text/javascript" src="//cdnjs.cloudflare.com/ajax/libs/d3/3.5.15/d3.js"></script>
+    <script type="text/javascript" src="//cdnjs.cloudflare.com/ajax/libs/d3/4.9.1/d3.min.js"></script>
     {{ if .IsOptimizedJs }}
     <script src="compiled/historian-optimized.js?ver={{.ResVersion}}"></script>
     {{ else }}
@@ -97,7 +100,7 @@ specific language governing permissions and limitations under the License.
       {{template "body" .}}
     </div>
     <div class="modal fade" id="dialog" tabindex="-1">
-      <div class="modal-dialog modal-lg">
+      <div class="modal-dialog modal-lg modal-lgify">
         <div class="modal-content">
           <div class="modal-header">
             <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span>&times;</span></button>
@@ -106,6 +109,9 @@ specific language governing permissions and limitations under the License.
           <div class="modal-body"></div>
         </div>
       </div>
+    </div>
+    <div id="copy-content" style="display: none;">
+      {{template "copy" .}}
     </div>
   </body>
 </html>

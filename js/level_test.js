@@ -114,10 +114,12 @@ testSuite({
       mockControl.$replayAll();
 
       var levelData =
-          new Data(testUtils.createData(t.initialData), mockContext, false);
+          new Data([testUtils.createData(t.initialData)], mockContext, false);
 
       var expected = testUtils.createData(t.expected);
-      var gotData = levelData.getDisplayedData();
+      var gotArray = levelData.getDisplayedData();
+      assertEquals(gotArray.length, 1);
+      var gotData = gotArray[0];
       assertObjectEquals(t.desc + ': Expected ' + JSON.stringify(expected) +
           ', got ' + JSON.stringify(gotData), expected, gotData);
 

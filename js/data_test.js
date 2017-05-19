@@ -18,12 +18,13 @@ goog.module('historian.dataTest');
 goog.setTestOnly('historian.dataTest');
 
 var Csv = goog.require('historian.metrics.Csv');
-goog.require('goog.testing.jsunit');
+var color = goog.require('historian.color');
 var data = goog.require('historian.data');
 var historianV2Logs = goog.require('historian.historianV2Logs');
 var metrics = goog.require('historian.metrics');
 var testSuite = goog.require('goog.testing.testSuite');
 var testUtils = goog.require('historian.testUtils');
+goog.require('goog.testing.jsunit');
 
 
 /**
@@ -78,7 +79,7 @@ var ExpectedClusterEntry;
  * Compares the clustered entry with the expected entry.
  * @param {string} desc Description for the test case.
  * @param {!ExpectedClusterEntry} expectedEntry
- * @param {!historian.data.ClusterEntry} clusteredEntry
+ * @param {!data.ClusterEntry} clusteredEntry
  */
 var verifyCluster = function(desc, expectedEntry, clusteredEntry) {
   var expectedText = 'Expected\n' + JSON.stringify(expectedEntry) +
@@ -108,10 +109,16 @@ var createExpectedKernelUptimeEntries = function(values) {
     return {
       startTime: value[0],
       endTime: value[1],
-      value: {
-        wakeReason: value[2],
-        wakelockCategory: value[3]
-      }
+      services: value[2].map(function(wr) {
+        return {
+          startTime: value[0],
+          endTime: value[1],
+          value: {
+            wakeReason: wr,
+            wakelockCategory: value[3]
+          }
+        };
+      })
     };
   });
 };
@@ -624,11 +631,12 @@ testSuite({
   testRunningClusteredCount: function() {
     var csv =
         'metric,type,start_time,end_time,value,opt\n' +
-        'CPU running,service,1000,5000,1000~wr1|2000~wr2|3000~wr3,\n';
+        'CPU running,service,1000,5000,1000~2000~wr1|2000~3000~wr2|3000~5000~wr3,\n';
     var logs = [{source: historianV2Logs.Sources.BATTERY_HISTORY, csv: csv}];
     var testData = data.processHistorianV2Data(logs, 2300, {}, '', true);
 
-    var runningGroup = testData.nameToBarGroup[Csv.CPU_RUNNING];
+    var runningGroup = testData.barGroups.getBatteryHistoryData(
+        Csv.CPU_RUNNING);
     assertNotNull(runningGroup);
 
     var clustered = data.cluster([runningGroup]);
@@ -682,12 +690,8 @@ testSuite({
       var output = data.sampleData(testData);
       var expected = testUtils.createData(t.expected);
 
-      var same = (output.length === expected.length) &&
-          output.every(function(element, index) {
-            return element.value == expected[index].value;
-          });
-      assertTrue(t.desc + ': Expected ' + JSON.stringify(expected) +
-          ', got ' + JSON.stringify(output), same);
+      assertArrayEquals(t.desc + ': Expected ' + JSON.stringify(expected) +
+          ', got ' + JSON.stringify(output), expected, output);
     });
   },
   /**
@@ -695,36 +699,35 @@ testSuite({
    * "with wakelocks" or "without wakelocks".
    */
   testCategorizeRunning: function() {
-    var none = 'No wakeup reason';
     var tests = [
       {
         desc: 'Wakelock starts before start of running entry',
         running: [
-          [100, 200, '100~wr']
+          [100, 200, '100~200~wr']
         ],
         wakelocks: [
           [0, 150, 'service1']
         ],
         expected: [
-          [150, 200, none, metrics.KERNEL_UPTIME_WITH_USERSPACE]
+          [150, 200, ['wr'], metrics.KERNEL_UPTIME_WITH_USERSPACE]
         ]
       },
       {
         desc: 'Wakelock starts in middle of running entry',
         running: [
-          [0, 100, '0~wr']
+          [0, 100, '0~50~wr']
         ],
         wakelocks: [
           [50, 100, 'service1']
         ],
         expected: [
-          [0, 50, 'wr', metrics.KERNEL_UPTIME_WITH_USERSPACE]
+          [0, 50, ['wr'], metrics.KERNEL_UPTIME_WITH_USERSPACE]
         ]
       },
       {
         desc: 'Wakelock starts before and ends after running entry.',
         running: [
-          [50, 100, '50~wr']
+          [50, 100, '50~100~wr']
         ],
         wakelocks: [
           [0, 200, 'service1']
@@ -742,8 +745,8 @@ testSuite({
           [75, 250, 'service1']
         ],
         expected: [
-          [50, 75, 'wr1', metrics.KERNEL_UPTIME_WITH_USERSPACE],
-          [250, 300, none, metrics.KERNEL_UPTIME_WITH_USERSPACE]
+          [50, 75, ['wr1'], metrics.KERNEL_UPTIME_WITH_USERSPACE],
+          [250, 300, ['wr2'], metrics.KERNEL_UPTIME_WITH_USERSPACE]
         ]
       },
       {
@@ -757,8 +760,8 @@ testSuite({
           [90, 300, 'service3'],
         ],
         expected: [
-          [25, 60, none, metrics.KERNEL_UPTIME_WITH_USERSPACE],
-          [70, 90, none, metrics.KERNEL_UPTIME_WITH_USERSPACE]
+          [25, 60, ['wr'], metrics.KERNEL_UPTIME_WITH_USERSPACE],
+          [70, 90, ['No wakeup reason'], metrics.KERNEL_UPTIME_WITH_USERSPACE]
         ]
       },
       {
@@ -772,7 +775,7 @@ testSuite({
           [200, 300, 'service3']
         ],
         expected: [
-          [100, 200, 'wr', metrics.KERNEL_UPTIME_NO_USERSPACE]
+          [100, 200, ['wr'], metrics.KERNEL_UPTIME_NO_USERSPACE]
         ]
       },
       {
@@ -786,20 +789,20 @@ testSuite({
           [300, 400, 'service2']
         ],
         expected: [
-          [200, 300, 'wr2', metrics.KERNEL_UPTIME_WITH_USERSPACE]
+          [200, 300, ['wr2'], metrics.KERNEL_UPTIME_WITH_USERSPACE]
         ]
       },
       {
         desc: 'No wakelocks',
         running: [
-          [100, 200, '100~wr1|15~wr2'],
+          [100, 200, '100~wr1|150~wr2'],
           [200, 400, '200~wr2']
         ],
         wakelocks: [
         ],
         expected: [
-          [100, 200, 'wr1', metrics.KERNEL_UPTIME_NO_USERSPACE],
-          [200, 400, 'wr2', metrics.KERNEL_UPTIME_NO_USERSPACE],
+          [100, 200, ['wr1', 'wr2'], metrics.KERNEL_UPTIME_NO_USERSPACE],
+          [200, 400, ['wr2'], metrics.KERNEL_UPTIME_NO_USERSPACE],
         ]
       }
     ];
@@ -825,7 +828,7 @@ testSuite({
       {
         desc: 'Unknown wakeup reason for running entry',
         running: [
-          [100, 200, '200~Unknown']
+          [100, 200, '100~200~Unknown']
         ],
         expected: [
           {
@@ -838,7 +841,7 @@ testSuite({
       {
         desc: 'Empty wakeup reason',
         running: [
-          [100, 200, '200~']
+          [100, 200, '100~200~']
         ],
         expected: [
           {
@@ -849,15 +852,30 @@ testSuite({
         ]
       },
       {
+        desc: 'Instantaneous wakeup reason',
+        running: [
+          [100, 200, '100~Instantaneous nothing']
+        ],
+        expected: [
+          {
+            startTime: 100,
+            endTime: 200,
+            services: [
+              {startTime: 100, endTime: 100, value: 'Instantaneous nothing'}
+            ]
+          }
+        ]
+      },
+      {
         desc: 'Multiple wakeup reasons',
         running: [
           [
            1000,
            4000,
-           '2000~Abort:Pending Wakeup Sources: ipc00000177_FLP Service Cal |' +
-           '2500~Abort:Pending Wakeup Sources: sh2ap_wakelock |' +
-           '3500~Abort:Some devices failed to suspend|' +
-           '4500~Abort:Pending Wakeup Sources: sh2ap_wakelock '
+          '1000~2000~Abort:Pending Wakeup Sources: ipc00000177_FLP Service Cal |' +
+          '2000~2500~Abort:Pending Wakeup Sources: sh2ap_wakelock |' +
+          '2500~3500~Abort:Some devices failed to suspend|' +
+          '3500~4000~Abort:Pending Wakeup Sources: sh2ap_wakelock '
           ]
         ],
         expected: [
@@ -883,7 +901,7 @@ testSuite({
               },
               {
                 startTime: 3500,
-                endTime: 4500,
+                endTime: 4000,
                 value: 'Abort:Pending Wakeup Sources: sh2ap_wakelock '
               }
             ]
@@ -936,21 +954,41 @@ testSuite({
       },
       // Begins before report start time.
       {
-        source: historianV2Logs.Sources.LOGCAT,
+        source: historianV2Logs.Sources.SYSTEM_LOG,
         csv: logcat,
         startMs: 2000
       }
     ];
     var result = data.processHistorianV2Data(logs, 2300, {}, '', true);
 
-    var wantGroups = [Csv.AM_LOW_MEMORY_ANR, Csv.CRASHES, Csv.WIFI_RUNNING];
-    var gotGroups = Object.keys(result.nameToBarGroup);
-    assertArrayEquals(wantGroups.sort(), gotGroups.sort());
+    var wantGroups = [
+      {
+        source: historianV2Logs.Sources.CUSTOM,
+        name: Csv.AM_LOW_MEMORY_ANR
+      },
+      {
+        source: historianV2Logs.Sources.CUSTOM,
+        name: Csv.CRASHES
+      },
+      {
+        source: historianV2Logs.Sources.BATTERY_HISTORY,
+        name: Csv.WIFI_RUNNING
+      }
+    ];
+    var gotGroups = result.barGroups.getAll().map(function(group) {
+      return {source: group.source, name: group.name};
+    });
+    var byName = function(a, b) {
+      return a.name.localeCompare(b.name);
+    };
+    assertArrayEquals(wantGroups.sort(byName), gotGroups.sort(byName));
 
-    assertEquals('Log start before report start, no UNAVAILABLE series added',
-        1, result.nameToBarGroup[Csv.CRASHES].series.length);
+    assertEquals('Log start is report start, no UNAVAILABLE series added',
+        1, result.barGroups.get(
+            historianV2Logs.Sources.CUSTOM, Csv.CRASHES).series.length);
 
-    var lowMemoryAnrGroup = result.nameToBarGroup[Csv.AM_LOW_MEMORY_ANR];
+    var lowMemoryAnrGroup = result.barGroups.get(
+        historianV2Logs.Sources.CUSTOM, Csv.AM_LOW_MEMORY_ANR);
     assertEquals('Log start after report start, expected UNAVAILABLE series',
         3, lowMemoryAnrGroup.series.length);
 
@@ -959,7 +997,7 @@ testSuite({
     var gotSeries = lowMemoryAnrGroup.series[0];
     assertEquals(1, gotSeries.values.length);
     assertEquals(metrics.UNAVAILABLE_TYPE, gotSeries.type);
-    assertEquals('Report start time', 4000, gotSeries.values[0].startTime);
+    assertEquals('Report start time', 2000, gotSeries.values[0].startTime);
     assertEquals('Log start time', 5000, gotSeries.values[0].endTime);
   },
   /**
@@ -1141,5 +1179,205 @@ testSuite({
     wantNonAggregated.forEach(function(metric) {
       assertFalse(metrics.isAggregatedMetric(metric));
     });
+  },
+  /**
+   * Tests the bucketting of wakeup reasons.
+   */
+  testBucketWakeups: function() {
+    var csv = 'metric,type,start_time,end_time,value,opt\n' +
+        'CPU running,service,1100,3000,1100~1500~wr1|1500~2200~wr2,\n' +
+        'CPU running,service,5200,5500,5200~5500~wr2,\n' +
+        'CPU running,service,5600,6000,5600~5700~wr2|5700~5800~wr3|5800~6000~wr2,\n';
+    var bucketSize = 1000;
+    var want = {
+      'wr1': [{bucketMs: 1100, count: 1}],
+      'wr2': [{bucketMs: 2100, count: 1}, {bucketMs: 5100, count: 3}],
+      'wr3': [{bucketMs: 5100, count: 1}]
+    };
+    var logs = [{source: historianV2Logs.Sources.BATTERY_HISTORY, csv: csv}];
+    var historianV2Data =
+        data.processHistorianV2Data(logs, 2300, {}, '', true);
+    var running = historianV2Data.barGroups.getBatteryHistoryData(
+        Csv.CPU_RUNNING);
+    var batteryHistoryExtent = historianV2Data
+        .logToExtent[historianV2Logs.Sources.BATTERY_HISTORY];
+    var bucketted =
+        data.bucketWakeups(batteryHistoryExtent.min, running, bucketSize);
+    assertObjectEquals(want, bucketted);
+  },
+  /**
+   * Tests the extraction of app transition events from sysui_action events.
+   */
+  testExtractAppTransitions: function() {
+    var csv = 'metric,type,start_time,end_time,value,opt\n' +
+        // Transition 1.
+        Csv.SYSUI_ACTION +
+            ',service,1000,1000,"323,com.google.android.example",\n' +
+        Csv.SYSUI_ACTION +
+            ',service,1050,1050,"324,true",\n' +
+        Csv.SYSUI_ACTION +
+            ',service,1100,1100,"320,reason",\n' +
+        // Non transition event.
+        Csv.SYSUI_ACTION +
+            ',service,1200,1200,"100",\n' +
+        // Transition 2.
+        Csv.SYSUI_ACTION +
+            ',service,2000,2000,"323,com.google.android.example",\n' +
+        // DELAY_MS event (id = 319) for transition 1. Delay = 1 second.
+        Csv.SYSUI_ACTION +
+            ',service,2200,2200,"319,1000",\n';
+    var logs = [{source: historianV2Logs.Sources.EVENT_LOG, csv: csv}];
+    var wantTransitions = [
+          {
+            startTime: 1000,
+            endTime: 2200,
+            id: 0,
+            value: {
+              323: {
+                startTime: 1000,
+                endTime: 1000,
+                value: '323,com.google.android.example'
+              },
+              324: {
+                startTime: 1050,
+                endTime: 1050,
+                value: '324,true'
+              },
+              320: {
+                startTime: 1100,
+                endTime: 1100,
+                value: '320,reason'
+              },
+              319: {
+                startTime: 2200,
+                endTime: 2200,
+                value: '319,1000'
+              }
+            }
+          },
+          {
+            startTime: 2000,
+            endTime: 2000,
+            id: 1,
+            value: {
+              323: {
+                startTime: 2000,
+                endTime: 2000,
+                value: '323,com.google.android.example'
+              }
+            }
+          }
+    ];
+
+    var wantAggregatedTransitions = [
+      {
+        startTime: 1000,
+        endTime: 2000,
+        services: [wantTransitions[0]]
+      },
+      {
+        startTime: 2000,
+        endTime: 2000,
+        services: [wantTransitions[0], wantTransitions[1]]
+      },
+      {
+        startTime: 2000,
+        endTime: 2200,
+        services: [wantTransitions[0]]
+      }
+    ];
+    var wantSysuiActions = [
+      {
+        startTime: 1200,
+        endTime: 1200,
+        value: '100'
+      }
+    ];
+    var historianV2Data =
+        data.processHistorianV2Data(logs, 2300, {}, '', true);
+    assertArrayEquals(wantAggregatedTransitions, historianV2Data.barGroups.get(
+        historianV2Logs.Sources.EVENT_LOG, Csv.APP_TRANSITIONS)
+            .series[0].values);
+    assertArrayEquals(wantSysuiActions, historianV2Data.barGroups.get(
+        historianV2Logs.Sources.EVENT_LOG, Csv.SYSUI_ACTION).series[0].values);
+  },
+  /**
+   * Tests the mapping of string to number values for displaying as a level
+   * line.
+   */
+  testStringMetricMapping: function() {
+    var csv = 'metric,type,start_time,end_time,value,opt\n' +
+        Csv.WIFI_SIGNAL_STRENGTH + ',string,1000,2000,good,\n' +
+        Csv.WIFI_SIGNAL_STRENGTH + ',string,2000,5000,poor,\n' +
+        Csv.WIFI_SIGNAL_STRENGTH + ',string,5000,6000,great,\n' +
+        Csv.WIFI_SIGNAL_STRENGTH + ',string,6000,7000,unknown,\n' +
+        Csv.WIFI_SIGNAL_STRENGTH + ',string,7000,10000,great,\n' +
+        Csv.WIFI_SIGNAL_STRENGTH + ',string,10000,12000,unknown,\n' +
+        Csv.WIFI_SIGNAL_STRENGTH + ',string,12000,14000,another,\n';
+    var logs = [{source: historianV2Logs.Sources.BATTERY_HISTORY, csv: csv}];
+
+    var expectedLevelGroup = {
+      name: Csv.WIFI_SIGNAL_STRENGTH,
+      source: historianV2Logs.Sources.BATTERY_HISTORY,
+      index: null,
+      series: [{
+        name: Csv.WIFI_SIGNAL_STRENGTH,
+        source: historianV2Logs.Sources.BATTERY_HISTORY,
+        type: 'string',
+        // Expected strings are: ['none', 'poor', 'moderate', 'good', 'great'].
+        values: [
+          {
+            startTime: 1000,
+            endTime: 2000,
+            value: 3
+          },
+          {
+            startTime: 2000,
+            endTime: 5000,
+            value: 1
+          },
+          {
+            startTime: 5000,
+            endTime: 6000,
+            value: 4
+          },
+          {
+            startTime: 6000,
+            endTime: 7000,
+            value: 5
+          },
+          {
+            startTime: 7000,
+            endTime: 10000,
+            value: 4
+          },
+          {
+            startTime: 10000,
+            endTime: 12000,
+            value: 5
+          },
+          {
+            startTime: 12000,
+            endTime: 14000,
+            value: 6
+          }
+        ],
+        cluster: true
+      }]
+    };
+
+    var historianV2Data =
+        data.processHistorianV2Data(logs, 2300, {}, '', true);
+    var gotLevelGroup =
+        historianV2Data.nameToLevelGroup[Csv.WIFI_SIGNAL_STRENGTH];
+    assertObjectEquals(expectedLevelGroup, gotLevelGroup);
+
+    // Try mapping the numbers back to the original strings.
+    var originalStrings =
+        ['good', 'poor', 'great', 'unknown', 'great', 'unknown', 'another'];
+    var gotStrings = gotLevelGroup.series[0].values.map(function(entry) {
+      return color.valueFormatter(gotLevelGroup.name, entry.value).value;
+    });
+    assertArrayEquals(originalStrings, gotStrings);
   }
 });

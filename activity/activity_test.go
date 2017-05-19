@@ -57,8 +57,8 @@ func TestParse(t *testing.T) {
 					EventLogSection: &Log{
 						CSV: strings.Join([]string{
 							csv.FileHeader,
-							`Activity Manager Proc,service,1442334565370,1442334729049,"26187,10007,com.google.android.gms.unstable,com.google.android.gms/.droidguard.DroidGuardService",10007`,
-							`Activity Manager Proc,service,1442334575654,1442334731261,"26297,10003,android.process.acore,com.android.providers.contacts/.PackageIntentReceiver",10003`,
+							`Activity Manager Proc,service,1442334565370,1442334729049,"11,26187,1110007,com.google.android.gms.unstable,service,com.google.android.gms/.droidguard.DroidGuardService",10007`,
+							`Activity Manager Proc,service,1442334575654,1442334731261,"11,26297,1110003,android.process.acore,broadcast,com.android.providers.contacts/.PackageIntentReceiver",10003`,
 						}, "\n"),
 						StartMs: 1442334565370,
 					},
@@ -82,7 +82,7 @@ func TestParse(t *testing.T) {
 					EventLogSection: &Log{
 						CSV: strings.Join([]string{
 							csv.FileHeader,
-							`Activity Manager Proc,service,1437652660883,1437652663546,"18230,10068,com.google.android.apps.plus,com.google.android.apps.plus/.service.PackagesMediaMonitor",10068`,
+							`Activity Manager Proc,service,1437652660883,1437652663546,"10,18230,1010068,com.google.android.apps.plus,broadcast,com.google.android.apps.plus/.service.PackagesMediaMonitor",10068`,
 						}, "\n"),
 						StartMs: 1437652660883,
 					},
@@ -105,7 +105,7 @@ func TestParse(t *testing.T) {
 					EventLogSection: &Log{
 						CSV: strings.Join([]string{
 							csv.FileHeader,
-							`Activity Manager Proc,service,1437652660883,-1,"18230,10068,com.google.android.apps.plus,com.google.android.apps.plus/.service.PackagesMediaMonitor",10068`,
+							`Activity Manager Proc,service,1437652660883,-1,"10,18230,1010068,com.google.android.apps.plus,broadcast,com.google.android.apps.plus/.service.PackagesMediaMonitor",10068`,
 						}, "\n"),
 						StartMs: 1437652660883,
 					},
@@ -128,7 +128,7 @@ func TestParse(t *testing.T) {
 					EventLogSection: &Log{
 						CSV: strings.Join([]string{
 							csv.FileHeader,
-							`Activity Manager Proc,service,-1,1437652663546,"18230,,com.google.android.apps.plus,",`,
+							`Activity Manager Proc,service,-1,1437652663546,"10,18230,com.google.android.apps.plus",`,
 						}, "\n"),
 						StartMs: 1437652663546,
 					},
@@ -159,8 +159,11 @@ func TestParse(t *testing.T) {
 						CSV: strings.Join([]string{
 							csv.FileHeader,
 							`AM Low Memory,service,1422390753699,1422390753699,20,`,
+							`force_gc,service,1422390753702,1422390753702,Binder,`,
 							`AM Low Memory,service,1422390779234,1422390779234,22,`,
+							`force_gc,service,1422390779238,1422390779238,Binder,`,
 							`AM Low Memory,service,1422390805381,1422390805381,23,`,
+							`notification_cancel,service,1422390805386,1422390805386,"10007,28835,com.google.android.gms,10436,NULL,0,0,64,8,NULL",`,
 						}, "\n"),
 						StartMs: 1422390753699,
 					},
@@ -193,6 +196,7 @@ func TestParse(t *testing.T) {
 							`ANR,service,1443411899609,1443411899609,"0,2103,com.google.android.gms,-1194836283,executing service com.google.android.gms/.reminders.service.RemindersIntentService",`,
 							`ANR,service,1443412028686,1443412028686,"0,3503,com.google.android.gms,-1194836283,Broadcast of Intent { act=android.net.conn.CONNECTIVITY_CHANGE flg=0x4000010 cmp=com.google.android.gms/.kids.chimera.SystemEventReceiverProxy (has extras) }",`,
 							`ANR,service,1443412028686,1443412028686,"0,3503,com.google.android.apps.photos,-1194836283,Broadcast/stuff",1`,
+							`am_proc_bound,service,1443412028704,1443412028704,"0,3555,com.google.android.apps.photos",`,
 						}, "\n"),
 						StartMs: 1443411899609,
 					},
@@ -285,6 +289,33 @@ func TestParse(t *testing.T) {
 			},
 		},
 		{
+			desc: "Events with months far away from dumpstate month",
+			input: []string{
+
+				`========================================================`,
+				`== dumpstate: 2016-04-01 21:04:31`,
+				`========================================================`,
+				`...`,
+				`------ EVENT LOG (logcat -b events -v threadtime -d *:v) ------`,
+				`07-01 20:44:59.609   808   822 I am_anr  : [0,2103,com.google.android.gms,-1194836283,reason]`,     // Year should be 2015.
+				`02-01 22:44:59.555   808   822 I am_anr  : [0,2103,com.google.android.example,-1194836283,reason]`, // Year should be 2016.
+				`...`,
+				`[persist.sys.timezone]: [America/Los_Angeles]`,
+			},
+			wantLogsData: LogsData{
+				Logs: map[string]*Log{
+					EventLogSection: &Log{
+						CSV: strings.Join([]string{
+							csv.FileHeader,
+							`ANR,service,1435808699609,1435808699609,"0,2103,com.google.android.gms,-1194836283,reason",`,
+							`ANR,service,1454395499555,1454395499555,"0,2103,com.google.android.example,-1194836283,reason",`,
+						}, "\n"),
+						StartMs: 1454395499555,
+					},
+				},
+			},
+		},
+		{
 			desc: "Last event after dumpstate time",
 			input: []string{
 				`========================================================`,
@@ -327,7 +358,7 @@ func TestParse(t *testing.T) {
 					EventLogSection: &Log{
 						CSV: strings.Join([]string{
 							csv.FileHeader,
-							`Activity Manager Proc,service,1451626165370,1451709899609,"26187,10007,com.google.android.gms.unstable,com.google.android.gms/.droidguard.DroidGuardService",10007`,
+							`Activity Manager Proc,service,1451626165370,1451709899609,"11,26187,1110007,com.google.android.gms.unstable,service,com.google.android.gms/.droidguard.DroidGuardService",10007`,
 						}, "\n"),
 						StartMs: 1451626165370,
 					},
@@ -354,7 +385,7 @@ func TestParse(t *testing.T) {
 					EventLogSection: &Log{
 						CSV: strings.Join([]string{
 							csv.FileHeader,
-							`Activity Manager Proc,service,1442334575654,1442334731261,"26297,10003,android.process.acore,com.android.providers.contacts/.PackageIntentReceiver",10003`,
+							`Activity Manager Proc,service,1442334575654,1442334731261,"11,26297,1110003,android.process.acore,broadcast,com.android.providers.contacts/.PackageIntentReceiver,Newfield",10003`,
 						}, "\n"),
 						StartMs: 1442334565370,
 					},
@@ -472,9 +503,209 @@ func TestParse(t *testing.T) {
 					SystemLogSection: &Log{
 						CSV: strings.Join([]string{
 							csv.FileHeader,
+							`libc,service,1456758255063,1456758255063,"Fatal signal 11 (SIGSEGV), code 1, fault addr 0x58 in tid 3788 (RenderThread)",`,
 							`Native crash,service,1456758255216,1456758255216,com.android.systemui: RenderThread,`,
 						}, "\n"),
 						StartMs: 1456758255063,
+					},
+				},
+			},
+		},
+		{
+			desc: "am_wtf",
+			input: []string{
+				`========================================================`,
+				`== dumpstate: 2015-11-05 06:30:29`,
+				`========================================================`,
+				`------ EVENT LOG (logcat -b events -v threadtime -d *:v) ------`,
+				`11-05 06:15:19.609 1136  1175 I am_wtf  : [0,2475,com.google.android.gms.persistent,-1194836283,StrictMode,Stack is too large: numViolations=5 policy=#1600007 front=android.os.StrictMode$StrictModeDiskReadViolation: policy=23068679 violation=2`,
+				`11-05 06:15:19.609 1136  1175 I am_wtf  : 	at android.os.StrictMode$AndroidBlockGuardPolicy.onReadFromDisk(StrictMode.java:1293)`,
+				`11-05 06:15:19.609 1136  1175 I am_wtf  : 	at libcore.io.BlockGuardOs.read(BlockGuardOs.java:230)`,
+				`11-05 06:15:19.609 1136  1175 I am_wtf  : 	at libcore.io.IoBridge.read(IoBri]`,
+				`11-05 06:15:21.609 4723  5868 I am_wtf  : [0,4723,system_server,-1,ActivityManager,Sending non-protected broadcast android.net.wifi.DHCP_RENEW from system]`,
+				`...`,
+				`[persist.sys.timezone]: [America/Los_Angeles]`,
+			},
+			wantLogsData: LogsData{
+				Logs: map[string]*Log{
+					EventLogSection: &Log{
+						CSV: strings.Join([]string{
+							csv.FileHeader,
+							`am_wtf,service,1446732919609,1446732919609,"0,2475,com.google.android.gms.persistent,-1194836283,StrictMode,Stack is too large: numViolations=5 policy=#1600007 front=android.os.StrictMode$StrictModeDiskReadViolation: policy=23068679 violation=2` + "\n" +
+								`at android.os.StrictMode$AndroidBlockGuardPolicy.onReadFromDisk(StrictMode.java:1293)` + "\n" +
+								`at libcore.io.BlockGuardOs.read(BlockGuardOs.java:230)` + "\n" +
+								`at libcore.io.IoBridge.read(IoBri",`,
+							`am_wtf,service,1446732921609,1446732921609,"0,4723,system_server,-1,ActivityManager,Sending non-protected broadcast android.net.wifi.DHCP_RENEW from system",`,
+						}, "\n"),
+						StartMs: 1446732919609,
+					},
+				},
+			},
+		},
+		{
+			desc: "dvm_lock_sample",
+			input: []string{
+				`========================================================`,
+				`== dumpstate: 2015-11-05 06:30:29`,
+				`========================================================`,
+				`------ EVENT LOG (logcat -b events -v threadtime -d *:v) ------`,
+				`11-05 06:15:21.609 31622 31727 I dvm_lock_sample: [com.google.example,0,pool-3-thread-4,494,MetricsManager.java,57,Object.java,-2,98]`,
+				`...`,
+				`[persist.sys.timezone]: [America/Los_Angeles]`,
+			},
+			pkgs: []*usagepb.PackageInfo{
+				{PkgName: proto.String("com.google.example"), Uid: proto.Int32(10114)},
+			},
+			wantLogsData: LogsData{
+				Logs: map[string]*Log{
+					EventLogSection: &Log{
+						CSV: strings.Join([]string{
+							csv.FileHeader,
+							`Long dvm_lock_sample,service,1446732921609,1446732921609,"com.google.example,0,pool-3-thread-4,494,MetricsManager.java,57,Object.java,-2,98",10114`,
+						}, "\n"),
+						StartMs: 1446732921609,
+					},
+				},
+			},
+		},
+		{
+			desc: "GC pauses",
+			input: []string{
+				`========================================================`,
+				`== dumpstate: 2015-06-10 15:41:07`,
+				`========================================================`,
+				`------ SYSTEM LOG (logcat -v threadtime -d *:v) ------`,
+				`--------- beginning of system`,
+				`--------- beginning of main`,
+				`06-10 15:21:43.587  5455  5469 I art     : Background partial concurrent mark sweep GC freed 40761(1528KB) AllocSpace objects, 2(415KB) LOS objects, 39% free, 24MB/40MB, paused 16.364ms total 66.159ms`,
+				`06-10 15:21:45.927  1852  2742 I art     : Explicit concurrent mark sweep GC freed 51894(2MB) AllocSpace objects, 4(79KB) LOS objects, 25% free, 47MB/63MB, paused 2.968ms total 106.780ms`,
+				`06-10 15:23:36.032  6199  6214 I art     : Background sticky concurrent mark sweep GC freed 59399(3MB) AllocSpace objects, 9(167KB) LOS objects, 11% free, 23MB/26MB, paused 29.133ms total 228.390ms`,
+				`06-10 15:37:48.254  1404  1404 I art     : Explicit concurrent mark sweep GC freed 706(30KB) AllocSpace objects, 0(0B) LOS objects, 40% free, 16MB/26MB, paused 632us total 52.753ms`,
+				`...`,
+				`[persist.sys.timezone]: [America/Los_Angeles]`,
+			},
+			wantLogsData: LogsData{
+				Logs: map[string]*Log{
+					SystemLogSection: &Log{
+						CSV: strings.Join([]string{
+							csv.FileHeader,
+							`GC Pause - Background (partial),service,1433974903587,1433974903587,16364000,`, // Value is pause duration in nanoseconds.
+							`GC Pause - Foreground,service,1433974905927,1433974905927,2968000,`,
+							`GC Pause - Background (sticky),service,1433975016032,1433975016032,29133000,`,
+							`GC Pause - Foreground,service,1433975868254,1433975868254,632000,`,
+						}, "\n"),
+						StartMs: 1433974903587,
+					},
+				},
+			},
+		},
+		{
+			desc: "Choreographer notifications",
+			input: []string{
+				`========================================================`,
+				`== dumpstate: 2016-02-29 15:45:37`,
+				`========================================================`,
+				`------ SYSTEM LOG (logcat -v threadtime -v printable -d *:v) ------`,
+				`02-29 15:45:14.575 24830 24830 I Choreographer: Skipped 60 frames!  The application may be doing too much work on its main thread.`,
+				`...`,
+				`  PID mappings:`,
+				`PID #24830: ProcessRecord{5dcac88 24830:com.android.settings/1000}`,
+				`...`,
+				`[persist.sys.timezone]: [America/Los_Angeles]`,
+			},
+			wantLogsData: LogsData{
+				Logs: map[string]*Log{
+					SystemLogSection: &Log{
+						CSV: strings.Join([]string{
+							csv.FileHeader,
+							`Choreographer (skipped frames),service,1456789514575,1456789514575,60,1000`,
+						}, "\n"),
+						StartMs: 1456789514575,
+					},
+				},
+			},
+		},
+		{
+			desc: "StrictMode policy violation",
+			input: []string{
+				`========================================================`,
+				`== dumpstate: 2015-11-05 06:30:29`,
+				`========================================================`,
+				`...`,
+				`------ SYSTEM LOG (logcat -v threadtime -d *:v) ------`,
+				`11-05 06:15:21.609 18263 18263 D StrictMode: StrictMode policy violation; ~duration=489 ms: android.os.StrictMode$StrictModeDiskReadViolation: policy=65567 violation=2`,
+				`11-05 06:15:21.609 18263 18263 D StrictMode:    at android.os.StrictMode$AndroidBlockGuardPolicy.onReadFromDisk(StrictMode.java:1293)`,
+				`11-05 06:15:21.609 18263 18263 D StrictMode:    at java.io.UnixFileSystem.checkAccess(UnixFileSystem.java:249)`,
+				`11-05 06:15:21.609 18263 18263 D StrictMode:    at java.io.File.exists(File.java:780)`,
+				`11-05 06:15:21.609 18263 18263 D StrictMode:    at android.app.ContextImpl.getDataDir(ContextImpl.java:1938)`,
+				`11-05 06:15:21.609 18263 18263 D StrictMode:    at android.app.ContextImpl.getPreferencesDir(ContextImpl.java:466)`,
+				`11-05 06:15:21.609 18263 18263 D StrictMode:    at android.app.ContextImpl.getSharedPreferencesPath(ContextImpl.java:627)`,
+				`11-05 06:15:21.609 18263 18263 D StrictMode:    at android.app.ContextImpl.getSharedPreferences(ContextImpl.java:345)`,
+				`11-05 06:15:21.609 18263 18263 D StrictMode:    at android.content.ContextWrapper.getSharedPreferences(ContextWrapper.java:164)`,
+				`11-05 06:15:21.609 18263 18263 D StrictMode:    at com.google.android.apps.gmm.shared.settings.GmmSettings.newInstance(GmmSettings.java:11418)`,
+				`11-05 06:15:21.609 18263 18263 D StrictMode:    at com.google.android.apps.gmm.map.impl.MapEnvironmentImplModule_GetSettingsFactory.get(MapEnvironmentImplModule_GetSettingsFactory.java:3222)`,
+				`11-05 06:15:21.609 18263 18263 D StrictMode:    at dagger.internal.DoubleCheck.get(DoubleCheck.java:47)`,
+				`11-05 06:15:21.609 18263 18263 D StrictMode:    at com.google.android.apps.gmm.map.impl.PaintfeClientPropertiesProviderImpl_Factory.get(PaintfeClientPropertiesProviderImpl_Factory.java:2027)`,
+				`11-05 06:15:21.609 18263 18263 D StrictMode:    at dagger.internal.DoubleCheck.get(DoubleCheck.java:47)`,
+				`11-05 06:15:21.609 18263 18263 D StrictMode:    at com.google.android.apps.gmm.map.impl.MapEnvironmentImplModule_GetPaintfeClientPropertiesProviderFactory.get(MapEnvironmentImplModule_GetPaintfeClientProp$`,
+				`11-05 06:15:21.609 18263 18263 D StrictMode:    at com.google.android.apps.gmm.shared.net.clientparam.manager.ClientParametersManagerModule_GetClientParametersManagerFactory.get(ClientParametersManagerMod$`,
+				`11-05 06:15:21.609 18263 18263 D StrictMode:    at dagger.internal.DoubleCheck.get(DoubleCheck.java:47)`,
+				`11-05 06:15:21.609 18263 18263 D StrictMode:    at com.google.android.apps.gmm.base.app.DaggerApplicationComponent.getClientParametersManager(DaggerApplicationComponent.java:7568)`,
+				`11-05 06:15:21.609 18263 18263 D StrictMode:    at com.google.android.apps.gmm.base.app.GoogleMapsApplication.onCreate(GoogleMapsApplication.java:51764)`,
+				`11-05 06:15:21.609 18263 18263 D StrictMode:    at android.app.Instrumentation.callApplicationOnCreate(Instrumentation.java:1024)`,
+				`11-05 06:15:21.609 18263 18263 D StrictMode:    at android.app.ActivityThread.handleBindApplication(ActivityThread.java:5372)`,
+				`11-05 06:15:21.609 18263 18263 D StrictMode:    at android.app.ActivityThread.-wrap2(ActivityThread.java)`,
+				`11-05 06:15:21.609 18263 18263 D StrictMode:    at android.app.ActivityThread$H.handleMessage(ActivityThread.java:1529)`,
+				`11-05 06:15:21.609 18263 18263 D StrictMode:    at android.os.Handler.dispatchMessage(Handler.java:102)`,
+				`11-05 06:15:21.609 18263 18263 D StrictMode:    at android.os.Looper.loop(Looper.java:154)`,
+				`11-05 06:15:21.609 18263 18263 D StrictMode:    at android.app.ActivityThread.main(ActivityThread.java:6088)`,
+				`11-05 06:15:21.609 18263 18263 D StrictMode:    at java.lang.reflect.Method.invoke(Native Method)`,
+				`11-05 06:15:21.609 18263 18263 D StrictMode:    at com.android.internal.os.ZygoteInit$MethodAndArgsCaller.run(ZygoteInit.java:886)`,
+				`11-05 06:15:21.609 18263 18263 D StrictMode:    at com.android.internal.os.ZygoteInit.main(ZygoteInit.java:776)`,
+				`...`,
+				`[persist.sys.timezone]: [America/Los_Angeles]`,
+			},
+			pkgs: []*usagepb.PackageInfo{
+				{PkgName: proto.String("android"), Uid: proto.Int32(1000)},
+				{PkgName: proto.String("com.google.android.apps.gmm"), Uid: proto.Int32(10110)},
+			},
+			wantLogsData: LogsData{
+				Logs: map[string]*Log{
+					SystemLogSection: &Log{
+						CSV: strings.Join([]string{
+							csv.FileHeader,
+							`StrictMode policy violation,service,1446732921609,1446732921609,~duration=489 ms: android.os.StrictMode$StrictModeDiskReadViolation: policy=65567 violation=2,10110`,
+						}, "\n"),
+						StartMs: 1446732921609,
+					},
+				},
+			},
+		},
+		{
+			desc: "StrictMode policy violation, without any matched processes",
+			input: []string{
+				`========================================================`,
+				`== dumpstate: 2015-11-05 06:30:29`,
+				`========================================================`,
+				`...`,
+				`------ SYSTEM LOG (logcat -v threadtime -d *:v) ------`,
+				`11-05 06:15:21.609 18263 18263 D StrictMode: StrictMode policy violation; ~duration=489 ms: android.os.StrictMode$StrictModeDiskReadViolation: policy=65567 violation=2`,
+				`11-05 06:15:21.609 18263 18263 D StrictMode:    at android.os.StrictMode$AndroidBlockGuardPolicy.onReadFromDisk(StrictMode.java:1293)`,
+				`11-05 06:15:21.888 18263 18263 D StrictMode: StrictMode policy violation; ~duration=100 ms: android.os.StrictMode$StrictModeDiskReadViolation: policy=65567 violation=2`,
+				`11-05 06:15:21.999 18263 18263 D StrictMode: StrictMode policy violation; ~duration=789 ms: android.os.StrictMode$StrictModeDiskReadViolation: policy=65567 violation=2`,
+				`...`,
+				`[persist.sys.timezone]: [America/Los_Angeles]`,
+			},
+			wantLogsData: LogsData{
+				Logs: map[string]*Log{
+					SystemLogSection: &Log{
+						CSV: strings.Join([]string{
+							csv.FileHeader,
+							`StrictMode policy violation,service,1446732921609,1446732921609,~duration=489 ms: android.os.StrictMode$StrictModeDiskReadViolation: policy=65567 violation=2,`,
+							`StrictMode policy violation,service,1446732921888,1446732921888,~duration=100 ms: android.os.StrictMode$StrictModeDiskReadViolation: policy=65567 violation=2,`,
+							`StrictMode policy violation,service,1446732921999,1446732921999,~duration=789 ms: android.os.StrictMode$StrictModeDiskReadViolation: policy=65567 violation=2,`,
+						}, "\n"),
+						StartMs: 1446732921609,
 					},
 				},
 			},
@@ -539,6 +770,7 @@ func TestParse(t *testing.T) {
 					EventLogSection: &Log{
 						CSV: strings.Join([]string{
 							csv.FileHeader,
+							`notification_cancel,service,1446700749047,1446700749047,,`,
 							`ANR,service,1446732921609,1446732921609,"0,2103,com.google.android.gms,-1194836283,executing service com.google.android.gms/.reminders.service.RemindersIntentService",`,
 						}, "\n"),
 						StartMs: 1446700749047,
@@ -546,6 +778,7 @@ func TestParse(t *testing.T) {
 					SystemLogSection: &Log{
 						CSV: strings.Join([]string{
 							csv.FileHeader,
+							`Vold,service,1446726057356,1446726057356,Vold 2.1 (the revenge) firing up,`,
 							`Bluetooth Scan,service,1446733154095,1446733154095,Unknown PID 1691 (PID: 1691),`,
 							`Logcat misc,string,1446733775969,1446733775969,bug report collection triggered,`,
 						}, "\n"),
@@ -576,14 +809,16 @@ func TestParse(t *testing.T) {
 					EventLogSection: &Log{
 						CSV: strings.Join([]string{
 							csv.FileHeader,
-							`Activity Manager Proc,service,1442334565370,-1,"26187,10007,com.google.android.gms.unstable,com.google.android.gms/.droidguard.DroidGuardService",10007`,
+							`Calendar,service,1442334350539,1442334350539,enqueueAttachment attachmentId: 10827,`,
+							`Activity Manager Proc,service,1442334565370,-1,"11,26187,1110007,com.google.android.gms.unstable,service,com.google.android.gms/.droidguard.DroidGuardService",10007`,
 						}, "\n"),
 						StartMs: 1442334350539,
 					},
 					LastLogcatSection: &Log{
 						CSV: strings.Join([]string{
 							csv.FileHeader,
-							`Activity Manager Proc,service,1442334575654,-1,"26297,10003,android.process.acore,com.android.providers.contacts/.PackageIntentReceiver",10003`,
+							`Gmail,service,1442333990539,1442333990539,enqueueAttachment attachmentId: 10827,`,
+							`Activity Manager Proc,service,1442334575654,-1,"11,26297,1110003,android.process.acore,broadcast,com.android.providers.contacts/.PackageIntentReceiver",10003`,
 						}, "\n"),
 						StartMs: 1442333990539,
 					},
@@ -608,13 +843,68 @@ func TestParse(t *testing.T) {
 					EventLogSection: &Log{
 						CSV: strings.Join([]string{
 							csv.FileHeader,
-							`Activity Manager Proc,service,1442334565370,-1,"26187,10007,com.google.android.gms.unstable,com.google.android.gms/.droidguard.DroidGuardService",10007`,
+							`Calendar,service,1442334650539,1442334650539,enqueueAttachment attachmentId: 10827,`,
+							`Activity Manager Proc,service,1442334565370,-1,"11,26187,1110007,com.google.android.gms.unstable,service,com.google.android.gms/.droidguard.DroidGuardService",10007`,
 						}, "\n"),
 						StartMs: 1442334565370,
 					},
 				},
 				Errs: []error{
 					fmt.Errorf("expect log timestamps in sorted order, got section start: 1442334650539, event timestamp: 1442334565370"),
+				},
+			},
+		},
+		{
+			desc: "Log line detail matches section heading",
+			input: []string{
+				`========================================================`,
+				`== dumpstate: 2015-06-10 15:41:07`,
+				`========================================================`,
+				`------ SYSTEM LOG (logcat -v threadtime -d *:v) ------`,
+				`--------- beginning of system`,
+				`--------- beginning of main`,
+				`06-10 15:19:18.447 20746 21720 I efw     : -------------- Local Query Results -----------`,
+				`...`,
+				`[persist.sys.timezone]: [America/Los_Angeles]`,
+			},
+			wantLogsData: LogsData{
+				Logs: map[string]*Log{
+					SystemLogSection: &Log{
+						CSV: strings.Join([]string{
+							csv.FileHeader,
+							`efw,service,1433974758447,1433974758447,-------------- Local Query Results -----------,`,
+						}, "\n"),
+						StartMs: 1433974758447,
+					},
+				},
+			},
+		},
+		{
+			desc: "UID column provided",
+			input: []string{
+				`========================================================`,
+				`== dumpstate: 2017-03-20 15:41:07`,
+				`========================================================`,
+				`------ SYSTEM LOG (logcat -v threadtime -d *:v) ------`,
+				`--------- beginning of system`,
+				`--------- beginning of main`,
+				`03-19 03:01:21.731  root   381   390 E vold    : fs_mgr_read_fstab_dt(): failed to read fstab from dt`,
+				`03-19 03:01:21.741  1000 17606 17674 D VoldConnector: RCV <- {200 8 Command succeeded}`,
+				`03-20 07:39:33.032 10084 28160 28160 D DevicePlayback: clearOrphanedFiles`,
+				`...`,
+				`[persist.sys.timezone]: [America/Los_Angeles]`,
+			},
+			wantLogsData: LogsData{
+				Logs: map[string]*Log{
+					SystemLogSection: &Log{
+						CSV: strings.Join([]string{
+							csv.FileHeader,
+							`vold,service,1489917681731,1489917681731,fs_mgr_read_fstab_dt(): failed to read fstab from dt,`,
+							`VoldConnector,service,1489917681741,1489917681741,RCV <- {200 8 Command succeeded},`,
+							`DevicePlayback,service,1490020773032,1490020773032,clearOrphanedFiles,`,
+						}, "\n"),
+						StartMs: 1489917681731,
+					},
 				},
 			},
 		},

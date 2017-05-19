@@ -17,6 +17,7 @@
 /**
  * @fileoverview Utilities to display histogram charts for system-stats metrics.
  */
+goog.provide('historian.FloatLevel');
 goog.provide('historian.HistogramStats');
 goog.provide('historian.histogramstats');
 goog.provide('historian.histogramstats.ABData');
@@ -2333,10 +2334,10 @@ historian.histogramstats.initialize = function(stats1, stats2,
   var file2VsFile1 =
       historian.histogramstats.createABDataSeries(stats2, stats1);
   historian.histogramstats.drawABHistogram(file1VsFile2, file2VsFile1);
-  document.getElementById('ABSelector').onchange = function() {
-    var order = parseInt($('#ABSelector').val(), 10);
+  $('#ABSelector').on('change', function() {
+    var order = parseInt($(this).val(), 10);
     historian.histogramstats.refreshAB(order, file1VsFile2, file2VsFile1);
-  };
+  });
   historian.histogramstats.drawUsageHistogram(stats1, stats2);
   historian.histogramstats.drawScreenHistogram(stats1, stats2);
   historian.histogramstats.drawWakelockHistogram(stats1, stats2);

@@ -103,13 +103,20 @@
 }
 
 .rotate div.xAxis div.tickLabel {
-  transform: rotate(-90deg);
-  -ms-transform:rotate(-90deg); /* IE 9 */
-  -moz-transform:rotate(-90deg); /* Firefox */
-  -webkit-transform:rotate(-90deg); /* Safari and Chrome */
-  -o-transform:rotate(-90deg); /* Opera */
+  min-width: 130px;
+  /*
+    Align the date to the bottom of graph, regardless of text width.
+    Flot does not appear to have an option to set this.
+  */
+  text-align: right !important;
+  transform: rotate(-50deg) translate(-55px, 20px);
+  -ms-transform:rotate(-50deg) translate(-55px, 20px); /* IE 9 */
+  -moz-transform:rotate(-50deg) translate(-55px, 20px); /* Firefox */
+  -webkit-transform:rotate(-50deg) translate(-55px, 20px); /* Safari and Chrome */
+  -o-transform:rotate(-50deg) translate(-55px, 20px); /* Opera */
+  transform-origin: 0 0;
 }
 
 .shift-left div.xAxis div.tickLabel {
-   margin-left: -80px; /* Shift the labels to the left once rotated */
+   margin-left: -130px; /* Shift the labels to the left once rotated */
 }

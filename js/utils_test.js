@@ -249,6 +249,28 @@ testSuite({
           [2000, 3000, 'a'],
           [2000, 3000, 'b']
         ]
+      },
+      {
+        desc: 'Instant event at domain start time',
+        data: [
+          [2000, 2000, 'a']
+        ],
+        startTime: 2000,
+        endTime: 10000,
+        expected: [
+          [2000, 2000, 'a']
+        ]
+      },
+      {
+        desc: 'Instant event at domain end time',
+        data: [
+          [10000, 10000, 'a']
+        ],
+        startTime: 2000,
+        endTime: 10000,
+        expected: [
+          [10000, 10000, 'a']
+        ]
       }
     ];
     tests.forEach(function(t) {
@@ -307,6 +329,120 @@ testSuite({
       var expected = testUtils.createData(t.expected);
       assertArrayEquals(t.desc + ': Expected ' + expected +
           ', got ' + result, expected, result);
+    });
+  },
+  /** Tests the classifying of an event as screen on or screen off. */
+  testIsMostlyScreenOffEvent: function() {
+    var tests = [
+      {
+        desc: 'No screen on events',
+        eventToCheck: [100, 200, 1],
+        screenOnEvents: [],
+        want: true
+      },
+      {
+        desc: 'Event intersects mostly with screen on event',
+        eventToCheck: [1000, 3000, 1],
+        screenOnEvents: [
+          [400, 800],
+          [1500, 3000, true],
+          [4000, 5000, true]
+        ],
+        want: false
+      },
+      {
+        desc: 'Event intersects with start of screen on event',
+        eventToCheck: [1000, 2000, 1],
+        screenOnEvents: [
+          [400, 800],
+          [1500, 3000, true],
+          [4000, 5000, true]
+        ],
+        want: true
+      },
+      {
+        desc: 'Event intersects with end of screen on event',
+        eventToCheck: [1000, 2000, 1],
+        screenOnEvents: [
+          [0, 1500, true],
+          [2500, 3000, true]
+        ],
+        want: true
+      },
+      {
+        desc: 'Event intersects mostly with end of screen on event',
+        eventToCheck: [1000, 2000, 1],
+        screenOnEvents: [
+          [0, 1600, true],
+          [2500, 3000, true]
+        ],
+        want: false
+      },
+      {
+        desc: '40s event contains 21s screen on events',
+        eventToCheck: [10000, 50000, 1],
+        screenOnEvents: [
+          [0, 11000, true],
+          [12000, 19000, true],
+          [22000, 25000, true],
+          [40000, 50000, true]
+        ],
+        want: false
+      },
+      {
+        desc: 'Screen on event contains entire event',
+        eventToCheck: [10000, 20000, 1],
+        screenOnEvents: [
+          [0, 30000, true]
+        ],
+        want: false
+      }
+    ];
+    tests.forEach(function(t) {
+      var result = utils.isMostlyScreenOffEvent(
+          testUtils.createTestEntry(t.eventToCheck),
+          testUtils.createData(t.screenOnEvents));
+      assertEquals(t.desc, t.want, result);
+    });
+  },
+  testAvgByCategory: function() {
+    var tests = [
+      {
+        desc: 'No events',
+        events: [],
+        getCategory: function(event) { return event.duringScreenOff; },
+        want: []
+      },
+      {
+        desc: 'Multiple events',
+        events: [
+          [1000, 2000, 16, true],
+          [2000, 3000, 15, true],
+          [3000, 5000, 14, false],
+          [5000, 8000, 13, false],
+          [6000, 10000, 12, true]
+        ],
+        getCategory: function(event) { return event.duringScreenOff; },
+        want: [
+          [1000, 2000, 15.5, true],
+          [2000, 3000, 15.5, true],
+          [3000, 5000, 13.4, false],
+          [5000, 8000, 13.4, false],
+          [6000, 10000, 12, true]
+        ]
+      },
+    ];
+    tests.forEach(function(t) {
+      var arrToEvent = function(arr) {
+        var event = testUtils.createTestEntry(arr);
+        event.duringScreenOff = arr[3];
+        return event;
+      };
+      var events = t.events.map(arrToEvent);
+      var want = t.want.map(arrToEvent);
+
+      utils.avgByCategory(events, t.getCategory);
+      assertArrayEquals(t.desc, want, events);
     });
   }
 });

@@ -15,6 +15,7 @@
  */
 
 goog.provide('historian.HistorianV2');
+goog.provide('historian.HistorianV2.Timeline');
 
 goog.require('historian.BarData');
 goog.require('historian.Bars');
@@ -23,10 +24,12 @@ goog.require('historian.LevelData');
 goog.require('historian.LevelLine');
 goog.require('historian.SeriesLevel');
 goog.require('historian.color');
+goog.require('historian.historianV2Logs');
 goog.require('historian.metrics');
 goog.require('historian.metrics.Csv');
 goog.require('historian.power.Estimator');
 goog.require('historian.power.Overlay');
+goog.require('historian.utils');
 
 
 
@@ -41,12 +44,18 @@ goog.require('historian.power.Overlay');
  * @param {!jQuery} panel The panel body container of the plot. Used for
  *     calculating rendered sizes.
  * @param {!Object<boolean>} barHidden Groups hidden by default.
- * @param {!Array<string>} barOrder Order of groups rendered as bars.
+ * @param {!Array<!historian.metrics.GroupProperties>} barOrder Order of groups
+ *     rendered as bars.
+ * @param {boolean} showReportTaken Whether to render the line for when the
+ *     bug report was taken.
+ * @param {?historian.historianV2Logs.Extent} defaultXExtent Min and max unix
+ *     ms timestamps for the x-axis. If null, it will be set to fit the data.
  * @constructor
  * @struct
  */
 historian.HistorianV2 = function(container, data, levelSummaryData, state,
-    powerStatsContainer, panel, barHidden, barOrder) {
+    powerStatsContainer, panel, barHidden, barOrder, showReportTaken,
+    defaultXExtent) {
   /** @private @const {!jQuery} */
   this.panel_ = panel;
 
@@ -65,23 +74,27 @@ historian.HistorianV2 = function(container, data, levelSummaryData, state,
   /** @private {!historian.State} */
   this.state_ = state;
 
-  historian.color.generateSeriesColors(this.data_.nameToBarGroup);
+  /** @private {?number} */
+  this.overflowMs_ = data.overflowMs;
+
+  historian.color.generateSeriesColors(this.data_.barGroups);
 
   /** @private {!historian.BarData} */
   var barData = new historian.BarData(this.container_,
-      this.data_.nameToBarGroup, barHidden, barOrder, true);
+      this.data_.barGroups, barHidden, barOrder, true);
 
   /** @private {!historian.LevelData} */
   this.levelData_ = new historian.LevelData(
       this.data_.nameToLevelGroup, this.data_.defaultLevelMetric,
-      this.data_.configs, this.container_);
+      this.data_.configs, this.container_,
+      this.data_.nameToLineGroup);
 
   var config = this.levelData_.getConfig();
 
   /** @private {!historian.Context} */
   this.context_ = new historian.Context(
       this.container_,
-      { min: this.data_.extent[0], max: this.data_.extent[1] },
+      defaultXExtent || {min: 0, max: 0},
       config.yDomain,
       barData,
       this.levelData_,
@@ -90,12 +103,12 @@ historian.HistorianV2 = function(container, data, levelSummaryData, state,
       this.panel_
       );
 
-  var running = this.data_.nameToBarGroup[historian.metrics.Csv.CPU_RUNNING];
-  var powermonitor =
-      this.data_.nameToBarGroup[historian.metrics.Csv.POWERMONITOR];
+  var running = barData.getSeries(historian.metrics.Csv.CPU_RUNNING,
+      historian.historianV2Logs.Sources.BATTERY_HISTORY);
+  var powerMonitor = barData.getSeries(historian.metrics.Csv.POWER_MONITOR,
+      historian.historianV2Logs.Sources.POWER_MONITOR);
   var powerEstimator = new historian.power.Estimator(
-      running ? running.series[0].values : [],
-      powermonitor ? powermonitor.series[0].values : [],
+      running ? running.values : [], powerMonitor ? powerMonitor.values : [],
       powerStatsContainer);
 
   /** @private {!historian.Bars} */
@@ -107,7 +120,8 @@ historian.HistorianV2 = function(container, data, levelSummaryData, state,
                                   this.container_);
   /** @private {!historian.LevelLine} */
   this.levelLine_ = new historian.LevelLine(this.context_, this.levelData_,
-      this.levelSummaryData_, this.summaryData_, this.container_);
+      this.levelSummaryData_, showReportTaken, this.overflowMs_,
+      this.summaryData_, this.container_);
 
   /** @private {!historian.SeriesLevel} */
   this.seriesLevel_ = new historian.SeriesLevel(this.container_,
@@ -127,8 +141,14 @@ historian.HistorianV2 = function(container, data, levelSummaryData, state,
   this.handleResize_();
   this.handleMouse_();
   this.handleDataUpdate_();
+  this.handleDomainChange_(this.levelData_, barData, defaultXExtent);
 
-  this.levelData_.registerListener(this.onLevelSeriesChange.bind(this));
+  this.container_.find('.settings-button').on('click', function() {
+    $(this).find('.settings-overflow').toggleClass('show');
+  });
+
+  this.levelData_.registerListener(
+      this.onLevelSeriesChange.bind(this, showReportTaken));
 };
 
 
@@ -142,25 +162,64 @@ historian.HistorianV2 = function(container, data, levelSummaryData, state,
  * container: Selector of the container the timeline is rendered in. This is
  *     a descendant of the panel and tab containers (if applicable).
  * historian: Reference to the constructed HistorianV2 object.
+ * barOrder: Order for the groups to be displayed in.
+ * barHidden: Groups hidden by default.
+ * logSources: Any other events from these logs not already listed in
+ *     barOrder or barHidden will be added to the groups to display. If there
+ *     are too many groups to display, the remainder will be added to the
+ *     hidden selectable groups.
+ * logSourcesHidden: Any other events from these logs not already listed in
+ *     barOrder or barHidden will be added to the hidden selectable groups.
+ *     logSources takes precedence over logSourcesHidden.
+ * defaultLevelMetricOverride: If set, overrides the level metric displayed
+ *     by default (default is battery level or power monitor, depending on the data).
+ * defaultXExtentLogs: The names of the logs that should be used to calculate
+ *     the x-axis extent. If empty, the extent will be set to fit all the data.
+ * showReportTaken: Whether to render the line for when the report was taken.
  *
  * @typedef {{
  *   panel: string,
  *   tabSelector: (string|undefined),
  *   container: string,
- *   historian: (!historian.HistorianV2|undefined)
+ *   historian: (!historian.HistorianV2|undefined),
+ *   barOrder: !Array<!historian.metrics.GroupProperties>,
+ *   barHidden: !Array<!historian.metrics.GroupProperties>,
+ *   logSources: !Array<!historian.historianV2Logs.Sources>,
+ *   logSourcesHidden: !Array<!historian.historianV2Logs.Sources>,
+ *   defaultLevelMetricOverride: (string|undefined),
+ *   defaultXExtentLogs: !Array<!historian.historianV2Logs.Sources>,
+ *   showReportTaken: boolean
  * }}
  */
 historian.HistorianV2.Timeline;
 
 
+/** @private @const {string} */
+historian.HistorianV2.SET_DOMAIN_ = '.set-domain';
+
+
+/**
+ * Options for the domain dropdown.
+ * @enum {string}
+ */
+historian.HistorianV2.DomainOptions = {
+  DEFAULT: 'Default',  // The recommended domain.
+  FIT_SHOWN_METRICS: 'Shown metrics'
+};
+
+
 /**
  * Clears the rendered level line and replaces it with a new level line created
  * from the level data.
+ * @param {boolean} showReportTaken Whether to render the line showing when the
+ *     bug report was taken.
  */
-historian.HistorianV2.prototype.onLevelSeriesChange = function() {
+historian.HistorianV2.prototype.onLevelSeriesChange =
+    function(showReportTaken) {
   this.levelLine_.clear();
   this.levelLine_ = new historian.LevelLine(this.context_, this.levelData_,
-      this.levelSummaryData_, this.summaryData_, this.container_);
+      this.levelSummaryData_, showReportTaken, this.overflowMs_,
+      this.summaryData_, this.container_);
 };
 
 
@@ -187,8 +246,9 @@ historian.HistorianV2.prototype.handleResize_ = function() {
  * @private
  */
 historian.HistorianV2.prototype.handleDataUpdate_ = function() {
-  var updateLevelSummaries = this.levelLine_.renderLevelSummaries
-      .bind(this.levelLine_);
+  var updateLevelSummaries = function() {
+    this.levelLine_.renderLevelSummaries();
+  }.bind(this);
   // The events are triggered on the panel in historian.js, so it's used
   // instead of this.container_.
   this.panel_
@@ -199,14 +259,81 @@ historian.HistorianV2.prototype.handleDataUpdate_ = function() {
 
 
 /**
+ * Re-renders axes and data for the new domain.
+ * @param {!historian.LevelData} levelData
+ * @param {!historian.BarData} barData
+ * @param {?historian.historianV2Logs.Extent} defaultXExtent
+ * @private
+ */
+historian.HistorianV2.prototype.handleDomainChange_ =
+    function(levelData, barData, defaultXExtent) {
+  var options = [historian.HistorianV2.DomainOptions.FIT_SHOWN_METRICS];
+  // There might not be a default x-extent (e.g. for the custom timeline).
+  if (defaultXExtent) {
+    options.unshift(historian.HistorianV2.DomainOptions.DEFAULT);
+  }
+  // Allow the user to set the domain to any logs that had data.
+  var logs = Object.keys(this.data_.logToExtent).map(function(log) {
+    return {val: log, html: log + ' Log'};
+  }).sort(function(a, b) {
+    return a.val - b.val;
+  });
+  options = options.concat(logs);
+  var select = this.container_.find(historian.HistorianV2.SET_DOMAIN_);
+  historian.utils.setupDropdown(select, options);
+
+  var modifyDomain = function() {
+    var selectedLog = select.find('option:selected').val();
+    var domain = null;
+    switch (selectedLog) {
+      case historian.HistorianV2.DomainOptions.DEFAULT:
+        domain = defaultXExtent;
+        break;
+      case historian.HistorianV2.DomainOptions.FIT_SHOWN_METRICS:
+        var barDomain = barData.getVisibleDomain();
+        var levelDomain = levelData.getVisibleDomain();
+        domain = barDomain || levelDomain;
+        if (barDomain && levelDomain) {
+          domain = {
+            min: Math.min(barDomain.min, levelDomain.min),
+            max: Math.max(barDomain.max, levelDomain.max)
+          };
+        }
+        break;
+      default:
+        domain = this.data_.logToExtent[selectedLog];
+    }
+    this.context_.setDomain(domain || {min: 0, max: 0});
+    this.zoomHandler_();
+  }.bind(this);
+
+  select.on('change', modifyDomain);
+
+  // Handle if the bar or level metrics change. e.g. added a new bar metric.
+  barData.registerListener(modifyDomain);
+  levelData.registerListener(modifyDomain);
+
+  // Handle if the checkbox to show bars changes. (There is no level checkbox.)
+  this.container_.find('.show-bars').change(modifyDomain);
+};
+
+
+/**
  * Renders everything under historian.
  */
 historian.HistorianV2.prototype.render = function() {
   this.setDisplayed(true);
-  this.bars_.render();
-  this.levelLine_.render();
-  this.seriesLevel_.render();
-  this.powerOverlay_.render();
+  // This will trigger the zoomHandler which will redraw the graph.
+  this.container_.find(historian.HistorianV2.SET_DOMAIN_).trigger('change');
+};
+
+
+/**
+ * Highlights the given metrics' series labels.
+ * @param {!Array<string>} metrics Names of metrics to be highlighted.
+ */
+historian.HistorianV2.prototype.highlightMetrics = function(metrics) {
+  this.bars_.highlightMetrics(metrics);
 };
 
 

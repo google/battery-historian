@@ -35,10 +35,12 @@ import (
 	"github.com/golang/protobuf/proto"
 
 	"github.com/google/battery-historian/activity"
+	"github.com/google/battery-historian/broadcasts"
 	"github.com/google/battery-historian/bugreportutils"
 	"github.com/google/battery-historian/checkindelta"
 	"github.com/google/battery-historian/checkinparse"
 	"github.com/google/battery-historian/checkinutil"
+	"github.com/google/battery-historian/dmesg"
 	"github.com/google/battery-historian/historianutils"
 	"github.com/google/battery-historian/kernel"
 	"github.com/google/battery-historian/packageutils"
@@ -54,19 +56,28 @@ import (
 
 const (
 	// maxFileSize is the maximum file size allowed for uploaded package.
-	maxFileSize = 50 * 1024 * 1024 // 50 MB Limit
+	maxFileSize = 100 * 1024 * 1024 // 100 MB Limit
 
 	minSupportedSDK        = 21 // We only support Lollipop bug reports and above
 	numberOfFilesToCompare = 2
 
 	// Historian V2 Log sources
-	batteryHistory  = "batteryhistory"
-	eventLog        = "eventlog"
-	kernelTrace     = "kerneltrace"
-	lastLogcat      = "lastlogcat"
-	powermonitorLog = "powermonitor"
-	systemLog       = "systemlog"
-	wearableLog     = "wearable"
+	batteryHistory  = "Battery History"
+	broadcastsLog   = "Broadcasts"
+	eventLog        = "Event"
+	kernelDmesg     = "Kernel Dmesg"
+	kernelTrace     = "Kernel Trace"
+	lastLogcat      = "Last Logcat"
+	locationLog     = "Location"
+	powerMonitorLog = "Power Monitor"
+	systemLog       = "System"
+	wearableLog     = "Wearable"
+
+	// Analyzable file types.
+	bugreportFT    = "bugreport"
+	bugreport2FT   = "bugreport2"
+	kernelFT       = "kernel"
+	powerMonitorFT = "powermonitor"
 )
 
 var (
@@ -110,7 +121,7 @@ type uploadResponse struct {
 	SDKVersion          int                      `json:"sdkVersion"`
 	HistorianV2Logs     []historianV2Log         `json:"historianV2Logs"`
 	LevelSummaryCSV     string                   `json:"levelSummaryCsv"`
-	DisplayPowermonitor bool                     `json:"displayPowermonitor"`
+	DisplayPowerMonitor bool                     `json:"displayPowerMonitor"`
 	ReportVersion       int32                    `json:"reportVersion"`
 	AppStats            []presenter.AppStat      `json:"appStats"`
 	BatteryStats        *bspb.BatteryStats       `json:"batteryStats"`
@@ -121,6 +132,8 @@ type uploadResponse struct {
 	Note                string                   `json:"note"`          // A message to show to the user that they should be aware of.
 	FileName            string                   `json:"fileName"`
 	Location            string                   `json:"location"`
+	OverflowMs          int64                    `json:"overflowMs"`
+	IsDiff              bool                     `json:"isDiff"`
 }
 
 type uploadResponseCompare struct {
@@ -128,6 +141,7 @@ type uploadResponseCompare struct {
 	HTML            string                           `json:"html"`
 	UsingComparison bool                             `json:"usingComparison"`
 	CombinedCheckin presenter.CombinedCheckinSummary `json:"combinedCheckin"`
+	SystemUIDecoder activity.SystemUIDecoder         `json:"systemUiDecoder"`
 }
 
 type summariesData struct {
@@ -136,7 +150,7 @@ type summariesData struct {
 	levelSummaryCSV string
 	timeToDelta     map[string]string
 	errs            []error
-	overflow        bool
+	overflowMs      int64
 }
 
 type checkinData struct {
@@ -193,7 +207,7 @@ func (pd *ParsedData) SendAsJSON(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	// Append any parsed kernel or powermonitor CSVs to the Historian V2 CSV.
+	// Append any parsed kernel or power monitor CSVs to the Historian V2 CSV.
 	if err := pd.appendCSVs(); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -224,6 +238,7 @@ func (pd *ParsedData) SendAsJSON(w http.ResponseWriter, r *http.Request) {
 		HTML:            buf.String(),
 		UsingComparison: (len(pd.data) == numberOfFilesToCompare),
 		CombinedCheckin: merge.CombinedCheckinData,
+		SystemUIDecoder: activity.Decoder(),
 	})
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -274,9 +289,9 @@ func (pd *ParsedData) Data() []presenter.HTMLData {
 	return pd.data
 }
 
-// appendCSVs adds the parsed kernel and/or powermonitor CSVs to the HistorianV2Logs slice.
+// appendCSVs adds the parsed kernel and/or power monitor CSVs to the HistorianV2Logs slice.
 func (pd *ParsedData) appendCSVs() error {
-	// Need to append the kernel and powermonitor CSV entries to the end of the existing CSV.
+	// Need to append the kernel and power monitor CSV entries to the end of the existing CSV.
 	if pd.kd != nil {
 		if len(pd.data) == 0 {
 			return errors.New("no bug report found for the provided kernel trace file")
@@ -290,14 +305,14 @@ func (pd *ParsedData) appendCSVs() error {
 
 	if pd.md != nil {
 		if len(pd.data) == 0 {
-			return errors.New("no bug report found for the provided powermonitor file")
+			return errors.New("no bug report found for the provided power monitor file")
 		}
 		if len(pd.data) > 1 {
-			return errors.New("powermonitor file uploaded with more than one bug report")
+			return errors.New("power monitor file uploaded with more than one bug report")
 		}
-		pd.responseArr[0].DisplayPowermonitor = true
-		// Need to append the powermonitor CSV entries to the end of the existing CSV.
-		pd.responseArr[0].HistorianV2Logs = append(pd.responseArr[0].HistorianV2Logs, historianV2Log{Source: powermonitorLog, CSV: pd.md.csv})
+		pd.responseArr[0].DisplayPowerMonitor = true
+		// Need to append the power monitor CSV entries to the end of the existing CSV.
+		pd.responseArr[0].HistorianV2Logs = append(pd.responseArr[0].HistorianV2Logs, historianV2Log{Source: powerMonitorLog, CSV: pd.md.csv})
 		pd.data[0].Error += historianutils.ErrorsToString(pd.md.errs)
 	}
 	return nil
@@ -313,13 +328,13 @@ func (pd *ParsedData) parseKernelFile(fname, contents string) error {
 	return fmt.Errorf("%v: invalid kernel wakesource trace file", fname)
 }
 
-// parsePowermonitorFile processes the powermonitor file and stores the result in the ParsedData.
-func (pd *ParsedData) parsePowermonitorFile(fname, contents string) error {
+// parsePowerMonitorFile processes the power monitor file and stores the result in the ParsedData.
+func (pd *ParsedData) parsePowerMonitorFile(fname, contents string) error {
 	if valid, output, extraErrs := powermonitor.Parse(contents); valid {
 		pd.md = &csvData{output, extraErrs}
 		return nil
 	}
-	return fmt.Errorf("%v: invalid powermonitor file", fname)
+	return fmt.Errorf("%v: invalid power monitor file", fname)
 }
 
 // templatePath expands a template filename into a full resource path for that template.
@@ -345,6 +360,7 @@ func InitTemplates(dir string) {
 		"base.html",
 		"body.html",
 		"upload.html",
+		"copy.html",
 	})
 
 	// base.html is intentionally excluded from resultTempl. resultTempl is loaded into the HTML
@@ -434,9 +450,9 @@ func UploadHandler(w http.ResponseWriter, r *http.Request) {
 
 // HTTPAnalyzeHandler processes the bugreport package uploaded via an http request's multipart body.
 func HTTPAnalyzeHandler(w http.ResponseWriter, r *http.Request) {
-	// Do not accept files that are greater than 50 MBs
+	// Do not accept files that are greater than 100 MBs.
 	if r.ContentLength > maxFileSize {
-		closeConnection(w, "File too large (>50MB).")
+		closeConnection(w, "File too large (>100MB).")
 		return
 	}
 	r.Body = http.MaxBytesReader(w, r.Body, maxFileSize)
@@ -485,7 +501,7 @@ func HTTPAnalyzeHandler(w http.ResponseWriter, r *http.Request) {
 			switch part.FormName() {
 			case "bugreport", "bugreport2":
 				if bugreportutils.IsBugReport(f) {
-					// TODO: handle the case of additional kernel and powermonitor files within a single uploaded file
+					// TODO: handle the case of additional kernel and power monitor files within a single uploaded file
 					valid = true
 					contents = f
 					fname = n
@@ -534,15 +550,15 @@ func AnalyzeAndResponse(w http.ResponseWriter, r *http.Request, files map[string
 	pd.SendAsJSON(w, r)
 }
 
-// AnalyzeFiles processes and analyzes a bugreport package.
+// AnalyzeFiles processes and analyzes the list of uploaded files.
 func (pd *ParsedData) AnalyzeFiles(files map[string]UploadedFile) error {
-	fB, okB := files["bugreport"]
+	fB, okB := files[bugreportFT]
 	if !okB {
 		return errors.New("missing bugreport file")
 	}
 
 	// Parse the bugreport.
-	fB2 := files["bugreport2"]
+	fB2 := files[bugreport2FT]
 	if err := pd.parseBugReport(fB.FileName, string(fB.Contents), fB2.FileName, string(fB2.Contents)); err != nil {
 		return fmt.Errorf("error parsing bugreport: %v", err)
 	}
@@ -554,7 +570,7 @@ func (pd *ParsedData) AnalyzeFiles(files map[string]UploadedFile) error {
 		}
 		pd.bugReport = tmpFile
 	}
-	if file, ok := files["kernel"]; ok {
+	if file, ok := files[kernelFT]; ok {
 		if !kernel.IsTrace(file.Contents) {
 			return fmt.Errorf("invalid kernel trace file: %v", file.FileName)
 		}
@@ -569,10 +585,10 @@ func (pd *ParsedData) AnalyzeFiles(files map[string]UploadedFile) error {
 			pd.kernelTrace = tmpFile
 		}
 	}
-	if file, ok := files["powermonitor"]; ok {
-		// Parse the powermonitor file.
-		if err := pd.parsePowermonitorFile(file.FileName, string(file.Contents)); err != nil {
-			return fmt.Errorf("error parsing powermonitor file: %v", err)
+	if file, ok := files[powerMonitorFT]; ok {
+		// Parse the power monitor file.
+		if err := pd.parsePowerMonitorFile(file.FileName, string(file.Contents)); err != nil {
+			return fmt.Errorf("error parsing power monitor file: %v", err)
 		}
 	}
 
@@ -646,6 +662,11 @@ func (pd *ParsedData) parseBugReport(fnameA, contentsA, fnameB, contentsB string
 		ch <- activity.Parse(pkgs, contents)
 	}
 
+	doBroadcasts := func(ch chan csvData, contents string) {
+		csv, errs := broadcasts.Parse(contents)
+		ch <- csvData{csv: csv, errs: errs}
+	}
+
 	doCheckin := func(ch chan checkinData, meta *bugreportutils.MetaInfo, bs string, pkgs []*usagepb.PackageInfo) {
 		var ctr checkinutil.IntCounter
 		s := &sessionpb.Checkin{
@@ -660,6 +681,10 @@ func (pd *ParsedData) parseBugReport(fnameA, contentsA, fnameB, contentsB string
 		}
 		ch <- checkinData{stats, warnings, errs}
 		log.Printf("Trace finished processing checkin.")
+	}
+
+	doDmesg := func(ch chan dmesg.Data, contents string) {
+		ch <- dmesg.Parse(contents)
 	}
 
 	doHistorian := func(ch chan historianData, fname, contents string) {
@@ -762,6 +787,8 @@ func (pd *ParsedData) parseBugReport(fnameA, contentsA, fnameB, contentsB string
 		historianCh := make(chan historianData)
 		summariesCh := make(chan summariesData)
 		activityManagerCh := make(chan activity.LogsData)
+		broadcastsCh := make(chan csvData)
+		dmesgCh := make(chan dmesg.Data)
 		wearableCh := make(chan string)
 		var checkinL, checkinE checkinData
 		var warnings []string
@@ -806,6 +833,8 @@ func (pd *ParsedData) parseBugReport(fnameA, contentsA, fnameB, contentsB string
 			// present in unsupported sdk version reports, because the events are rendered
 			// with Historian v2, which is not generated for unsupported sdk versions.
 			go doActivity(activityManagerCh, late.contents, pkgsL)
+			go doBroadcasts(broadcastsCh, late.contents)
+			go doDmesg(dmesgCh, late.contents)
 			go doWearable(wearableCh, late.dt.Location().String(), late.contents)
 			go doSummaries(summariesCh, bsL, pkgsL)
 
@@ -833,13 +862,17 @@ func (pd *ParsedData) parseBugReport(fnameA, contentsA, fnameB, contentsB string
 
 		var summariesOutput summariesData
 		var activityManagerOutput activity.LogsData
+		var broadcastsOutput csvData
+		var dmesgOutput dmesg.Data
 		var wearableOutput string
 
 		if supV {
 			summariesOutput = <-summariesCh
 			activityManagerOutput = <-activityManagerCh
+			broadcastsOutput = <-broadcastsCh
+			dmesgOutput = <-dmesgCh
 			wearableOutput = <-wearableCh
-			errs = append(errs, append(summariesOutput.errs, activityManagerOutput.Errs...)...)
+			errs = append(errs, append(broadcastsOutput.errs, append(dmesgOutput.Errs, append(summariesOutput.errs, activityManagerOutput.Errs...)...)...)...)
 		}
 
 		warnings = append(warnings, activityManagerOutput.Warnings...)
@@ -851,7 +884,7 @@ func (pd *ParsedData) parseBugReport(fnameA, contentsA, fnameB, contentsB string
 			summariesOutput.summaries,
 			bsStats, historianOutput.html,
 			warnings,
-			errs, summariesOutput.overflow)
+			errs, summariesOutput.overflowMs > 0, true)
 
 		historianV2Logs := []historianV2Log{
 			{
@@ -861,6 +894,15 @@ func (pd *ParsedData) parseBugReport(fnameA, contentsA, fnameB, contentsB string
 			{
 				Source: wearableLog,
 				CSV:    wearableOutput,
+			},
+			{
+				Source:  kernelDmesg,
+				CSV:     dmesgOutput.CSV,
+				StartMs: dmesgOutput.StartMs,
+			},
+			{
+				Source: broadcastsLog,
+				CSV:    broadcastsOutput.csv,
 			},
 		}
 		for s, l := range activityManagerOutput.Logs {
@@ -906,6 +948,8 @@ func (pd *ParsedData) parseBugReport(fnameA, contentsA, fnameB, contentsB string
 			Note:            note,
 			FileName:        data.Filename,
 			Location:        late.dt.Location().String(),
+			OverflowMs:      summariesOutput.overflowMs,
+			IsDiff:          diff,
 		})
 		pd.data = append(pd.data, data)
 
@@ -972,7 +1016,7 @@ func analyze(bugReport string, pkgs []*usagepb.PackageInfo) summariesData {
 	}
 
 	errs = append(errs, repTotal.Errs...)
-	return summariesData{summariesTotal, bufTotal.String(), bufLevel.String(), repTotal.TimeToDelta, errs, repTotal.Overflow}
+	return summariesData{summariesTotal, bufTotal.String(), bufLevel.String(), repTotal.TimeToDelta, errs, repTotal.OverflowMs}
 }
 
 // generateHistorianPlot calls the Historian python script to generate html charts.
