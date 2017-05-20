@@ -268,7 +268,7 @@ $ go run cmd/checkin-delta/local_checkin_delta.go --input=bugreport_1.txt,bugrep
 
 ## Support
 
-- G+ Community (Discussion Thread: Battery Historian): https://plus.google.com/b/108967384991768947849/communities/114791428968349268860
+- G+ Community (Discussion Thread: Battery Historian): https://plus.google.com/communities/112943340699633396715
 
 If you've found an error in this project, please file an issue:
 <https://github.com/google/battery-historian/issues>
