@@ -26,8 +26,8 @@ For Windows:
   BIOS](<http://www.itworld.com/article/2981515/virtualization/virtualbox-diagnose-and-fix-vt-xamd-v-hardware-acceleration-errors.html>).
 
 * Once you start Docker, it should tell you the IP address of the machine it is
-using. If, for example, the IP address is 123.456.78.90, Historian will be
-available at `http://123.456.78.90:<port>`.
+using. If, for example, the IP address is 123.45.67.89, Historian will be
+available at `http://123.45.67.89:<port>`.
 
 For more information about the port forwarding, see the [Docker
 documentation](<https://docs.docker.com/engine/reference/run/#/expose-incoming-ports>).
