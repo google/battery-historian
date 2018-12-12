@@ -1,0 +1,24 @@
+name: battery-historian
+version: '1.0'
+summary: Battery Historian is a tool to analyze battery consumers
+description: |
+  Battery Historian is a tool to analyze battery consumers using Android bugreport files.
+grade: stable
+confinement: strict
+base: core18
+parts:
+  battery-historian:
+    plugin: go
+    source: https://github.com/google/battery-historian.git
+    go-importpath: github.com/google/battery-historian
+    build-packages:
+      - build-essential
+apps:
+  battery-historian:
+    command: bin/battery-historian
+    daemon: simple
+    restart-condition: on-abnormal
+    plugs:
+      - home
+      - network
+      - network-bind
