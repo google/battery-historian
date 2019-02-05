@@ -42,7 +42,7 @@ import (
 // Otherwise, this function returns (input[len(output):], nil).
 func Consume(input []string, output ...interface{}) (remaining []string, err error) {
 	if len(input) < len(output) {
-		return nil, fmt.Errorf("Input of size %d for %d outputs", len(input), len(output))
+		return nil, fmt.Errorf("input of size %d for %d outputs", len(input), len(output))
 	}
 	for i, outI := range output {
 		if outI == nil {
@@ -78,7 +78,7 @@ func Consume(input []string, output ...interface{}) (remaining []string, err err
 				*out = n
 			}
 		default:
-			return nil, fmt.Errorf("Unsupported output type: %T", out)
+			return nil, fmt.Errorf("unsupported output type: %T", out)
 		}
 	}
 	return input[len(output):], nil
