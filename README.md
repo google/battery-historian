@@ -12,7 +12,7 @@ Run the Battery Historian image. Choose a port number and replace `<port>` with
 that number in the commands below:
 
 ```
-docker -- run -p <port>:9999 gcr.io/android-battery-historian/stable:3.0 --port 9999
+docker run -p <port>:9999 gcr.io/android-battery-historian/stable:3.0 --port 9999
 ```
 
 For Linux and Mac OS X:
